@@ -1,0 +1,5 @@
+durante el TTS cuando la opción correspondiente está activa.\n\n"""+old)
+rd=readme.read_text()
+if '## 0.10.0' not in rd: rd += "\n\n## 0.10.0\n\nIncluye Eventos de TikTok LIVE, Spotify persistente y la sección Sobre Lulu.\n"
+readme.write_text(rd)
+print('patched')
