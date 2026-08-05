@@ -1,0 +1,140 @@
+name: Publicar Lulu Finity 0.11.0
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/release-v011.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Reconstruir y validar 0.11.0
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.10.0/Lulu-Finity-Source-0.10.0.zip" -OutFile base.zip
+          $baseHash = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
+          if ($baseHash -ne "ff2f9947dea8f888765d2b979bb91e0fef7ac95739b944969eb296024ffd8da4") { throw "Base 0.10.0 incorrecta: $baseHash" }
+          Expand-Archive base.zip -DestinationPath app -Force
+
+          $parts = Get-ChildItem "build-v011/scriptgz/part-*.txt" | Sort-Object Name
+          if ($parts.Count -ne 2) { throw "Se esperaban 2 fragmentos del script." }
+          $script64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
+          [IO.File]::WriteAllBytes("apply-v011.py.gz", [Convert]::FromBase64String($script64))
+          $gzipHash = (Get-FileHash apply-v011.py.gz -Algorithm SHA256).Hash.ToLower()
+          if ($gzipHash -ne "081b147b1f0449980b6ef0e421c61340114da7492f9b13c8ae5a1fadcca22b62") { throw "Script comprimido incorrecto: $gzipHash" }
+
+          python -c "import gzip,pathlib; pathlib.Path('apply-v011.py').write_bytes(gzip.decompress(pathlib.Path('apply-v011.py.gz').read_bytes()))"
+          $scriptHash = (Get-FileHash apply-v011.py -Algorithm SHA256).Hash.ToLower()
+          if ($scriptHash -ne "b7ba553a5cced1afbb460b56999cc0ef75afb940f791e07c661ada902690d5a7") { throw "Script incorrecto: $scriptHash" }
+
+          python -X utf8 apply-v011.py app
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo aplicar la actualización 0.11.0." }
+
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+
+          $package = Get-Content app/package.json -Raw | ConvertFrom-Json
+          if ($package.version -ne "0.11.0") { throw "Versión inesperada: $($package.version)" }
+          if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita administrador." }
+
+          $main = Get-Content app/src/main.js -Raw
+          $renderer = Get-Content app/src/renderer.js -Raw
+          $html = Get-Content app/src/index.html -Raw
+          foreach ($token in @("installUpdateWhenDownloaded","ttsPermissionMode","allowedTtsUsers","userVoiceRules","musicProvider")) {
+            if (!$main.Contains($token)) { throw "Falta $token en main.js" }
+          }
+          foreach ($token in @("enqueueRequestedMusic","voiceForMessage","minimumTtsMemberLevelInput","customVoiceRulesList","musicProvider")) {
+            if (!$renderer.Contains($token) -and !$html.Contains($token)) { throw "Falta $token en la interfaz" }
+          }
+          if ($main.Contains("id: 'spotify'") -or $html.Contains('value="spotify">Pedir en Spotify')) {
+            throw "Todavía existe el comando separado de Spotify."
+          }
+
+          New-Item -ItemType Directory source-v011 -Force | Out-Null
+          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) {
+            if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v011/$file" -Force }
+          }
+          foreach ($folder in @("src","build",".github")) {
+            if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v011/$folder" -Recurse -Force }
+          }
+          Compress-Archive -Path "source-v011/*" -DestinationPath "Lulu-Finity-Source-0.11.0.zip" -Force
+
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm install --no-audit --no-fund
+
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run build:win -- --publish never
+
+      - name: Verificar y analizar
+        shell: pwsh
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.11.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.11.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.11.0.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.11.0.zip")) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          if ((Get-Item $installer).Length -lt 50000000 -or (Get-Item $zip).Length -lt 50000000) { throw "Paquete incompleto." }
+          try {
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $installer) -ErrorAction Stop
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $zip) -ErrorAction Stop
+            $recent = Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -gt (Get-Date).AddMinutes(-15) }
+            if ($recent) { throw "Microsoft Defender reportó una detección." }
+          } catch {
+            if ($_.Exception.Message -like '*reportó una detección*') { throw }
+            Write-Warning $_.Exception.Message
+          }
+
+      - name: Publicar Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v0.11.0"
+          $files = @(
+            "app/dist/Lulu-Finity-Setup-0.11.0.exe",
+            "app/dist/Lulu-Finity-0.11.0-x64.zip",
+            "app/dist/latest.yml",
+            "app/dist/Lulu-Finity-Setup-0.11.0.exe.blockmap",
+            "Lulu-Finity-Source-0.11.0.zip"
+          )
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $files --clobber
+            gh release edit $tag --title "Lulu Finity 0.11.0" --notes-file "app/CHANGELOG.md"
+          } else {
+            gh release create $tag $files --target main --title "Lulu Finity 0.11.0" --notes-file "app/CHANGELOG.md"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.11.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.11.0.exe
+            app/dist/Lulu-Finity-0.11.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.11.0.exe.blockmap
+            Lulu-Finity-Source-0.11.0.zip
+          if-no-files-found: error
+          retention-days: 30
