@@ -43,7 +43,7 @@ jobs:
           $image64 = ($images | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
           [IO.File]::WriteAllBytes("app/src/lulu-about.webp", [Convert]::FromBase64String($image64))
           $imageHash = (Get-FileHash "app/src/lulu-about.webp" -Algorithm SHA256).Hash.ToLower()
-          if ($imageHash -ne "7e1910864bcdbfaaf2353ae2b382952ba3fe72a44f9b9dc8ab445ad2b4836abf") { throw "Imagen incorrecta: $imageHash" }
+          if ($imageHash -ne "b6e32cbae322d502b5265dc39365d717eb834d639fc2d0e32704f8659ce5acae") { throw "Imagen incorrecta: $imageHash" }
 
           python apply-v010.py app
           node --check app/src/main.js
