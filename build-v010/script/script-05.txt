@@ -1,0 +1,57 @@
+span>${i+1}</span><div><strong>${escapeHtml(x.query)}</strong><small>${escapeHtml(x.requestedBy)}</small></div><button class="remove-spotify" data-id="${escapeHtml(x.id)}">×</button></div>`).join(''):'<div class="empty-state small"><span>Cola vacía</span></div>';
+  qsa('.remove-spotify').forEach(b=>b.onclick=()=>{state.spotifyQueue=state.spotifyQueue.filter(x=>x.id!==b.dataset.id);renderSpotify();});
+  $('spotifyVolumeOutput').textContent=`${Math.round((state.settings.spotifyVolume??.8)*100)}%`;
+}
+
+'''
+if ui_marker not in r: raise SystemExit('renderer marker missing')
+r=r.replace(ui_marker, ui_code+ui_marker)
+# normalized command actions
+r=r.replace("['response', 'tts', 'song', 'skip'].includes(command.action)", "['response', 'tts', 'song', 'skip', 'spotify'].includes(command.action)")
+r=r.replace("  skip: 'Saltar canción'", "  skip: 'Saltar canción',\n  spotify: 'Pedir en Spotify'")
+# handle command spotify before tts branch
+handle_marker="  if (command.action === 'tts') {"
+handle_code=r'''  if (command.action === 'spotify') {
+    if (!remainder) { updateCommentResult(message.id, 'blocked', 'falta la canción'); return true; }
+    if (!hasAudienceAccess(message, state.settings.musicPermissionMode || 'all')) { updateCommentResult(message.id, 'blocked', 'sin permiso para música'); return true; }
+    const added = enqueueSpotify(remainder, message.nickname);
+    updateCommentResult(message.id, added ? 'song' : 'skipped', added ? '' : 'no agregada');
+    return true;
+  }
+
+'''
+if handle_marker not in r: raise SystemExit('handle marker missing')
+r=r.replace(handle_marker, handle_code+handle_marker)
+# TTS mute Spotify too
+r=r.replace("if (state.settings.youtubeMuteDuringTts) api.muteYouTube(false).catch(() => {});", "if (state.settings.youtubeMuteDuringTts) { api.muteYouTube(false).catch(() => {}); api.muteSpotify(false).catch(() => {}); }")
+r=r.replace("if (state.settings.youtubeMuteDuringTts) api.muteYouTube(true).catch(() => {});", "if (state.settings.youtubeMuteDuringTts) { api.muteYouTube(true).catch(() => {}); api.muteSpotify(true).catch(() => {}); }")
+# sync outputs and populate settings inserts
+r=r.replace("  if ($('youtubeVolumeOutput')) $('youtubeVolumeOutput').textContent = `${Math.round(volume * 100)}%`;", "  if ($('youtubeVolumeOutput')) $('youtubeVolumeOutput').textContent = `${Math.round(volume * 100)}%`;\n  if ($('spotifyVolumeOutput')) $('spotifyVolumeOutput').textContent = `${Math.round(clamp(state.settings.spotifyVolume ?? 0.8,0,1)*100)}%`;")
+r=r.replace("  $('checkUpdatesOnStartupInput').checked = settings.checkUpdatesOnStartup !== false;", "  $('checkUpdatesOnStartupInput').checked = settings.checkUpdatesOnStartup !== false;\n  for (const key of ['eventTtsEnabled','eventGiftEnabled','eventFollowEnabled','eventLikeEnabled','eventShareEnabled','eventMemberEnabled','eventSubscribeEnabled']) { const el=$(key+'Input'); if(el) el.checked=settings[key]!==false; }\n  if ($('spotifyVolumeInput')) $('spotifyVolumeInput').value=settings.spotifyVolume??0.8;\n  if ($('spotifyRecommendedInput')) $('spotifyRecommendedInput').checked=settings.spotifyContinueRecommended!==false;")
+# setupEvents insert before updates handlers
+setup_marker="  $('checkUpdatesBtn').addEventListener('click', async () => {"
+setup_code=r'''  $('clearEventsBtn')?.addEventListener('click',()=>{state.liveEvents=[];renderLiveEvents();});
+  for (const key of ['eventTtsEnabled','eventGiftEnabled','eventFollowEnabled','eventLikeEnabled','eventShareEnabled','eventMemberEnabled','eventSubscribeEnabled']) {
+    $(key+'Input')?.addEventListener('change',()=>{state.settings[key]=$(key+'Input').checked;scheduleSave();});
+  }
+  $('copyDiscordBtn')?.addEventListener('click',async()=>{try{await navigator.clipboard.writeText('Luluvcupidx');toast('Usuario copiado','Luluvcupidx','success');}catch{toast('Discord','Luluvcupidx','info');}});
+  const addSpotify=()=>{const input=$('spotifyQueryInput');if(enqueueSpotify(input.value,'Manual'))input.value='';};
+  $('addSpotifyBtn')?.addEventListener('click',addSpotify);
+  $('spotifyQueryInput')?.addEventListener('keydown',e=>{if(e.key==='Enter')addSpotify();});
+  $('showSpotifyBtn')?.addEventListener('click',()=>api.showSpotify().catch(e=>toast('No se pudo mostrar Spotify',e.message,'error')));
+  $('spotifyPlayPauseBtn')?.addEventListener('click',()=>api.controlSpotify('toggle').catch(()=>{}));
+  $('spotifyNextBtn')?.addEventListener('click',()=>{if(state.spotifyQueue.length)finishSpotify();else api.controlSpotify('next').catch(()=>{});});
+  $('spotifyPreviousBtn')?.addEventListener('click',()=>api.controlSpotify('previous').catch(()=>{}));
+  $('spotifyExternalBtn')?.addEventListener('click',()=>api.openSpotifyExternal({query:state.spotifyPlayer.url||state.currentSpotify?.query||''}).catch(()=>{}));
+  $('clearSpotifyQueueBtn')?.addEventListener('click',()=>{state.spotifyQueue=[];renderSpotify();});
+  $('spotifyVolumeInput')?.addEventListener('input',()=>{state.settings.spotifyVolume=clamp($('spotifyVolumeInput').value,0,1);syncOutputs();scheduleSave();api.setSpotifyVolume(state.settings.spotifyVolume).catch(()=>{});});
+  $('spotifyRecommendedInput')?.addEventListener('change',()=>{state.settings.spotifyContinueRecommended=$('spotifyRecommendedInput').checked;scheduleSave();});
+
+'''
+if setup_marker not in r: raise SystemExit('setup marker missing')
+r=r.replace(setup_marker, setup_code+setup_marker)
+# subscriptions before onUpdateStatus
+sub_marker="  api.onUpdateStatus((payload) => renderUpdateStatus(payload));"
+sub_code=r'''  api.onLiveEvent((payload)=>processLiveEvent(payload));
+  api.onSpotifyStatus((payload)=>{state.spotifyOpen=Boolean(payload?.open);state.spotifyVisible=Boolean(payload?.visible);state.spotifyMuted=Boolean(payload?.muted);renderSpotify();});
+  api.onSpotifySelected((payload)=>{if(!state.currentSpotify)return;state.currentSpotify.title=payload?.title||state.currentSpotify.query;state.currentSpotify.artist=payload?.artist||'';state.currentSpotify.url=payload?.url||'';state.
