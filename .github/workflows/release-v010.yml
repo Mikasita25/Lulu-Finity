@@ -45,7 +45,8 @@ jobs:
           $imageHash = (Get-FileHash "app/src/lulu-about.webp" -Algorithm SHA256).Hash.ToLower()
           if ($imageHash -ne "b6e32cbae322d502b5265dc39365d717eb834d639fc2d0e32704f8659ce5acae") { throw "Imagen incorrecta: $imageHash" }
 
-          python apply-v010.py app
+          python -X utf8 apply-v010.py app
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo aplicar la actualización 0.10.0." }
           node --check app/src/main.js
           node --check app/src/preload.js
           node --check app/src/renderer.js
