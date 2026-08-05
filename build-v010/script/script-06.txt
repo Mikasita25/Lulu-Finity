@@ -1,0 +1,33 @@
+spotifyPlayer={...state.spotifyPlayer,title:state.currentSpotify.title,artist:state.currentSpotify.artist,url:state.currentSpotify.url};renderSpotify();});
+  api.onSpotifyPlayer((payload)=>{state.spotifyPlayer={...state.spotifyPlayer,...payload};renderSpotify();});
+  api.onSpotifyEnded(()=>{if(state.spotifyQueue.length)finishSpotify();else if(state.settings.spotifyContinueRecommended!==false) renderSpotify();});
+  api.onSpotifyUnavailable((payload)=>{toast('Spotify',payload?.message||'No se encontró una canción.','error');finishSpotify();});
+  api.onSpotifyError((payload)=>toast('Error de Spotify',payload?.message||'No se pudo cargar Spotify.','error'));
+'''
+if sub_marker not in r: raise SystemExit('subscription marker missing')
+r=r.replace(sub_marker, sub_code+sub_marker)
+# stats merge not overwrite viewer on like stats
+r=r.replace("api.onStats((payload) => { state.viewerCount = Number(payload?.viewerCount || 0); renderStats(); });", "api.onStats((payload) => { if(payload?.viewerCount!==undefined) state.viewerCount=Number(payload.viewerCount||0); if(payload?.totalLikeCount!==undefined) state.eventCounters.likes=Math.max(state.eventCounters.likes,Number(payload.totalLikeCount||0)); renderStats(); renderLiveEvents(); });")
+# init call ensure before navigation and initialize arrays/default command
+r=r.replace("async function init() {\n  setupNavigation();", "async function init() {\n  ensureV010Ui();\n  setupNavigation();")
+r=r.replace("  state.settings.customCommands = normalizedCommands();", "  state.settings.customCommands = normalizedCommands();\n  if (!state.settings.customCommands.some(c=>c.action==='spotify')) state.settings.customCommands.push({id:'spotify',trigger:'!spotify',action:'spotify',response:'',permission:'music',enabled:true});")
+r=r.replace("  renderPermissions();", "  renderPermissions();\n  renderLiveEvents();\n  renderSpotify();",1)
+r=r.replace("  api.setYouTubeVolume(state.settings.youtubeVolume ?? 0.8).catch(() => {});", "  api.setYouTubeVolume(state.settings.youtubeVolume ?? 0.8).catch(() => {});\n  api.setSpotifyVolume(state.settings.spotifyVolume ?? 0.8).catch(() => {});")
+ren.write_text(r)
+
+# index modal option for spotify and update static version
+h=html.read_text().replace('v0.9.0','v0.10.0')
+h=h.replace('<option value="skip">Saltar canción</option>', '<option value="skip">Saltar canción</option><option value="spotify">Pedir en Spotify</option>')
+html.write_text(h)
+
+# CSS append
+c=css.read_text()+r'''
+
+/* Lulu Finity 0.10.0 */
+.event-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}.events-layout,.spotify-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.75fr);gap:16px}.events-feed-card{min-height:520px}.live-events-list{display:flex;flex-direction:column;gap:9px;max-height:590px;overflow:auto;padding-right:4px}.live-event-row{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:12px;padding:12px;border:1px solid rgba(255,255,255,.09);border-radius:calc(var(--corner-radius) * .75);background:rgba(255,255,255,.035)}.live-event-row .event-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#ff77b4,#9f65d4);font-size:20px}.live-event-row div{display:flex;flex-direction:column;gap:3px}.live-event-row small,.live-event-row time{color:var(--muted);font-size:12px}.event-settings-card .visibility-option{margin-top:10px}.spotify-player-card{min-height:470px}.spotify-now{display:flex;gap:16px;align-items:center;margin:16px 0 24px}.spotify-cover{width:84px;height:84px;border-radius:18px;display:grid;place-items:center;font-size:38px;background:linear-gradient(135deg,#1ed760,#0b7b36);box-shadow:0 16px 40px rgba(30,215,96,.22)}.spotify-now>div:last-child{display:flex;flex-direction:column;gap:6px}.spotify-now small{letter-spacing:.13em;color:#68e994}.spotify-now strong{font-size:22px}.spotify-now span{color:var(--muted)}.spotify-queue-list{display:flex;flex-direction:column;gap:8px;margin-top:16px;max-height:390px;overflow:auto}.spotify-queue-row{display:grid;grid-template-columns:24px 1fr 32px;gap:10px;align-items:center;padding:11px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}.spotify-queue-row div{display:flex;flex-direction:column;gap:3px}.spotify-queue-row small{color:var(--muted)}.spotify-queue-row button{border:0;background:transparent;color:var(--muted);font-size:20px}.about-lulu-card{display:grid;grid-template-columns:minmax(320px,.85fr) minmax(360px,1.15fr);gap:34px;align-items:center;padding:28px;min-height:620px;overflow:hidden}.about-lulu-image{width:100%;max-height:570px;object-fit:cover;border-radius:calc(var(--corner-radius) * 1.2);box-shadow:0 24px 70px rgba(255,100,160,.23)}.about-lulu-copy{max-width:620px}.about-kicker{color:#ff85bd;font-weight:800;letter-spacing:.18em;font-size:12px}.about-lulu-copy h2{font-size:36px;margin:12px 0 20px}.about-lulu-copy p{font-size:18px;line-height:1.75;color:var(--muted);margin:0 0 18px}.about-lulu-copy strong{color:#ff96c6}.about-lulu-copy button{margin-top:12px}@media(max-width:1050px){.event-stats-grid{grid-template-columns:repeat(2,1fr)}.events-layout,.spotify-layout,.about-lulu-card{grid-template-columns:1fr}.about-lulu-image{max-height:430px}}
+'''
+css.write_text(c)
+
+# changelog/readme
+old=changelog.read_text()
+changelog.write_text("""# Cambios\n\n## 0.10.0\n\n- Detección de regalos/donaciones, seguidores, likes, compartidos, usuarios que entran y suscripciones de TikTok LIVE.\n- Contadores y actividad reciente en una categoría independiente de Eventos.\n- Avisos opcionales mediante TTS para cada tipo de evento.\n- Sección Sobre Lulu con presentación, contacto de Discord e imagen proporcionada por Lulu.\n- Spotify en una sesión persistente con búsqueda automática, cola, controles, volumen y reproducción continua.\n- Comando `!spotify` incluido y sujeto a los mismos permisos de música.\n- YouTube y Spotify se silencian 
