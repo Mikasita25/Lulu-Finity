@@ -1,0 +1,159 @@
+name: Publicar Lulu Finity 0.8.0
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "build-v8/delta/**"
+      - ".github/workflows/release-v8.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir base 0.7.0
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem "source-parts/part-*.txt" | Sort-Object Name
+          if ($parts.Count -ne 19) {
+            throw "Se esperaban 19 fragmentos de la base y se encontraron $($parts.Count)."
+          }
+          $encoded = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
+          [IO.File]::WriteAllBytes("Lulu-Finity-Source-0.7.0.zip", [Convert]::FromBase64String($encoded))
+          $hash = (Get-FileHash "Lulu-Finity-Source-0.7.0.zip" -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne "0a9cdd7356ba035daf52d5b7b0422aa030385762c0f9f90e190ce1a5e301ccf5") {
+            throw "El hash de la base 0.7.0 no coincide: $hash"
+          }
+          Expand-Archive "Lulu-Finity-Source-0.7.0.zip" -DestinationPath "app" -Force
+
+      - name: Aplicar cambios 0.8.0
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem "build-v8/delta/part-*.txt" | Sort-Object Name
+          if ($parts.Count -ne 6) {
+            throw "Se esperaban 6 fragmentos de la actualización y se encontraron $($parts.Count)."
+          }
+          $encoded = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
+          [IO.File]::WriteAllBytes("Lulu-Finity-Delta-0.8.0.zip", [Convert]::FromBase64String($encoded))
+          $hash = (Get-FileHash "Lulu-Finity-Delta-0.8.0.zip" -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne "feb1d7b2c6086bfb5b868624481c273e713ecbc45fd9fcdc3438b33dfb2a203e") {
+            throw "El hash de los cambios 0.8.0 no coincide: $hash"
+          }
+          Expand-Archive "Lulu-Finity-Delta-0.8.0.zip" -DestinationPath "app" -Force
+          Write-Host "Lulu Finity 0.8.0 reconstruida correctamente."
+
+      - name: Validar aplicación y funciones nuevas
+        shell: pwsh
+        working-directory: app
+        run: |
+          node --check src/main.js
+          node --check src/preload.js
+          node --check src/renderer.js
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          if ($package.version -ne "0.8.0") { throw "Versión inesperada: $($package.version)" }
+          if ($package.build.productName -ne "Lulu Finity") { throw "Nombre de producto incorrecto." }
+          if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita elevación." }
+          if ($package.build.nsis.perMachine -ne $false -or $package.build.nsis.allowElevation -ne $false) {
+            throw "El instalador no está configurado por usuario."
+          }
+          if (!(Test-Path "src/mascot.webp")) { throw "Falta la mascota de la interfaz." }
+          $main = Get-Content src/main.js -Raw
+          $renderer = Get-Content src/renderer.js -Raw
+          $html = Get-Content src/index.html -Raw
+          foreach ($required in @("continueRecommended", "musicPermissionMode", "customCommands", "allowedMusicUsers")) {
+            if (!$main.Contains($required) -and !$renderer.Contains($required)) { throw "Falta la función $required" }
+          }
+          foreach ($requiredId in @("page-commands", "page-permissions", "commandsList", "allowedUsersList", "continueRecommendedInput")) {
+            if (!$html.Contains("id=`"$requiredId`"")) { throw "Falta el control $requiredId" }
+          }
+
+      - name: Preparar código fuente
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "source-v8" -Force | Out-Null
+          foreach ($file in @("package.json", "NOTICE.md", "README.md", "CHANGELOG.md", ".gitignore")) {
+            if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v8/$file" -Force }
+          }
+          foreach ($folder in @("src", "build", ".github")) {
+            if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v8/$folder" -Recurse -Force }
+          }
+          Compress-Archive -Path "source-v8/*" -DestinationPath "Lulu-Finity-Source-0.8.0.zip" -Force
+
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm install --no-audit --no-fund
+
+      - name: Compilar instalador, ZIP y actualizador
+        working-directory: app
+        run: npm run build:win -- --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Verificar archivos y analizar con Defender
+        shell: pwsh
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.8.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.8.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          foreach ($file in @($installer, $zip, $latest, "Lulu-Finity-Source-0.8.0.zip")) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          if ((Get-Item $installer).Length -lt 50000000) { throw "El instalador parece incompleto." }
+          if ((Get-Item $zip).Length -lt 50000000) { throw "El ZIP parece incompleto." }
+          try {
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $installer) -ErrorAction Stop
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $zip) -ErrorAction Stop
+            $recent = Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -gt (Get-Date).AddMinutes(-15) }
+            if ($recent) { throw "Microsoft Defender reportó una detección." }
+            Write-Host "Microsoft Defender no reportó detecciones."
+          } catch {
+            if ($_.Exception.Message -like '*reportó una detección*') { throw }
+            Write-Warning "Defender no pudo ejecutarse: $($_.Exception.Message)"
+          }
+
+      - name: Publicar Release v0.8.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "v0.8.0"
+          $files = @(
+            "app/dist/Lulu-Finity-Setup-0.8.0.exe",
+            "app/dist/Lulu-Finity-0.8.0-x64.zip",
+            "app/dist/latest.yml",
+            "app/dist/Lulu-Finity-Setup-0.8.0.exe.blockmap",
+            "Lulu-Finity-Source-0.8.0.zip"
+          ) | Where-Object { Test-Path $_ }
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $files --clobber
+            gh release edit $tag --title "Lulu Finity 0.8.0" --notes-file "app/CHANGELOG.md"
+          } else {
+            gh release create $tag $files --target main --title "Lulu Finity 0.8.0" --notes-file "app/CHANGELOG.md"
+          }
+
+      - name: Subir artefacto de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.8.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.8.0.exe
+            app/dist/Lulu-Finity-0.8.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.8.0.exe.blockmap
+            Lulu-Finity-Source-0.8.0.zip
+          if-no-files-found: error
+          retention-days: 30
