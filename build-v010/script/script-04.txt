@@ -1,0 +1,79 @@
+dica al desarrollo de add-ons para Minecraft Bedrock y tiene los principios para crear aplicaciones.</p><p>Si gustas contactarme para algún proyecto, mi usuario de Discord es <strong>Luluvcupidx</strong>.</p><button class="secondary" id="copyDiscordBtn">Copiar usuario de Discord</button></div></article>
+    </section>`);
+}
+
+function formatEvent(event) {
+  const name = event.nickname || event.uniqueId || 'Alguien';
+  if (event.type === 'gift') return { icon: '🎁', title: `${name} envió ${event.giftName || 'un regalo'}`, detail: `×${event.repeatCount || 1}${event.diamonds ? ` · ${event.diamonds} diamantes` : ''}` };
+  if (event.type === 'follow') return { icon: '♡', title: `${name} empezó a seguirte`, detail: 'Nuevo seguidor' };
+  if (event.type === 'like') return { icon: '♥', title: `${name} envió ${event.count || 0} likes`, detail: event.total ? `${event.total} likes totales` : 'Likes recibidos' };
+  if (event.type === 'share') return { icon: '↗', title: `${name} compartió el LIVE`, detail: 'Compartido' };
+  if (event.type === 'subscribe') return { icon: '★', title: `${name} se suscribió`, detail: 'Nueva suscripción' };
+  return { icon: '●', title: `${name} entró al LIVE`, detail: event.memberCount ? `${event.memberCount} espectadores` : 'Nuevo espectador' };
+}
+
+function eventSettingEnabled(type) {
+  const key = { gift:'eventGiftEnabled', follow:'eventFollowEnabled', like:'eventLikeEnabled', share:'eventShareEnabled', member:'eventMemberEnabled', subscribe:'eventSubscribeEnabled' }[type];
+  return key ? state.settings[key] !== false : true;
+}
+
+function renderLiveEvents() {
+  const target = $('liveEventsList');
+  if (!target) return;
+  $('eventGiftCount').textContent = state.eventCounters.gift.toLocaleString('es-MX');
+  $('eventDiamondCount').textContent = `${state.eventCounters.diamonds.toLocaleString('es-MX')} diamantes`;
+  $('eventFollowCount').textContent = state.eventCounters.follow.toLocaleString('es-MX');
+  $('eventLikeCount').textContent = state.eventCounters.likes.toLocaleString('es-MX');
+  $('eventShareCount').textContent = state.eventCounters.share.toLocaleString('es-MX');
+  target.innerHTML = state.liveEvents.length ? state.liveEvents.map((event) => {
+    const info = formatEvent(event);
+    return `<div class="live-event-row"><span class="event-icon">${info.icon}</span><div><strong>${escapeHtml(info.title)}</strong><small>${escapeHtml(info.detail)}</small></div><time>${new Date(event.timestamp).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</time></div>`;
+  }).join('') : '<div class="empty-state"><div>✧</div><strong>Esperando eventos</strong><span>La actividad del LIVE aparecerá aquí.</span></div>';
+}
+
+function processLiveEvent(event) {
+  if (!eventSettingEnabled(event.type)) return;
+  state.liveEvents.unshift(event);
+  if (state.liveEvents.length > 150) state.liveEvents.length = 150;
+  if (event.type === 'gift') { state.eventCounters.gift += 1; state.eventCounters.diamonds += Number(event.diamonds || 0); }
+  if (event.type === 'follow') state.eventCounters.follow += 1;
+  if (event.type === 'like') state.eventCounters.likes += Number(event.count || 0);
+  if (event.type === 'share') state.eventCounters.share += 1;
+  if (event.type === 'member') state.eventCounters.member += 1;
+  if (event.type === 'subscribe') state.eventCounters.subscribe += 1;
+  renderLiveEvents();
+  const info = formatEvent(event);
+  toast(info.title, info.detail, event.type === 'gift' || event.type === 'subscribe' ? 'success' : 'info');
+  if (state.settings.eventTtsEnabled) speakText(info.title);
+}
+
+function spotifyIdentity(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/open\.spotify\.com\/track\/([A-Za-z0-9]+)/i);
+  return match ? `spotify:${match[1]}` : normalizeText(text).replace(/[^a-z0-9]+/g,' ').trim();
+}
+function enqueueSpotify(query, requestedBy='Manual') {
+  query=String(query||'').trim(); if(!query) return false;
+  const identity=spotifyIdentity(query);
+  if ([state.currentSpotify,...state.spotifyQueue].filter(Boolean).some(x=>spotifyIdentity(x.url||x.title||x.query)===identity)) { toast('Spotify duplicado','Ya está sonando o en la cola.','error'); return false; }
+  if (state.spotifyQueue.length >= Math.max(1,Number(state.settings.songQueueLimit)||10)) { toast('Cola de Spotify llena','','error'); return false; }
+  state.spotifyQueue.push({id:`sp-${Date.now()}-${Math.random()}`,query,requestedBy}); renderSpotify();
+  if(!state.currentSpotify&&!state.spotifyTransitioning) playNextSpotify(); return true;
+}
+async function playNextSpotify(){
+  if(state.spotifyTransitioning)return; state.spotifyTransitioning=true;
+  if(!state.spotifyQueue.length){state.currentSpotify=null;state.spotifyTransitioning=false;renderSpotify();return;}
+  state.currentSpotify=state.spotifyQueue.shift();renderSpotify();
+  try{await api.openSpotify({query:state.currentSpotify.query});toast('Buscando en Spotify',state.currentSpotify.query,'success');}
+  catch(e){toast('No se pudo abrir Spotify',e.message||String(e),'error');}
+  finally{state.spotifyTransitioning=false;}
+}
+function finishSpotify(){state.currentSpotify=null;state.spotifyPlayer={...state.spotifyPlayer,currentTime:0,duration:0,paused:true};renderSpotify();if(state.spotifyQueue.length)playNextSpotify();}
+function renderSpotify(){
+  if(!$('spotifyCurrentTitle'))return;
+  const p=state.spotifyPlayer; $('spotifyCurrentTitle').textContent=p.title||state.currentSpotify?.title||state.currentSpotify?.query||'Sin música';
+  $('spotifyCurrentArtist').textContent=p.artist||state.currentSpotify?.requestedBy||'Abre Spotify e inicia sesión una vez.';
+  $('spotifyCurrentTime').textContent=formatClock(p.currentTime); $('spotifyDuration').textContent=formatClock(p.duration);
+  $('spotifyProgress').value=p.duration?Math.min(100,p.currentTime/p.duration*100):0;
+  $('spotifyPlayPauseBtn').textContent=p.paused?'▶':'Ⅱ';
+  $('spotifyQueueList').innerHTML=state.spotifyQueue.length?state.spotifyQueue.map((x,i)=>`<div class="spotify-queue-row"><
