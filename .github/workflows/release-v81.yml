@@ -1,10 +1,10 @@
-name: Publicar Lulu Finity 0.8.1
+name: Publicar Lulu Finity 0.9.0
 
 on:
   push:
     branches: [main]
     paths:
-      - "build-v81/delta/**"
+      - "build-v9/**"
       - ".github/workflows/release-v81.yml"
   workflow_dispatch:
 
@@ -24,67 +24,37 @@ jobs:
         with:
           node-version: 22
 
-      - name: Descargar base oficial 0.8.0
-        shell: pwsh
-        run: |
-          $url = "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.8.0/Lulu-Finity-Source-0.8.0.zip"
-          Invoke-WebRequest -Uri $url -OutFile "Lulu-Finity-Source-0.8.0.zip"
-          $hash = (Get-FileHash "Lulu-Finity-Source-0.8.0.zip" -Algorithm SHA256).Hash.ToLower()
-          if ($hash -ne "654384609d04edd19af037441be89d61f38c3694456572a890ddbff6b61a4f4c") {
-            throw "El hash de la base 0.8.0 no coincide: $hash"
-          }
-          Expand-Archive "Lulu-Finity-Source-0.8.0.zip" -DestinationPath "app" -Force
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Aplicar arreglo 0.8.1
+      - name: Descargar base oficial 0.8.1
         shell: pwsh
         run: |
-          $parts = Get-ChildItem "build-v81/delta/part-*.txt" | Sort-Object Name
-          if ($parts.Count -ne 4) {
-            throw "Se esperaban 4 fragmentos y se encontraron $($parts.Count)."
+          $url = "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.8.1/Lulu-Finity-Source-0.8.1.zip"
+          Invoke-WebRequest -Uri $url -OutFile "Lulu-Finity-Source-0.8.1.zip"
+          $hash = (Get-FileHash "Lulu-Finity-Source-0.8.1.zip" -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne "2c30542b45340fd8677426be8d9411e43b07a3f5c853c93cb03912607a6d4701") {
+            throw "El hash de la base 0.8.1 no coincide: $hash"
           }
-          $encoded = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
-          [IO.File]::WriteAllBytes("Lulu-Finity-Delta-0.8.1.zip", [Convert]::FromBase64String($encoded))
-          $hash = (Get-FileHash "Lulu-Finity-Delta-0.8.1.zip" -Algorithm SHA256).Hash.ToLower()
-          if ($hash -ne "226a96a9b22b9547877ac08e412ccc2f3c2d7636324f5e37922a8eef001e8cd9") {
-            throw "El hash del arreglo 0.8.1 no coincide: $hash"
-          }
-          Expand-Archive "Lulu-Finity-Delta-0.8.1.zip" -DestinationPath "app" -Force
+          Expand-Archive "Lulu-Finity-Source-0.8.1.zip" -DestinationPath "app" -Force
 
-      - name: Validar arreglo LocalAppData
+      - name: Aplicar y validar actualización 0.9.0
         shell: pwsh
-        working-directory: app
-        run: |
-          node --check src/main.js
-          node --check src/preload.js
-          node --check src/renderer.js
-          $package = Get-Content package.json -Raw | ConvertFrom-Json
-          if ($package.version -ne "0.8.1") { throw "Versión inesperada: $($package.version)" }
-          if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita elevación." }
-          if ($package.build.nsis.perMachine -ne $false -or $package.build.nsis.allowElevation -ne $false) {
-            throw "El instalador no está configurado por usuario."
-          }
-          $main = Get-Content src/main.js -Raw
-          if ($main.Contains("app.getPath('localAppData')") -or $main.Contains('app.getPath("localAppData")')) {
-            throw "Todavía existe una llamada incompatible a app.getPath(localAppData)."
-          }
-          if (!$main.Contains("process.env.LOCALAPPDATA")) {
-            throw "Falta la ruta segura LOCALAPPDATA."
-          }
-          if (!$main.Contains("function isLikelyInstalledBuild")) {
-            throw "Falta la detección segura del tipo de instalación."
-          }
+        run: ./build-v9/apply.ps1
 
       - name: Preparar código fuente
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "source-v81" -Force | Out-Null
+          New-Item -ItemType Directory -Path "source-v9" -Force | Out-Null
           foreach ($file in @("package.json", "NOTICE.md", "README.md", "CHANGELOG.md", ".gitignore")) {
-            if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v81/$file" -Force }
+            if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v9/$file" -Force }
           }
           foreach ($folder in @("src", "build", ".github")) {
-            if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v81/$folder" -Recurse -Force }
+            if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v9/$folder" -Recurse -Force }
           }
-          Compress-Archive -Path "source-v81/*" -DestinationPath "Lulu-Finity-Source-0.8.1.zip" -Force
+          Compress-Archive -Path "source-v9/*" -DestinationPath "Lulu-Finity-Source-0.9.0.zip" -Force
 
       - name: Instalar dependencias
         working-directory: app
@@ -99,11 +69,11 @@ jobs:
       - name: Verificar archivos y analizar con Defender
         shell: pwsh
         run: |
-          $installer = "app/dist/Lulu-Finity-Setup-0.8.1.exe"
-          $zip = "app/dist/Lulu-Finity-0.8.1-x64.zip"
+          $installer = "app/dist/Lulu-Finity-Setup-0.9.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.9.0-x64.zip"
           $latest = "app/dist/latest.yml"
-          $blockmap = "app/dist/Lulu-Finity-Setup-0.8.1.exe.blockmap"
-          foreach ($file in @($installer, $zip, $latest, $blockmap, "Lulu-Finity-Source-0.8.1.zip")) {
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.9.0.exe.blockmap"
+          foreach ($file in @($installer, $zip, $latest, $blockmap, "Lulu-Finity-Source-0.9.0.zip")) {
             if (!(Test-Path $file)) { throw "No se generó $file" }
           }
           if ((Get-Item $installer).Length -lt 50000000) { throw "El instalador parece incompleto." }
@@ -119,36 +89,36 @@ jobs:
             Write-Warning "Defender no pudo ejecutarse: $($_.Exception.Message)"
           }
 
-      - name: Publicar Release v0.8.1
+      - name: Publicar Release v0.9.0
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = "v0.8.1"
+          $tag = "v0.9.0"
           $files = @(
-            "app/dist/Lulu-Finity-Setup-0.8.1.exe",
-            "app/dist/Lulu-Finity-0.8.1-x64.zip",
+            "app/dist/Lulu-Finity-Setup-0.9.0.exe",
+            "app/dist/Lulu-Finity-0.9.0-x64.zip",
             "app/dist/latest.yml",
-            "app/dist/Lulu-Finity-Setup-0.8.1.exe.blockmap",
-            "Lulu-Finity-Source-0.8.1.zip"
+            "app/dist/Lulu-Finity-Setup-0.9.0.exe.blockmap",
+            "Lulu-Finity-Source-0.9.0.zip"
           ) | Where-Object { Test-Path $_ }
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $files --clobber
-            gh release edit $tag --title "Lulu Finity 0.8.1" --notes-file "app/CHANGELOG.md"
+            gh release edit $tag --title "Lulu Finity 0.9.0" --notes-file "app/CHANGELOG.md"
           } else {
-            gh release create $tag $files --target main --title "Lulu Finity 0.8.1" --notes-file "app/CHANGELOG.md"
+            gh release create $tag $files --target main --title "Lulu Finity 0.9.0" --notes-file "app/CHANGELOG.md"
           }
 
       - name: Subir artefacto de Windows
         uses: actions/upload-artifact@v4
         with:
-          name: Lulu-Finity-Windows-v0.8.1
+          name: Lulu-Finity-Windows-v0.9.0
           path: |
-            app/dist/Lulu-Finity-Setup-0.8.1.exe
-            app/dist/Lulu-Finity-0.8.1-x64.zip
+            app/dist/Lulu-Finity-Setup-0.9.0.exe
+            app/dist/Lulu-Finity-0.9.0-x64.zip
             app/dist/latest.yml
-            app/dist/Lulu-Finity-Setup-0.8.1.exe.blockmap
-            Lulu-Finity-Source-0.8.1.zip
+            app/dist/Lulu-Finity-Setup-0.9.0.exe.blockmap
+            Lulu-Finity-Source-0.9.0.zip
           if-no-files-found: error
           retention-days: 30
