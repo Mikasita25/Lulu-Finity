@@ -1,0 +1,107 @@
+xt = document.querySelector('[data-testid="playback-position"]')?.textContent || '';
+        const durationText = document.querySelector('[data-testid="playback-duration"]')?.textContent || '';
+        const currentTime = clockToSeconds(positionText);
+        const duration = clockToSeconds(durationText);
+        const pauseButton = document.querySelector('button[data-testid="control-button-playpause"][aria-label*="Pause"], button[data-testid="control-button-playpause"][aria-label*="Paus"]');
+        const paused = !pauseButton;
+        const payload = { title, artist, url: location.href, currentTime, duration, paused };
+        console.info('__LULU_SPOTIFY_PLAYER__:${nonce}:' + encodeURIComponent(JSON.stringify(payload)));
+        if (title && title !== lastTitle) { lastTitle = title; endedSent = false; }
+        if (!paused && duration > 4 && currentTime >= duration - 2 && !endedSent) {
+          endedSent = true;
+          console.info('__LULU_SPOTIFY_ENDED__:${nonce}:' + location.href);
+        }
+      };
+      const tryPlay = () => {
+        if (clickedPlay) return;
+        const button = document.querySelector('button[data-testid="play-button"], button[aria-label="Play"], button[aria-label="Reproducir"]');
+        if (button) { clickedPlay = true; button.click(); }
+      };
+      const timer = setInterval(() => { tryPlay(); report(); }, 750);
+      window.__luluSpotifyCleanup = () => { clearInterval(timer); delete window.__luluSpotifyCleanup; };
+      tryPlay(); report();
+      return true;
+    })()`, true);
+    if (installed) return;
+  } catch (error) {
+    console.warn('No se pudo vigilar Spotify:', error?.message || error);
+  }
+  if (attempt < 20 && nonce === spotifyAutomationNonce) spotifyAutomationTimer = setTimeout(() => installSpotifyPlaybackWatcher(nonce, attempt + 1), 650);
+}
+
+async function controlSpotifyPlayer(action, value) {
+  const win = createSpotifyWindow();
+  if (!win.webContents.getURL()) await win.loadURL('https://open.spotify.com/');
+  return win.webContents.executeJavaScript(`(() => {
+    const action = ${JSON.stringify(action)};
+    const value = ${JSON.stringify(value)};
+    const playPause = document.querySelector('button[data-testid="control-button-playpause"]');
+    const next = document.querySelector('button[data-testid="control-button-skip-forward"]');
+    const previous = document.querySelector('button[data-testid="control-button-skip-back"]');
+    if (action === 'toggle' && playPause) playPause.click();
+    if (action === 'next' && next) next.click();
+    if (action === 'previous' && previous) previous.click();
+    if (action === 'volume') {
+      const slider = document.querySelector('[data-testid="volume-bar"] input[type="range"], input[aria-label*="Volume"], input[aria-label*="volumen"]');
+      if (slider) {
+        const normalized = Math.max(0, Math.min(1, Number(value) || 0));
+        const max = Number(slider.max || 1);
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        setter?.call(slider, String(normalized * max));
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        slider.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    return { ok: Boolean(playPause || next || previous) };
+  })()`, true);
+}
+
+function createSpotifyWindow() {
+  if (spotifyWindow && !spotifyWindow.isDestroyed()) return spotifyWindow;
+  spotifyWindow = new BrowserWindow({
+    width: 1240, height: 820, minWidth: 850, minHeight: 580,
+    title: 'Spotify — Lulu Finity', backgroundColor: '#121212', autoHideMenuBar: true, show: false,
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, autoplayPolicy: 'no-user-gesture-required' }
+  });
+  spotifyWindow.webContents.setAudioMuted(spotifyMuted);
+  spotifyWindow.on('closed', () => {
+    clearSpotifyAutomation(); spotifyWindow = null;
+    send('spotify:status', { open: false, visible: false, muted: spotifyMuted });
+  });
+  spotifyWindow.webContents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
+    if (!isMainFrame || code === -3) return;
+    send('spotify:error', { message: `${description} (${code})`, url });
+  });
+  spotifyWindow.webContents.on('did-finish-load', () => scheduleSpotifyAutomation(spotifyWindow?.webContents.getURL() || ''));
+  spotifyWindow.webContents.on('did-navigate-in-page', (_event, url, isMainFrame) => { if (isMainFrame) scheduleSpotifyAutomation(url); });
+  spotifyWindow.webContents.on('console-message', (_event, details, legacyMessage) => {
+    const message = String(details && typeof details === 'object' ? details.message : (legacyMessage || details) || '');
+    const ended = message.match(/^__LULU_SPOTIFY_ENDED__:(\d+):(.*)$/);
+    if (ended && Number(ended[1]) === spotifyAutomationNonce) { send('spotify:ended', { url: ended[2] || '' }); return; }
+    const player = message.match(/^__LULU_SPOTIFY_PLAYER__:(\d+):(.*)$/);
+    if (player && Number(player[1]) === spotifyAutomationNonce) {
+      try { send('spotify:player', JSON.parse(decodeURIComponent(player[2]))); } catch {}
+    }
+  });
+  spotifyWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSpotifyUrl(url)) spotifyWindow.loadURL(url).catch(() => shell.openExternal(url));
+    else if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  return spotifyWindow;
+}
+
+async function openSpotify(rawQuery) {
+  const target = spotifyTarget(rawQuery);
+  const win = createSpotifyWindow();
+  try { await win.loadURL(target); }
+  catch (error) { await shell.openExternal(target); throw new Error(`No se pudo abrir Spotify dentro de Lulu: ${error.message}`); }
+  win.webContents.setAudioMuted(spotifyMuted);
+  const payload = { open: true, visible: win.isVisible(), muted: spotifyMuted, target, query: String(rawQuery || '').trim() };
+  send('spotify:status', payload);
+  return payload;
+}
+
+'''
+if marker not in m: raise SystemExit('marker missing')
+m=m.replace(marker, spotif
