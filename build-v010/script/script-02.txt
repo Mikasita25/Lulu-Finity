@@ -1,0 +1,88 @@
+y_code+marker)
+
+# extend live events after chat handler block, before existing FOLLOW. Replace existing follow block with comprehensive event listeners.
+old=r'''  if (WebcastEvent.FOLLOW) {
+    connection.on(WebcastEvent.FOLLOW, (data) => {
+      const followerId = String(data?.user?.uniqueId || data?.user?.displayId || '').trim().replace(/^@/, '').toLowerCase();
+      if (followerId) knownFollowers.add(followerId);
+    });
+  }
+'''
+new=r'''  const liveUser = (data = {}) => {
+    const user = data?.user || data?.sender || {};
+    return {
+      uniqueId: String(user.uniqueId || user.displayId || user.userId || ''),
+      nickname: String(user.nickname || user.displayName || user.uniqueId || 'Usuario'),
+      profilePictureUrl: user.profilePicture?.urlList?.[0] || user.avatarThumb?.urlList?.[0] || ''
+    };
+  };
+  const emitLiveEvent = (type, source = {}, extra = {}) => {
+    if (connectionNonce !== liveConnectNonce || liveConnection !== connection) return;
+    send('live:event', { id: `${type}-${Date.now()}-${Math.random()}`, type, timestamp: Date.now(), ...liveUser(source), ...extra });
+  };
+
+  if (WebcastEvent.GIFT) connection.on(WebcastEvent.GIFT, (data) => {
+    const details = data?.giftDetails || data?.extendedGiftInfo || {};
+    const giftType = Number(details?.giftType ?? data?.giftType ?? 0);
+    const repeatEnd = Boolean(data?.repeatEnd);
+    if (giftType === 1 && !repeatEnd) return;
+    const repeatCount = Math.max(1, Number(data?.repeatCount || 1));
+    const diamondEach = Math.max(0, Number(details?.diamondCount || details?.diamond_count || data?.diamondCount || 0));
+    emitLiveEvent('gift', data, {
+      giftName: String(details?.giftName || details?.name || `Regalo ${data?.giftId || ''}`).trim(),
+      repeatCount,
+      diamonds: diamondEach * repeatCount
+    });
+  });
+
+  if (WebcastEvent.FOLLOW) connection.on(WebcastEvent.FOLLOW, (data) => {
+    const followerId = String(data?.user?.uniqueId || data?.user?.displayId || '').trim().replace(/^@/, '').toLowerCase();
+    if (followerId) knownFollowers.add(followerId);
+    emitLiveEvent('follow', data);
+  });
+  if (WebcastEvent.LIKE) connection.on(WebcastEvent.LIKE, (data) => {
+    emitLiveEvent('like', data, { count: Number(data?.likeCount || 0), total: Number(data?.totalLikeCount || 0) });
+    send('live:stats', { totalLikeCount: Number(data?.totalLikeCount || 0) });
+  });
+  if (WebcastEvent.SHARE) connection.on(WebcastEvent.SHARE, (data) => emitLiveEvent('share', data));
+  if (WebcastEvent.MEMBER) connection.on(WebcastEvent.MEMBER, (data) => emitLiveEvent('member', data, { memberCount: Number(data?.memberCount || 0) }));
+  if (WebcastEvent.SUB_NOTIFY) connection.on(WebcastEvent.SUB_NOTIFY, (data) => emitLiveEvent('subscribe', data));
+'''
+if old not in m: raise SystemExit('follow block missing')
+m=m.replace(old,new)
+m=m.replace("    enableExtendedGiftInfo: false,", "    enableExtendedGiftInfo: false,")
+# IPC add before live connect handlers
+ipc_marker="ipcMain.handle('live:connect', async (_event, username) => connectLive(username));"
+ipc_code=r'''ipcMain.handle('spotify:open', async (_event, details) => openSpotify(details?.query));
+ipcMain.handle('spotify:show', async () => {
+  const win = createSpotifyWindow();
+  if (!win.webContents.getURL()) await win.loadURL('https://open.spotify.com/');
+  win.show(); win.focus();
+  send('spotify:status', { open: true, visible: true, muted: spotifyMuted });
+  return { open: true, visible: true, muted: spotifyMuted };
+});
+ipcMain.handle('spotify:control', async (_event, details) => controlSpotifyPlayer(details?.action, details?.value));
+ipcMain.handle('spotify:set-volume', async (_event, volume) => controlSpotifyPlayer('volume', volume));
+ipcMain.handle('spotify:mute', async (_event, muted) => {
+  spotifyMuted = Boolean(muted);
+  if (spotifyWindow && !spotifyWindow.isDestroyed()) spotifyWindow.webContents.setAudioMuted(spotifyMuted);
+  send('spotify:status', { open: Boolean(spotifyWindow && !spotifyWindow.isDestroyed()), visible: Boolean(spotifyWindow && !spotifyWindow.isDestroyed() && spotifyWindow.isVisible()), muted: spotifyMuted });
+  return spotifyMuted;
+});
+ipcMain.handle('spotify:external', async (_event, details) => shell.openExternal(spotifyTarget(details?.query)));
+
+'''
+if ipc_marker not in m: raise SystemExit('ipc marker missing')
+m=m.replace(ipc_marker, ipc_code+ipc_marker)
+main.write_text(m)
+
+# preload
+pr=pre.read_text()
+pr=pr.replace("  openYouTubeExternal: (details) => ipcRenderer.invoke('youtube:external', details),", "  openYouTubeExternal: (details) => ipcRenderer.invoke('youtube:external', details),\n  openSpotify: (details) => ipcRenderer.invoke('spotify:open', details),\n  showSpotify: () => ipcRenderer.invoke('spotify:show'),\n  controlSpotify: (action, value = null) => ipcRenderer.invoke('spotify:control', { action, value }),\n  setSpotifyVolume: (volume) => ipcRenderer.invoke('spotify:set-volume', volume),\n  muteSpotify: (muted) => ipcRenderer.invoke('spotify:mute', muted),\n  openSpotifyExternal: (details) => ipcRenderer.invoke('spotify:external', details),")
+pr=pr.replace("  onStats: (callback) => subscribe('live:stats', callback),", "  onStats: (callback) => subscribe('live:stats', callback),\n  onLiveEvent: (callback) => subscribe('live:event', callback),")
+pr=pr.replace("  onYouTubeUnavailable: (callback) => subscribe('youtube:unavailable', callback),", "  onYouTubeUnavailable: (callback) => subscribe('youtube:unavailable', callback),\n  onSpotifyStatus: (callback) => subscribe('spotify:status', callback),\n  onSpotifyError: (callback) => subscribe('spotify:error', callback),\n  onSpotifySelected: (callback) => subscribe('spotify:selected', callback),\n  onSpotifyEnded: (callback) => subscribe('spotify:ended', callback),\n  onSpotifyPlayer: (callback) => subscribe('spotify:player', callback),\n  onSpotifyUnavailable: (callback) => subscribe('spotify:unavailable', callback),")
+pre.write_text(pr)
+
+# renderer: extend state
+r=ren.read_text()
+r=r.replace("  comm
