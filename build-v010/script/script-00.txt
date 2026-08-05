@@ -1,0 +1,114 @@
+from pathlib import Path
+import json, re
+import sys
+root=Path(sys.argv[1] if len(sys.argv) > 1 else 'app')
+main=root/'src/main.js'; pre=root/'src/preload.js'; ren=root/'src/renderer.js'; html=root/'src/index.html'; css=root/'src/styles.css'; pkg=root/'package.json'; changelog=root/'CHANGELOG.md'; readme=root/'README.md'
+
+# package
+p=json.loads(pkg.read_text())
+p['version']='0.10.0'
+p['description']='Lulu Finity: TikTok LIVE con TTS, eventos, YouTube, Spotify y personalización visual'
+pkg.write_text(json.dumps(p,ensure_ascii=False,indent=2)+'\n')
+
+m=main.read_text()
+m=m.replace("let youtubeWindow = null;", "let youtubeWindow = null;\nlet spotifyWindow = null;")
+m=m.replace("let youtubeAutomationTimer = null;", "let youtubeAutomationTimer = null;\nlet spotifyMuted = false;\nlet spotifyAutomationNonce = 0;\nlet spotifyAutomationTimer = null;")
+# defaults
+m=m.replace("  youtubeVolume: 0.8,", "  youtubeVolume: 0.8,\n  spotifyVolume: 0.8,\n  spotifyContinueRecommended: true,")
+m=m.replace("  hiddenDashboardPanels: [],", "  hiddenDashboardPanels: [],\n  eventTtsEnabled: false,\n  eventGiftEnabled: true,\n  eventFollowEnabled: true,\n  eventLikeEnabled: true,\n  eventShareEnabled: true,\n  eventMemberEnabled: false,\n  eventSubscribeEnabled: true,")
+m=m.replace("    { id: 'hello', trigger: '!saludo', action: 'response', response: 'Hola {usuario}', permission: 'all', enabled: true }", "    { id: 'hello', trigger: '!saludo', action: 'response', response: 'Hola {usuario}', permission: 'all', enabled: true },\n    { id: 'spotify', trigger: '!spotify', action: 'spotify', response: '', permission: 'music', enabled: true }")
+
+# insert Spotify functions before withTimeout
+marker="async function withTimeout(promise, timeoutMs, message) {"
+spotify_code=r'''
+function isSpotifyUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    return host === 'open.spotify.com' || host.endsWith('.spotify.com');
+  } catch { return false; }
+}
+
+function spotifyTarget(rawQuery) {
+  const query = String(rawQuery || '').trim().slice(0, 180);
+  if (!query) return 'https://open.spotify.com/';
+  if (isSpotifyUrl(query)) return query;
+  return `https://open.spotify.com/search/${encodeURIComponent(query)}`;
+}
+
+function spotifyUrlKind(value) {
+  try {
+    const url = new URL(String(value || ''));
+    if (!isSpotifyUrl(url.href)) return 'other';
+    if (url.pathname.startsWith('/search/')) return 'search';
+    if (url.pathname.startsWith('/track/')) return 'track';
+    return 'home';
+  } catch { return 'other'; }
+}
+
+function clearSpotifyAutomation() {
+  spotifyAutomationNonce += 1;
+  if (spotifyAutomationTimer) clearTimeout(spotifyAutomationTimer);
+  spotifyAutomationTimer = null;
+}
+
+function scheduleSpotifyAutomation(url) {
+  if (!spotifyWindow || spotifyWindow.isDestroyed()) return;
+  const kind = spotifyUrlKind(url);
+  const nonce = ++spotifyAutomationNonce;
+  if (spotifyAutomationTimer) clearTimeout(spotifyAutomationTimer);
+  spotifyAutomationTimer = setTimeout(() => {
+    spotifyAutomationTimer = null;
+    if (kind === 'search') selectFirstSpotifyTrack(nonce, 0);
+    if (kind === 'track' || kind === 'home') installSpotifyPlaybackWatcher(nonce, 0);
+  }, 900);
+}
+
+async function selectFirstSpotifyTrack(nonce, attempt) {
+  if (nonce !== spotifyAutomationNonce || !spotifyWindow || spotifyWindow.isDestroyed()) return;
+  try {
+    const result = await spotifyWindow.webContents.executeJavaScript(`(() => {
+      const rows = [...document.querySelectorAll('[data-testid="tracklist-row"], [role="row"]')];
+      for (const row of rows) {
+        const link = row.querySelector('a[href*="/track/"]');
+        if (!link?.href) continue;
+        const title = (link.textContent || row.querySelector('[data-testid="internal-track-link"]')?.textContent || '').trim();
+        const artist = (row.querySelector('a[href*="/artist/"]')?.textContent || '').trim();
+        return { url: link.href, title, artist };
+      }
+      const link = document.querySelector('a[href*="/track/"]');
+      return link?.href ? { url: link.href, title: (link.textContent || '').trim(), artist: '' } : null;
+    })()`, true);
+    if (nonce !== spotifyAutomationNonce) return;
+    if (result?.url) {
+      send('spotify:selected', result);
+      await spotifyWindow.loadURL(result.url);
+      return;
+    }
+  } catch (error) {
+    console.warn('No se pudo seleccionar Spotify:', error?.message || error);
+  }
+  if (attempt < 24 && nonce === spotifyAutomationNonce) {
+    spotifyAutomationTimer = setTimeout(() => selectFirstSpotifyTrack(nonce, attempt + 1), 700);
+  } else if (nonce === spotifyAutomationNonce) {
+    send('spotify:unavailable', { message: 'No se encontró una canción. Abre Spotify e inicia sesión si es necesario.' });
+  }
+}
+
+async function installSpotifyPlaybackWatcher(nonce, attempt) {
+  if (nonce !== spotifyAutomationNonce || !spotifyWindow || spotifyWindow.isDestroyed()) return;
+  try {
+    const installed = await spotifyWindow.webContents.executeJavaScript(`(() => {
+      if (window.__luluSpotifyCleanup) window.__luluSpotifyCleanup();
+      let lastTitle = '';
+      let endedSent = false;
+      let clickedPlay = false;
+      const clockToSeconds = (text) => {
+        const parts = String(text || '').trim().split(':').map(Number);
+        if (!parts.length || parts.some(Number.isNaN)) return 0;
+        return parts.reduce((total, part) => total * 60 + part, 0);
+      };
+      const report = () => {
+        const title = (document.querySelector('[data-testid="context-item-info-title"]')?.textContent || document.querySelector('[data-testid="now-playing-widget"] a[href*="/track/"]')?.textContent || document.title.replace(' | Spotify','')).trim();
+        const artist = (document.querySelector('[data-testid="context-item-info-artist"]')?.textContent || document.querySelector('[data-testid="now-playing-widget"] a[href*="/artist/"]')?.textContent || '').trim();
+        const positionTe
