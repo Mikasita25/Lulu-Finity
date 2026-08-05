@@ -1,0 +1,54 @@
+ents: [],", "  comments: [],\n  liveEvents: [],\n  eventCounters: { gift: 0, diamonds: 0, follow: 0, likes: 0, share: 0, member: 0, subscribe: 0 },")
+r=r.replace("  currentSong: null,", "  currentSong: null,\n  spotifyQueue: [],\n  currentSpotify: null,\n  spotifyOpen: false,\n  spotifyVisible: false,\n  spotifyMuted: false,\n  spotifyTransitioning: false,\n  spotifyPlayer: { title: '', artist: '', url: '', currentTime: 0, duration: 0, paused: true },")
+# add UI builder after linesToArray
+ui_marker="function youtubeVideoId(value) {"
+ui_code=r'''
+function ensureV010Ui() {
+  const nav = document.querySelector('.nav-list');
+  const settingsButton = nav?.querySelector('[data-page="settings"]');
+  const filtersButton = nav?.querySelector('[data-page="filters"]');
+  if (nav && !nav.querySelector('[data-page="events"]')) {
+    filtersButton?.insertAdjacentHTML('beforebegin', '<button class="nav-item" data-page="events"><span>✧</span>Eventos</button>');
+    filtersButton?.insertAdjacentHTML('beforebegin', '<button class="nav-item" data-page="spotify"><span>●</span>Spotify</button>');
+    settingsButton?.insertAdjacentHTML('beforebegin', '<button class="nav-item" data-page="about"><span>♡</span>Sobre Lulu</button>');
+  }
+  const main = document.querySelector('.main-content');
+  if (!main || document.getElementById('page-events')) return;
+  main.insertAdjacentHTML('beforeend', `
+    <section class="page" id="page-events">
+      <div class="page-heading simple"><div><h1>Eventos del LIVE</h1><p>Regalos, seguidores, likes, compartidos y suscripciones.</p></div></div>
+      <div class="event-stats-grid">
+        <article class="stat-card"><span>Regalos</span><strong id="eventGiftCount">0</strong><small id="eventDiamondCount">0 diamantes</small></article>
+        <article class="stat-card"><span>Seguidores</span><strong id="eventFollowCount">0</strong><small>nuevos</small></article>
+        <article class="stat-card"><span>Likes</span><strong id="eventLikeCount">0</strong><small>recibidos</small></article>
+        <article class="stat-card"><span>Compartidos</span><strong id="eventShareCount">0</strong><small>en esta sesión</small></article>
+      </div>
+      <div class="events-layout">
+        <article class="panel events-feed-card"><div class="panel-header"><h2>Actividad reciente</h2><button class="ghost tiny" id="clearEventsBtn">Limpiar</button></div><div id="liveEventsList" class="live-events-list"></div></article>
+        <article class="panel settings-card event-settings-card"><h2>Avisos</h2>
+          <label class="setting-row compact"><span><strong>Leer eventos con voz</strong></span><span class="switch"><input id="eventTtsEnabledInput" type="checkbox"><span></span></span></label>
+          <label class="visibility-option"><input id="eventGiftEnabledInput" type="checkbox"> Regalos y donaciones</label>
+          <label class="visibility-option"><input id="eventFollowEnabledInput" type="checkbox"> Nuevos seguidores</label>
+          <label class="visibility-option"><input id="eventLikeEnabledInput" type="checkbox"> Likes</label>
+          <label class="visibility-option"><input id="eventShareEnabledInput" type="checkbox"> Compartidos</label>
+          <label class="visibility-option"><input id="eventSubscribeEnabledInput" type="checkbox"> Suscripciones</label>
+          <label class="visibility-option"><input id="eventMemberEnabledInput" type="checkbox"> Usuarios que entran</label>
+        </article>
+      </div>
+    </section>
+    <section class="page" id="page-spotify">
+      <div class="page-heading simple"><div><h1>Spotify</h1><p>Una sola sesión para buscar, reproducir y mantener una cola. Puede requerir Spotify Premium.</p></div><button class="ghost" id="showSpotifyBtn">Ver Spotify</button></div>
+      <div class="spotify-layout">
+        <article class="panel spotify-player-card">
+          <div class="spotify-now"><div class="spotify-cover">●</div><div><small>REPRODUCIENDO</small><strong id="spotifyCurrentTitle">Sin música</strong><span id="spotifyCurrentArtist">Abre Spotify e inicia sesión una vez.</span></div></div>
+          <div class="progress-wrap"><span id="spotifyCurrentTime">0:00</span><input id="spotifyProgress" type="range" min="0" max="100" value="0" disabled><span id="spotifyDuration">0:00</span></div>
+          <div class="player-controls main-controls"><button id="spotifyPreviousBtn">|◀</button><button class="play-main" id="spotifyPlayPauseBtn">▶</button><button id="spotifyNextBtn">▶|</button><button id="spotifyExternalBtn">↗</button></div>
+          <div class="volume-row"><span>🔊</span><input id="spotifyVolumeInput" type="range" min="0" max="1" step="0.05"><output id="spotifyVolumeOutput">80%</output></div>
+          <label class="recommend-row"><span><strong>Continuar con recomendadas</strong><small>Spotify seguirá con su reproducción automática cuando la cola quede vacía.</small></span><span class="switch"><input id="spotifyRecommendedInput" type="checkbox"><span></span></span></label>
+        </article>
+        <article class="panel spotify-queue-card"><div class="panel-header"><h2>Cola de Spotify</h2><button class="ghost tiny" id="clearSpotifyQueueBtn">Limpiar</button></div><div class="song-request-inline"><input id="spotifyQueryInput" placeholder="Canción, artista o enlace de Spotify"><button class="secondary" id="addSpotifyBtn">Agregar</button></div><p class="hint">Comando del chat: <strong>!spotify nombre</strong></p><div id="spotifyQueueList" class="spotify-queue-list"></div></article>
+      </div>
+    </section>
+    <section class="page" id="page-about">
+      <div class="page-heading simple"><div><h1>Sobre Lulu</h1><p>La persona detrás de Lulu Finity.</p></div></div>
+      <article class="panel about-lulu-card"><img src="lulu-about.webp" alt="Lulu" class="about-lulu-image"><div class="about-lulu-copy"><span class="about-kicker">DESARROLLADORA</span><h2>Lulu, también conocida como Alya</h2><p>Lulu, o más conocida como Alya, es una pequeña desarrolladora que se de
