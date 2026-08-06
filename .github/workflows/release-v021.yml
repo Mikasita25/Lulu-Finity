@@ -38,7 +38,9 @@ jobs:
           if ($baseHash -ne "c9e09583d7a328bff04106a61ef954477651a69d969f421f9ba9d726febc161c") { throw "La fuente 0.20.0 no coincide: $baseHash" }
           Expand-Archive base.zip -DestinationPath app -Force
 
-          $base64 = Get-Content "build-v021/script/patch.txt" -Raw
+          $parts = Get-ChildItem "build-v021/script/part-*.txt" | Sort-Object Name
+          if ($parts.Count -ne 10) { throw "Se esperaban 10 partes del parche y se encontraron $($parts.Count)." }
+          $base64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
           [IO.File]::WriteAllText("apply-v021.b64", $base64, [Text.Encoding]::ASCII)
           python -c "import base64,gzip,pathlib; pathlib.Path('apply-v021.py').write_bytes(gzip.decompress(base64.b64decode(pathlib.Path('apply-v021.b64').read_text())))"
           $scriptHash = (Get-FileHash "apply-v021.py" -Algorithm SHA256).Hash.ToLower()
