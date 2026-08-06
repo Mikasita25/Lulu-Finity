@@ -41,14 +41,14 @@ jobs:
             --output base.zip
           echo "c9e09583d7a328bff04106a61ef954477651a69d969f421f9ba9d726febc161c  base.zip" | sha256sum --check
           unzip -q base.zip -d app
-          test "$(find build-v021/script -maxdepth 1 -name 'part-*.txt' | wc -l)" -eq 10
+          test "$(find build-v021/script -maxdepth 1 -name 'part-*.txt' | wc -l)" -eq 11
           cat build-v021/script/part-*.txt > apply-v021.b64
           python - <<'PY'
           import base64, gzip, pathlib
           encoded = pathlib.Path('apply-v021.b64').read_text(encoding='ascii')
           pathlib.Path('apply-v021.py').write_bytes(gzip.decompress(base64.b64decode(encoded)))
           PY
-          echo "59a9f72a3654602a4037e4667365dc58625c1b8b018a444d530ed3acbd0b21fd  apply-v021.py" | sha256sum --check
+          echo "f03c7320f04c73aa5f3b81582668d3e14a657cd4857d848988e493f1ba948526  apply-v021.py" | sha256sum --check
           python apply-v021.py app
 
       - name: Validar aplicación reconstruida
@@ -63,13 +63,11 @@ jobs:
           preload = Path('app/src/preload.js').read_text(encoding='utf-8')
           renderer = Path('app/src/renderer.js').read_text(encoding='utf-8')
           html = Path('app/src/index.html').read_text(encoding='utf-8')
-          for token in ('RailwayRelayConnection', 'normalizeRelayWebSocketUrl', 'relayUrl', 'relayClientToken', 'lulu.relay.status'):
+          for token in ('RailwayRelayConnection', 'normalizeRelayWebSocketUrl', 'EMBEDDED_RELAY_URL', 'EMBEDDED_RELAY_CLIENT_TOKEN', 'lulu-finity-production.up.railway.app', '__LULU_RELAY_CLIENT_TOKEN__', 'lulu.relay.status'):
               assert token in main, token
-          for token in ('relayUrlInput', 'relayClientTokenInput', 'toggleRelayTokenBtn'):
-              assert token in renderer, token
-          for token in ('Servidor seguro de TikTok LIVE', 'relayUrlInput', 'relayClientTokenInput'):
+          for token in ('Servidor seguro de TikTok LIVE', 'Los usuarios no tienen que escribir'):
               assert token in html, token
-          combined = main + preload + renderer
-          for forbidden in ('EULER_CLOUD_WEBSOCKET_URL', 'openFreeTikTokKey', 'new FreeEulerCloudConnection'):
+          combined = main + preload + renderer + html
+          for forbidden in ('EULER_CLOUD_WEBSOCKET_URL', 'openFreeTikTokKey', 'new FreeEulerCloudConnection', 'relayUrlInput', 'relayClientTokenInput', 'toggleRelayTokenBtn'):
               assert forbidden not in combined, forbidden
           PY

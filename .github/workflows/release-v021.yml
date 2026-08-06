@@ -39,12 +39,12 @@ jobs:
           Expand-Archive base.zip -DestinationPath app -Force
 
           $parts = Get-ChildItem "build-v021/script/part-*.txt" | Sort-Object Name
-          if ($parts.Count -ne 10) { throw "Se esperaban 10 partes del parche y se encontraron $($parts.Count)." }
+          if ($parts.Count -ne 11) { throw "Se esperaban 11 partes del parche y se encontraron $($parts.Count)." }
           $base64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
           [IO.File]::WriteAllText("apply-v021.b64", $base64, [Text.Encoding]::ASCII)
           python -c "import base64,gzip,pathlib; pathlib.Path('apply-v021.py').write_bytes(gzip.decompress(base64.b64decode(pathlib.Path('apply-v021.b64').read_text())))"
           $scriptHash = (Get-FileHash "apply-v021.py" -Algorithm SHA256).Hash.ToLower()
-          if ($scriptHash -ne "59a9f72a3654602a4037e4667365dc58625c1b8b018a444d530ed3acbd0b21fd") { throw "El parche 0.21.0 no coincide: $scriptHash" }
+          if ($scriptHash -ne "f03c7320f04c73aa5f3b81582668d3e14a657cd4857d848988e493f1ba948526") { throw "El parche 0.21.0 no coincide: $scriptHash" }
           python apply-v021.py app
 
           node --check app/src/main.js
@@ -60,11 +60,11 @@ jobs:
           $preload = Get-Content app/src/preload.js -Raw
           $renderer = Get-Content app/src/renderer.js -Raw
           $html = Get-Content app/src/index.html -Raw
-          foreach ($token in @("RailwayRelayConnection", "normalizeRelayWebSocketUrl", "relayUrl", "relayClientToken", "lulu.relay.status")) { if (!$main.Contains($token)) { throw "Falta $token en main.js" } }
-          foreach ($token in @("relayUrlInput", "relayClientTokenInput", "toggleRelayTokenBtn")) { if (!$renderer.Contains($token)) { throw "Falta $token en renderer.js" } }
-          foreach ($token in @("Servidor seguro de TikTok LIVE", "relayUrlInput", "relayClientTokenInput")) { if (!$html.Contains($token)) { throw "Falta $token en index.html" } }
-          foreach ($forbidden in @("EULER_CLOUD_WEBSOCKET_URL", "openFreeTikTokKey", "new FreeEulerCloudConnection")) {
-            if ($main.Contains($forbidden) -or $preload.Contains($forbidden) -or $renderer.Contains($forbidden)) { throw "La app todavía contiene $forbidden" }
+          foreach ($token in @("RailwayRelayConnection", "normalizeRelayWebSocketUrl", "EMBEDDED_RELAY_URL", "EMBEDDED_RELAY_CLIENT_TOKEN", "lulu-finity-production.up.railway.app", "lulu.relay.status")) { if (!$main.Contains($token)) { throw "Falta $token en main.js" } }
+          if (!$main.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta el marcador seguro del token de compilación." }
+          foreach ($token in @("Servidor seguro de TikTok LIVE", "Los usuarios no tienen que escribir")) { if (!$html.Contains($token)) { throw "Falta $token en index.html" } }
+          foreach ($forbidden in @("EULER_CLOUD_WEBSOCKET_URL", "openFreeTikTokKey", "new FreeEulerCloudConnection", "relayUrlInput", "relayClientTokenInput", "toggleRelayTokenBtn")) {
+            if ($main.Contains($forbidden) -or $preload.Contains($forbidden) -or $renderer.Contains($forbidden) -or $html.Contains($forbidden)) { throw "La app todavía contiene $forbidden" }
           }
 
           New-Item -ItemType Directory source-v021 -Force | Out-Null
@@ -72,6 +72,23 @@ jobs:
           foreach ($folder in @("src", "build", ".github")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v021/$folder" -Recurse -Force } }
           Copy-Item "railway-relay" "source-v021/railway-relay" -Recurse -Force
           Compress-Archive -Path "source-v021/*" -DestinationPath "Lulu-Finity-Source-0.21.0.zip" -Force
+
+      - name: Inyectar token privado del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN)) {
+            throw "Configura el secreto LULU_RELAY_CLIENT_TOKEN en Settings > Secrets and variables > Actions."
+          }
+          if ($env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "LULU_RELAY_CLIENT_TOKEN debe tener al menos 32 caracteres." }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "No se encontró el marcador del token." }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          if ((Get-Content $path -Raw).Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "El token no fue inyectado." }
+          node --check $path
 
       - name: Instalar dependencias
         working-directory: app

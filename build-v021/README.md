@@ -1,5 +1,5 @@
 # Parche 0.21.0
 
-`script/part-*.txt` (parche Python dividido, comprimido y validado por SHA-256) reconstruye Lulu Finity 0.21.0 partiendo de la fuente publicada de 0.20.0.
+`script/part-*.txt` reconstruye Lulu Finity 0.21.0 partiendo de la fuente publicada de 0.20.0. El parche está comprimido, dividido y validado mediante SHA-256.
 
-El parche elimina la API key de EulerStream de la aplicación, migra cualquier valor antiguo fuera del archivo local de ajustes y conecta Electron con el relay WebSocket de Railway incluido en `railway-relay/`.
+La aplicación incluye automáticamente `wss://lulu-finity-production.up.railway.app/v1/tiktok/live`. El token de cliente no se publica en el repositorio: GitHub Actions lo inyecta durante la compilación desde el secreto `LULU_RELAY_CLIENT_TOKEN`. Por ello, los usuarios finales no tienen que introducir URL, token ni API keys.
