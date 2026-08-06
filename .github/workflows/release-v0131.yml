@@ -43,7 +43,11 @@ jobs:
           Expand-Archive base.zip -DestinationPath app -Force
 
           $scriptHash = (Get-FileHash "build-v0131/apply_patch.py" -Algorithm SHA256).Hash.ToLower()
-          if ($scriptHash -ne "5ee4e5e90a09897036bb71f6f81ca0ff1df326ba78ccc4ad70db4230ab77cb53") {
+          $validScriptHashes = @(
+            "5ee4e5e90a09897036bb71f6f81ca0ff1df326ba78ccc4ad70db4230ab77cb53",
+            "9c69d4fdafbd45403c4c797da94b7db4a47a9daef1cca24b4bccad830410e956"
+          )
+          if ($scriptHash -notin $validScriptHashes) {
             throw "El parche 0.13.1 no coincide: $scriptHash"
           }
           Copy-Item "build-v0131/apply_patch.py" "app/apply_patch.py" -Force
