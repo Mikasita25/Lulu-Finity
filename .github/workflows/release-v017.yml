@@ -43,7 +43,7 @@ jobs:
           [IO.File]::WriteAllText("apply-v017.b64", $base64, [Text.Encoding]::ASCII)
           python -c "import base64,gzip,pathlib; pathlib.Path('apply-v017.py').write_bytes(gzip.decompress(base64.b64decode(pathlib.Path('apply-v017.b64').read_text())))"
           $scriptHash = (Get-FileHash apply-v017.py -Algorithm SHA256).Hash.ToLower()
-          if ($scriptHash -ne "da8c0ef5536197f452587c76eff72e633d21d6e58fb8cd2c49d2b962a0466ffd") { throw "El parche 0.17.0 no coincide: $scriptHash" }
+          if ($scriptHash -ne "3f775c13126c6ca876f91604295f8dab273c023313c2f855efc8737e598fa3fe") { throw "El parche 0.17.0 no coincide: $scriptHash" }
           Push-Location app
           python ../apply-v017.py
           Pop-Location
