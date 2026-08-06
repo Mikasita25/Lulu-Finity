@@ -6,6 +6,7 @@ const WebSocket = require('ws');
 const { WebSocketServer } = WebSocket;
 const { KeyPool, parseList } = require('./key-pool');
 const { classifyUpstreamFailure } = require('./failure-classifier');
+const { DailyUsageMeter } = require('./usage-meter');
 
 const PORT = Math.max(1, Number(process.env.PORT || 3000));
 const UPSTREAM_WS_URL = String(process.env.UPSTREAM_WS_URL || 'wss://ws.eulerstream.com').trim();
@@ -13,6 +14,14 @@ const CLIENT_TOKENS = new Set(parseList(process.env.CLIENT_TOKENS || process.env
 const MAX_CLIENTS = Math.max(1, Number(process.env.MAX_CLIENTS || 50));
 const MAX_ATTEMPTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_CONNECTION_ATTEMPTS_PER_MINUTE || 30));
 const UPSTREAM_OPEN_TIMEOUT_MS = Math.max(3000, Number(process.env.UPSTREAM_OPEN_TIMEOUT_MS || 18000));
+const DAILY_USAGE_LIMIT = Math.max(1, Number(process.env.DAILY_USAGE_LIMIT || 7500));
+const USAGE_PER_CONNECTION = Math.max(0.1, Number(process.env.USAGE_PER_CONNECTION || 2));
+const USAGE_STATE_FILE = String(process.env.USAGE_STATE_FILE || '').trim();
+const usageMeter = new DailyUsageMeter({
+  limit: DAILY_USAGE_LIMIT,
+  perConnection: USAGE_PER_CONNECTION,
+  stateFile: USAGE_STATE_FILE || undefined
+});
 const keyPool = new KeyPool(parseList(process.env.EULER_API_KEYS), {
   cooldownMs: process.env.KEY_COOLDOWN_MS,
   quotaCooldownMs: process.env.QUOTA_COOLDOWN_MS,
@@ -197,21 +206,36 @@ class RelaySession {
   }
 }
 
+function jsonHeaders() {
+  return {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+    'access-control-allow-origin': '*'
+  };
+}
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   if (request.method === 'GET' && url.pathname === '/health') {
     const snapshot = keyPool.snapshot();
-    response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    const usage = usageMeter.snapshot();
+    response.writeHead(200, jsonHeaders());
     response.end(JSON.stringify({
       ok: true,
       service: 'lulu-finity-railway-relay',
       uptimeSeconds: Math.round(process.uptime()),
       clients: activeClients,
-      keys: { total: snapshot.total, available: snapshot.available, activeConnections: snapshot.activeConnections }
+      keys: { total: snapshot.total, available: snapshot.available, activeConnections: snapshot.activeConnections },
+      usage: { used: usage.used, limit: usage.limit, percent: usage.percent, resetAt: usage.resetAt }
     }));
     return;
   }
-  response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+  if (request.method === 'GET' && url.pathname === '/usage') {
+    response.writeHead(200, jsonHeaders());
+    response.end(JSON.stringify({ ok: true, ...usageMeter.snapshot() }));
+    return;
+  }
+  response.writeHead(404, jsonHeaders());
   response.end(JSON.stringify({ ok: false, error: 'Not found' }));
 });
 
@@ -243,6 +267,8 @@ server.on('upgrade', (request, socket, head) => {
 
 wss.on('connection', (client, request, uniqueId) => {
   activeClients += 1;
+  const usage = usageMeter.recordConnection();
+  console.info(`[usage] ${usage.used}/${usage.limit} usos diarios (${usage.percent}%).`);
   const session = new RelaySession(client, request, uniqueId);
   sessions.add(session);
   let alive = true;
@@ -284,5 +310,6 @@ process.on('uncaughtException', (error) => console.error('[uncaughtException]', 
 process.on('unhandledRejection', (error) => console.error('[unhandledRejection]', error));
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.info(`[startup] Relay listo en el puerto ${PORT}; ${keyPool.size} API keys cargadas.`);
+  const usage = usageMeter.snapshot();
+  console.info(`[startup] Relay listo en el puerto ${PORT}; ${keyPool.size} API keys cargadas; uso diario ${usage.used}/${usage.limit}.`);
 });
