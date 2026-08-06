@@ -54,7 +54,7 @@ jobs:
           $preload = Get-Content app/src/preload.js -Raw
           $renderer = Get-Content app/src/renderer.js -Raw
           $html = Get-Content app/src/index.html -Raw
-          foreach ($token in @("FreeEulerCloudConnection", "wss://ws.eulerstream.com", "features.bundleEvents", "eulerApiKey", "cloudCloseMessage", "new WebSocket(url)")) { if (!$main.Contains($token)) { throw "Falta $token en main.js" } }
+          foreach ($token in @("FreeEulerCloudConnection", "wss://ws.eulerstream.com", "features.bundleEvents", "eulerApiKey", "cloudCloseMessage", "new WebSocket(url, { handshakeTimeout")) { if (!$main.Contains($token)) { throw "Falta $token en main.js" } }
           if ($main.Contains("new TikTokLiveConnection(username")) { throw "La conexión antigua de firma sigue activa." }
           foreach ($token in @("openFreeTikTokKey")) { if (!$preload.Contains($token)) { throw "Falta $token en preload.js" } }
           foreach ($token in @("eulerApiKeyInput", "openFreeEulerBtn", "toggleEulerKeyBtn", "openFreeTikTokKey")) { if (!$renderer.Contains($token)) { throw "Falta $token en renderer.js" } }
