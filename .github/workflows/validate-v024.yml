@@ -39,7 +39,7 @@ jobs:
           encoded = pathlib.Path('apply-v024.b64').read_text(encoding='ascii')
           pathlib.Path('apply-v024.py').write_bytes(gzip.decompress(base64.b64decode(encoded)))
           PY
-          echo "533ce85794a98fbc01bd067d8b1ef97dcc60e3fbe72588205b86d151876e6a18  apply-v024.py" | sha256sum --check
+          echo "a1dea3fbc2b0aae05504dcf7c576cc169e60d6f225832157a3d40a6dcfd92144  apply-v024.py" | sha256sum --check
           python apply-v024.py app
 
       - name: Validar aplicación y recursos
