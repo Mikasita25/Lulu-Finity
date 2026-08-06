@@ -1,0 +1,71 @@
+name: Validar temas Miku 0.24
+
+on:
+  pull_request:
+    paths:
+      - "build-v024/**"
+      - ".github/workflows/validate-v024.yml"
+      - ".github/workflows/release-v024.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v024/**"
+      - ".github/workflows/validate-v024.yml"
+      - ".github/workflows/release-v024.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir Lulu Finity 0.24.0
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.23.0/Lulu-Finity-Source-0.23.0.zip \
+            --output base.zip
+          echo "dffea4d9e024b56049cd4884d23864b8b7281db2ceaf27e524533fd6b68c4eab  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          test "$(find build-v024/script -maxdepth 1 -name 'part-*.txt' | wc -l)" -eq 1
+          cat build-v024/script/part-*.txt > apply-v024.b64
+          python - <<'PY'
+          import base64, gzip, pathlib
+          encoded = pathlib.Path('apply-v024.b64').read_text(encoding='ascii')
+          pathlib.Path('apply-v024.py').write_bytes(gzip.decompress(base64.b64decode(encoded)))
+          PY
+          echo "533ce85794a98fbc01bd067d8b1ef97dcc60e3fbe72588205b86d151876e6a18  apply-v024.py" | sha256sum --check
+          python apply-v024.py app
+
+      - name: Validar aplicación y recursos
+        run: |
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.24.0') process.exit(1)"
+          echo "029f0bc515cd12523bafd8eb993ceed31dc5fe8804657bd1854495d2ac7367cc  app/src/miku-classic.svg" | sha256sum --check
+          echo "52d78d756ae380c0b8d335cacee7c150b27bcd79365f1686771b057b4a5e8a88  app/src/miku-soft.svg" | sha256sum --check
+          echo "8d07696205c1c76c9c4c5093aa439b9a68188df5d3a6350dde79de39698c4f71  app/src/miku-dark.svg" | sha256sum --check
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('app/src/index.html').read_text(encoding='utf-8')
+          renderer = Path('app/src/renderer.js').read_text(encoding='utf-8')
+          css = Path('app/src/styles.css').read_text(encoding='utf-8')
+          for token in ('Miku Classic','Miku Soft','Miku Dark','miku-classic','miku-soft','miku-dark'):
+              assert token in html + renderer + css, token
+          for asset in ('miku-classic.svg','miku-soft.svg','miku-dark.svg'):
+              assert asset in css, asset
+          assert 'Temas Miku: solo cambian la apariencia de la aplicación' in css
+          # Los recursos de Miku deben quedar limitados a la aplicación, no al relay ni a generadores de overlays.
+          for path in Path('app').rglob('*'):
+              if not path.is_file() or path.suffix.lower() in {'.svg','.ico'}:
+                  continue
+              text = path.read_text(encoding='utf-8', errors='ignore')
+              if 'miku-classic.svg' in text or 'miku-soft.svg' in text or 'miku-dark.svg' in text:
+                  assert path.as_posix() == 'app/src/styles.css', path
+          PY
