@@ -47,6 +47,7 @@ jobs:
             | base64 --decode > Lulu-Finity-Mobile-Source-0.1.0.zip
           echo "d9a641b1b50054ddbbce09fc650a976d56e2424528a6767bad503f3a4d7b0d07  Lulu-Finity-Mobile-Source-0.1.0.zip" | sha256sum -c -
           unzip -q Lulu-Finity-Mobile-Source-0.1.0.zip
+          patch -p1 -d android < build-mobile-v010/patches/001-java-compat.patch
 
       - name: Compilar APK instalable
         run: gradle -p android --stacktrace assembleDebug
