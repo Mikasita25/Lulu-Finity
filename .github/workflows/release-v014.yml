@@ -35,8 +35,12 @@ jobs:
           }
           Expand-Archive base.zip -DestinationPath app -Force
 
-          $parts = Get-ChildItem "build-v014/patch/part-*.txt" | Sort-Object Name
-          if ($parts.Count -ne 13) { throw "Se esperaban 13 fragmentos y se encontraron $($parts.Count)." }
+          $partNames = @(
+            "part-00.txt", "part-01.txt", "part-02.txt", "part-03.txt", "part-04.txt", "part-05.txt",
+            "part-06.txt", "part-07.txt", "part-08.txt", "part-09.txt", "part-10.txt",
+            "part-11-00.txt", "part-11-01.txt", "part-11-02.txt", "part-11-03.txt", "part-12.txt"
+          )
+          $parts = $partNames | ForEach-Object { Get-Item "build-v014/patch/$_" }
           $base64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
           $patch = "Lulu-Finity-Patch-0.14.0.zip"
           [IO.File]::WriteAllBytes($patch, [Convert]::FromBase64String($base64))
