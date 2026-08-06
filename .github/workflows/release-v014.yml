@@ -63,10 +63,10 @@ jobs:
           $renderer = Get-Content app/src/renderer.js -Raw
           $html = Get-Content app/src/index.html -Raw
 
-          foreach ($token in @("WebcastEvent.EMOTE", "fanSticker", "economy:mutate", "economy.json", "extractFanStickers")) {
+          foreach ($token in @("WebcastEvent.EMOTE", "fanSticker", "economy:mutate", "economy.json", "extractFanStickerEntries")) {
             if (!$main.Contains($token)) { throw "Falta $token en main.js" }
           }
-          foreach ($token in @("mutateEconomy", "getEconomySnapshot")) {
+          foreach ($token in @("mutateEconomy", "getEconomy")) {
             if (!$preload.Contains($token)) { throw "Falta $token en preload.js" }
           }
           foreach ($token in @("revokePendingSong", "chargeCommand", "economyRewards", "renderDetectedFanStickers", "command.action === 'balance'", "command.action === 'revoke'")) {
