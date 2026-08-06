@@ -1,13 +1,13 @@
 {
   "name": "lulu-finity-railway-relay",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Relay WebSocket para mantener las API keys de EulerStream fuera de Lulu Finity y rotarlas al alcanzar límites.",
   "type": "commonjs",
-  "main": "src/server.js",
+  "main": "src/public-server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/key-pool.js && node --check src/failure-classifier.js",
+    "start": "node src/public-server.js",
+    "check": "node --check src/public-server.js && node --check src/server.js && node --check src/key-pool.js && node --check src/failure-classifier.js",
     "test": "node --test src/*.test.js"
   },
   "engines": {
