@@ -1,96 +1,13 @@
-name: Publicar Lulu Finity para Windows
+name: Publicación antigua de Lulu Finity (deshabilitada)
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    runs-on: windows-latest
-
+  legacy-disabled:
+    runs-on: ubuntu-latest
     steps:
-      - name: Descargar repositorio
-        uses: actions/checkout@v4
-
-      - name: Instalar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Reconstruir código fuente
-        shell: pwsh
-        run: |
-          $parts = Get-ChildItem "source-parts/part-*.txt" | Sort-Object Name
-          if ($parts.Count -ne 19) {
-            throw "Se esperaban 19 fragmentos y se encontraron $($parts.Count)."
-          }
-
-          $encoded = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
-          [IO.File]::WriteAllBytes(
-            "Lulu-Finity-Source-0.7.0.zip",
-            [Convert]::FromBase64String($encoded)
-          )
-
-          $hash = (Get-FileHash "Lulu-Finity-Source-0.7.0.zip" -Algorithm SHA256).Hash.ToLower()
-          if ($hash -ne "0a9cdd7356ba035daf52d5b7b0422aa030385762c0f9f90e190ce1a5e301ccf5") {
-            throw "El hash del código fuente no coincide: $hash"
-          }
-
-          Expand-Archive "Lulu-Finity-Source-0.7.0.zip" -DestinationPath "app" -Force
-
-      - name: Validar código
-        working-directory: app
-        run: |
-          node --check src/main.js
-          node --check src/preload.js
-          node --check src/renderer.js
-
-      - name: Instalar dependencias
-        working-directory: app
-        run: npm install --no-audit --no-fund
-
-      - name: Compilar instalador, ZIP y manifiesto
-        working-directory: app
-        run: npm run build:win -- --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-
-      - name: Publicar o actualizar GitHub Release
-        shell: pwsh
-        working-directory: app
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $version = node -p "require('./package.json').version"
-          $tag = "v$version"
-          $assets = @(
-            "dist/Lulu-Finity-Setup-$version.exe",
-            "dist/Lulu-Finity-$version-x64.zip",
-            "dist/latest.yml"
-          )
-
-          foreach ($asset in $assets) {
-            if (!(Test-Path $asset)) {
-              throw "Falta el archivo $asset"
-            }
-          }
-
-          $previousErrorPreference = $ErrorActionPreference
-          $ErrorActionPreference = "Continue"
-          gh release view $tag --repo "${{ github.repository }}" *> $null
-          $releaseExists = $LASTEXITCODE -eq 0
-          $ErrorActionPreference = $previousErrorPreference
-
-          if ($releaseExists) {
-            gh release upload $tag @assets --clobber --repo "${{ github.repository }}"
-          } else {
-            gh release create $tag @assets `
-              --repo "${{ github.repository }}" `
-              --title "Lulu Finity $version" `
-              --notes-file CHANGELOG.md
-          }
+      - run: echo "Este workflow 0.7 quedó deshabilitado. Usa el workflow versionado más reciente."
