@@ -36,7 +36,12 @@ jobs:
           if ($baseHash -ne "3e5e6c9d16d1bc08366f5c446046f1283430a4dde18dbb43bedd452efde0cba6") { throw "La fuente 0.14.0 no coincide: $baseHash" }
           Expand-Archive base.zip -DestinationPath app -Force
 
-          $parts = @("build-v015/script/part-00.txt", "build-v015/script/part-01.txt")
+          $parts = @(
+            "build-v015/script/part-00-0.txt",
+            "build-v015/script/part-00-1.txt",
+            "build-v015/script/part-00-2.txt",
+            "build-v015/script/part-01.txt"
+          )
           $base64 = ($parts | ForEach-Object { Get-Content $_ -Raw }) -join ""
           [IO.File]::WriteAllText("apply-v015.b64", $base64, [Text.Encoding]::ASCII)
           python -c "import base64,gzip,pathlib; pathlib.Path('apply-v015.py').write_bytes(gzip.decompress(base64.b64decode(pathlib.Path('apply-v015.b64').read_text())))"
