@@ -1,0 +1,139 @@
+name: Publicar Lulu Finity 0.16.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "build-v016/**"
+      - ".github/workflows/release-v016.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Reconstruir y validar 0.16.0
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.15.0/Lulu-Finity-Source-0.15.0.zip" -OutFile base.zip
+          $baseHash = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
+          if ($baseHash -ne "11d0c63e59563ddfa375302f2d681fcdc31d3e38f80174e3c3dc9a83953df9cb") { throw "La fuente 0.15.0 no coincide: $baseHash" }
+          Expand-Archive base.zip -DestinationPath app -Force
+
+          $parts = @(
+            "build-v016/script/part-00.txt",
+            "build-v016/script/part-rest.txt"
+          )
+          $base64 = ($parts | ForEach-Object { Get-Content $_ -Raw }) -join ""
+          [IO.File]::WriteAllText("apply-v016.b64", $base64, [Text.Encoding]::ASCII)
+          python -c "import base64,gzip,pathlib; pathlib.Path('apply-v016.py').write_bytes(gzip.decompress(base64.b64decode(pathlib.Path('apply-v016.b64').read_text())))"
+          $scriptHash = (Get-FileHash apply-v016.py -Algorithm SHA256).Hash.ToLower()
+          if ($scriptHash -ne "830b6bdda3138428dd8776289502be6d9eeb61970e9ff478c3adc21578ed44c3") { throw "El parche 0.16.0 no coincide: $scriptHash" }
+          Push-Location app
+          python ../apply-v016.py
+          Pop-Location
+
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          $package = Get-Content app/package.json -Raw | ConvertFrom-Json
+          if ($package.version -ne "0.16.0") { throw "Versión inesperada: $($package.version)" }
+          if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita administrador." }
+
+          $main = Get-Content app/src/main.js -Raw
+          $preload = Get-Content app/src/preload.js -Raw
+          $renderer = Get-Content app/src/renderer.js -Raw
+          $html = Get-Content app/src/index.html -Raw
+          foreach ($token in @("rankingSnapshot", "recordRankingMetric", "ranking:get-info", "ranking-events", "fanStickers", "TOP GIFTERS", "rgbText")) { if (!$main.Contains($token)) { throw "Falta $token en main.js" } }
+          foreach ($token in @("getRankingInfo", "copyRankingUrl", "refreshRanking", "resetRanking", "onRankingStatus")) { if (!$preload.Contains($token)) { throw "Falta $token en preload.js" } }
+          foreach ($token in @("normalizedRankingOverlays", "collectRankingControls", "refreshRankingInfo", "copyRankingUrlBtn", "resetRankingBtn")) { if (!$renderer.Contains($token)) { throw "Falta $token en renderer.js" } }
+          foreach ($token in @("page-rankings", "rankingTypeInput", "rankingFontInput", "rankingRgbInput", "rankingPreviewFrame", "rankingUrlOutput")) { if (!$html.Contains($token)) { throw "Falta $token en index.html" } }
+
+          @'
+          const fs=require('fs'),vm=require('vm');
+          const source=fs.readFileSync('app/src/main.js','utf8');
+          const start=source.indexOf('function rankingHtml(');
+          const end=source.indexOf('\nasync function broadcastRankingSlot',start);
+          if(start<0||end<0) throw new Error('No se encontró rankingHtml');
+          const code=`function normalizeRankingSlot(v){return Math.min(4,Math.max(1,Math.round(Number(v||1))))}\n${source.slice(start,end)}\nresult=rankingHtml(2,'token-local',true);`;
+          const context={result:''};vm.createContext(context);vm.runInContext(code,context);
+          const match=context.result.match(/<script>([\s\S]*)<\/script>/);
+          if(!match) throw new Error('La superposición no contiene script');
+          fs.writeFileSync('ranking-overlay-script.js',match[1]);
+          '@ | Set-Content validate-ranking.js -Encoding utf8
+          node validate-ranking.js
+          node --check ranking-overlay-script.js
+
+          New-Item -ItemType Directory source-v016 -Force | Out-Null
+          foreach ($file in @("package.json", "NOTICE.md", "README.md", "CHANGELOG.md", ".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v016/$file" -Force } }
+          foreach ($folder in @("src", "build", ".github")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v016/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v016/*" -DestinationPath "Lulu-Finity-Source-0.16.0.zip" -Force
+
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm install --no-audit --no-fund
+
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win -- --publish never
+
+      - name: Verificar y analizar
+        shell: pwsh
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.16.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.16.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.16.0.exe.blockmap"
+          foreach ($file in @($installer, $zip, $latest, $blockmap, "Lulu-Finity-Source-0.16.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          if ((Get-Item $installer).Length -lt 50000000 -or (Get-Item $zip).Length -lt 50000000) { throw "El paquete parece incompleto." }
+          try {
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $installer) -ErrorAction Stop
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $zip) -ErrorAction Stop
+            $recent = Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -gt (Get-Date).AddMinutes(-15) }
+            if ($recent) { throw "Microsoft Defender reportó una detección." }
+          } catch {
+            if ($_.Exception.Message -like '*reportó una detección*') { throw }
+            Write-Warning $_.Exception.Message
+          }
+
+      - name: Publicar Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v0.16.0"
+          $files = @("app/dist/Lulu-Finity-Setup-0.16.0.exe", "app/dist/Lulu-Finity-0.16.0-x64.zip", "app/dist/latest.yml", "app/dist/Lulu-Finity-Setup-0.16.0.exe.blockmap", "Lulu-Finity-Source-0.16.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.16.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.16.0" --notes-file "app/CHANGELOG.md" }
+
+      - name: Subir artefacto de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.16.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.16.0.exe
+            app/dist/Lulu-Finity-0.16.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.16.0.exe.blockmap
+            Lulu-Finity-Source-0.16.0.zip
+          if-no-files-found: error
+          retention-days: 30
