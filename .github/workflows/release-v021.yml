@@ -1,0 +1,125 @@
+name: Publicar Lulu Finity 0.21.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "build-v021/**"
+      - ".github/workflows/release-v021.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validar relay de Railway
+        working-directory: railway-relay
+        run: |
+          npm install --no-audit --no-fund
+          npm run check
+          npm test
+
+      - name: Reconstruir y validar 0.21.0
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.20.0/Lulu-Finity-Source-0.20.0.zip" -OutFile base.zip
+          $baseHash = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
+          if ($baseHash -ne "c9e09583d7a328bff04106a61ef954477651a69d969f421f9ba9d726febc161c") { throw "La fuente 0.20.0 no coincide: $baseHash" }
+          Expand-Archive base.zip -DestinationPath app -Force
+
+          $base64 = Get-Content "build-v021/script/patch.txt" -Raw
+          [IO.File]::WriteAllText("apply-v021.b64", $base64, [Text.Encoding]::ASCII)
+          python -c "import base64,gzip,pathlib; pathlib.Path('apply-v021.py').write_bytes(gzip.decompress(base64.b64decode(pathlib.Path('apply-v021.b64').read_text())))"
+          $scriptHash = (Get-FileHash "apply-v021.py" -Algorithm SHA256).Hash.ToLower()
+          if ($scriptHash -ne "59a9f72a3654602a4037e4667365dc58625c1b8b018a444d530ed3acbd0b21fd") { throw "El parche 0.21.0 no coincide: $scriptHash" }
+          python apply-v021.py app
+
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+
+          $package = Get-Content app/package.json -Raw | ConvertFrom-Json
+          if ($package.version -ne "0.21.0") { throw "Versión inesperada: $($package.version)" }
+          if ($package.dependencies.ws -ne "8.18.2") { throw "Versión inesperada de ws: $($package.dependencies.ws)" }
+          if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita administrador." }
+
+          $main = Get-Content app/src/main.js -Raw
+          $preload = Get-Content app/src/preload.js -Raw
+          $renderer = Get-Content app/src/renderer.js -Raw
+          $html = Get-Content app/src/index.html -Raw
+          foreach ($token in @("RailwayRelayConnection", "normalizeRelayWebSocketUrl", "relayUrl", "relayClientToken", "lulu.relay.status")) { if (!$main.Contains($token)) { throw "Falta $token en main.js" } }
+          foreach ($token in @("relayUrlInput", "relayClientTokenInput", "toggleRelayTokenBtn")) { if (!$renderer.Contains($token)) { throw "Falta $token en renderer.js" } }
+          foreach ($token in @("Servidor seguro de TikTok LIVE", "relayUrlInput", "relayClientTokenInput")) { if (!$html.Contains($token)) { throw "Falta $token en index.html" } }
+          foreach ($forbidden in @("EULER_CLOUD_WEBSOCKET_URL", "openFreeTikTokKey", "new FreeEulerCloudConnection")) {
+            if ($main.Contains($forbidden) -or $preload.Contains($forbidden) -or $renderer.Contains($forbidden)) { throw "La app todavía contiene $forbidden" }
+          }
+
+          New-Item -ItemType Directory source-v021 -Force | Out-Null
+          foreach ($file in @("package.json", "NOTICE.md", "README.md", "CHANGELOG.md", ".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v021/$file" -Force } }
+          foreach ($folder in @("src", "build", ".github")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v021/$folder" -Recurse -Force } }
+          Copy-Item "railway-relay" "source-v021/railway-relay" -Recurse -Force
+          Compress-Archive -Path "source-v021/*" -DestinationPath "Lulu-Finity-Source-0.21.0.zip" -Force
+
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm install --no-audit --no-fund
+
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win -- --publish never
+
+      - name: Verificar paquetes
+        shell: pwsh
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.21.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.21.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.21.0.exe.blockmap"
+          foreach ($file in @($installer, $zip, $latest, $blockmap, "Lulu-Finity-Source-0.21.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          if ((Get-Item $installer).Length -lt 50000000 -or (Get-Item $zip).Length -lt 50000000) { throw "El paquete parece incompleto." }
+          try {
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $installer) -ErrorAction Stop
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $zip) -ErrorAction Stop
+            $recent = Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -gt (Get-Date).AddMinutes(-15) }
+            if ($recent) { throw "Microsoft Defender reportó una detección." }
+          } catch {
+            if ($_.Exception.Message -like '*reportó una detección*') { throw }
+            Write-Warning $_.Exception.Message
+          }
+
+      - name: Publicar Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v0.21.0"
+          $files = @("app/dist/Lulu-Finity-Setup-0.21.0.exe", "app/dist/Lulu-Finity-0.21.0-x64.zip", "app/dist/latest.yml", "app/dist/Lulu-Finity-Setup-0.21.0.exe.blockmap", "Lulu-Finity-Source-0.21.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.21.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.21.0" --notes-file "app/CHANGELOG.md" }
+
+      - name: Subir artefacto de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.21.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.21.0.exe
+            app/dist/Lulu-Finity-0.21.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.21.0.exe.blockmap
+            Lulu-Finity-Source-0.21.0.zip
+          if-no-files-found: error
+          retention-days: 30
