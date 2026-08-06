@@ -1,10 +1,11 @@
-name: Validar relay y parche 0.21
+name: Validar relay y parche 0.22
 
 on:
   pull_request:
     paths:
       - "railway-relay/**"
       - "build-v021/**"
+      - "build-v022/**"
       - ".github/workflows/relay-ci.yml"
       - ".github/workflows/release-v021.yml"
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - "railway-relay/**"
       - "build-v021/**"
+      - "build-v022/**"
       - ".github/workflows/relay-ci.yml"
       - ".github/workflows/release-v021.yml"
 
@@ -34,7 +36,17 @@ jobs:
           npm run check
           npm test
 
-      - name: Reconstruir parche 0.21
+      - name: Probar endpoints de uso diario
+        working-directory: railway-relay
+        run: |
+          EULER_API_KEYS='["dummy-key"]' PORT=3210 USAGE_STATE_FILE=/tmp/lulu-usage-ci.json node src/public-server.js > /tmp/lulu-relay.log 2>&1 &
+          RELAY_PID=$!
+          trap 'kill $RELAY_PID 2>/dev/null || true' EXIT
+          for i in {1..30}; do curl --fail --silent http://127.0.0.1:3210/health > /tmp/health.json && break; sleep 0.2; done
+          curl --fail --silent http://127.0.0.1:3210/usage > /tmp/usage.json
+          node -e "const u=require('/tmp/usage.json');if(!u.ok||u.limit!==7500||u.perConnection!==2)process.exit(1)"
+
+      - name: Reconstruir parches 0.21 y 0.22
         run: |
           curl --fail --location --silent --show-error \
             https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.20.0/Lulu-Finity-Source-0.20.0.zip \
@@ -50,24 +62,29 @@ jobs:
           PY
           echo "f03c7320f04c73aa5f3b81582668d3e14a657cd4857d848988e493f1ba948526  apply-v021.py" | sha256sum --check
           python apply-v021.py app
+          python build-v022/apply-v022.py app
 
       - name: Validar aplicación reconstruida
         run: |
           node --check app/src/main.js
           node --check app/src/preload.js
           node --check app/src/renderer.js
-          node -e "const p=require('./app/package.json'); if(p.version!=='0.21.0'||p.dependencies.ws!=='8.18.2') process.exit(1)"
           python - <<'PY'
           from pathlib import Path
           main = Path('app/src/main.js').read_text(encoding='utf-8')
           preload = Path('app/src/preload.js').read_text(encoding='utf-8')
           renderer = Path('app/src/renderer.js').read_text(encoding='utf-8')
           html = Path('app/src/index.html').read_text(encoding='utf-8')
-          for token in ('RailwayRelayConnection', 'normalizeRelayWebSocketUrl', 'EMBEDDED_RELAY_URL', 'EMBEDDED_RELAY_CLIENT_TOKEN', 'lulu-finity-production.up.railway.app', '__LULU_RELAY_CLIENT_TOKEN__', 'lulu.relay.status'):
+          styles = Path('app/src/styles.css').read_text(encoding='utf-8')
+          for token in ('relay:usage', 'youtubeAdBlockEnabled', 'YOUTUBE_PARTITION', 'Conectado correctamente al LIVE.'):
               assert token in main, token
-          for token in ('Servidor seguro de TikTok LIVE', 'Los usuarios no tienen que escribir'):
-              assert token in html, token
+          for token in ('getRelayUsage',):
+              assert token in preload, token
+          for token in ('relayUsageBar', 'youtubeAdBlockEnabledInput', 'Rosa claro', 'Morado', 'Rojo', 'Azul', 'Lulu ya incluye una conexión estable para leer a TikTok.'):
+              assert token in renderer + html, token
+          for token in ('data-theme="blush"', 'data-theme="purple"', 'data-theme="red"', 'data-theme="blue"', 'relay-usage-card'):
+              assert token in styles, token
           combined = main + preload + renderer + html
-          for forbidden in ('EULER_CLOUD_WEBSOCKET_URL', 'openFreeTikTokKey', 'new FreeEulerCloudConnection', 'relayUrlInput', 'relayClientTokenInput', 'toggleRelayTokenBtn'):
-              assert forbidden not in combined, forbidden
+          assert 'Conectado mediante Railway' not in combined
+          assert 'Los usuarios no tienen que escribir' not in combined
           PY
