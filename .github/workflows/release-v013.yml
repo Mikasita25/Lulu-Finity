@@ -1,0 +1,160 @@
+name: Publicar Lulu Finity 0.13.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "build-v013/**"
+      - ".github/workflows/release-v013.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Reconstruir y validar 0.13.0
+        shell: pwsh
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.12.0/Lulu-Finity-Source-0.12.0.zip" -OutFile base.zip
+          $baseHash = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
+          if ($baseHash -ne "6f936ecefa316ddf041934b2530cfa50e8ebf3efdca5c7d4e653eb17e49a7085") {
+            throw "La fuente 0.12.0 no coincide: $baseHash"
+          }
+          Expand-Archive base.zip -DestinationPath app -Force
+
+          $parts = Get-ChildItem "build-v013/scriptgz/part-*.txt" | Sort-Object Name
+          if ($parts.Count -ne 2) { throw "Se esperaban 2 fragmentos y se encontraron $($parts.Count)." }
+          $base64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
+          [IO.File]::WriteAllBytes("patch-v013.py.gz", [Convert]::FromBase64String($base64))
+          python -c "import gzip,pathlib; pathlib.Path('apply-v013.py').write_bytes(gzip.decompress(pathlib.Path('patch-v013.py.gz').read_bytes()))"
+          $scriptHash = (Get-FileHash "apply-v013.py" -Algorithm SHA256).Hash.ToLower()
+          if ($scriptHash -ne "6ccbf62b15249719c3393ce8b68082659123521b0cf9944fac82790ed8f8f782") {
+            throw "El parche 0.13.0 no coincide: $scriptHash"
+          }
+          Push-Location app
+          python ../apply-v013.py
+          Pop-Location
+
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+
+          $package = Get-Content app/package.json -Raw | ConvertFrom-Json
+          if ($package.version -ne "0.13.0") { throw "Versión inesperada: $($package.version)" }
+          if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita administrador." }
+
+          $main = Get-Content app/src/main.js -Raw
+          $preload = Get-Content app/src/preload.js -Raw
+          $renderer = Get-Content app/src/renderer.js -Raw
+          $html = Get-Content app/src/index.html -Raw
+
+          foreach ($token in @("ipcMain.handle('youtube:resolve'", "resolveYoutubeRequest", "ipcMain.handle('spotify:desktop'", "voiceLanguageFilter: 'all'")) {
+            if (!$main.Contains($token)) { throw "Falta $token en main.js" }
+          }
+          foreach ($token in @("resolveYouTube", "openSpotifyDesktop")) {
+            if (!$preload.Contains($token)) { throw "Falta $token en preload.js" }
+          }
+          foreach ($token in @("handlingExternalYoutubeSkip", "await enqueueRequestedMusic", "voiceCatalogExpandedV013", "showSpotifyDesktopBtn", "runEventMediaRules")) {
+            if (!$renderer.Contains($token)) { throw "Falta $token en renderer.js" }
+          }
+          foreach ($token in @("voiceSearchInput", "voiceVisibleCount", "Acciones por regalos y stickers")) {
+            if (!$html.Contains($token)) { throw "Falta $token en index.html" }
+          }
+          if ($renderer.Contains('<span>✧</span>Eventos')) { throw "Todavía se crea la categoría Eventos." }
+          if ($renderer.Contains('id="page-events"')) { throw "Todavía existe la página Eventos." }
+
+          New-Item -ItemType Directory source-v013 -Force | Out-Null
+          foreach ($file in @("package.json", "NOTICE.md", "README.md", "CHANGELOG.md", ".gitignore")) {
+            if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v013/$file" -Force }
+          }
+          foreach ($folder in @("src", "build", ".github")) {
+            if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v013/$folder" -Recurse -Force }
+          }
+          Compress-Archive -Path "source-v013/*" -DestinationPath "Lulu-Finity-Source-0.13.0.zip" -Force
+
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm install --no-audit --no-fund
+
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win -- --publish never
+
+      - name: Verificar y analizar
+        shell: pwsh
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.13.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.13.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.13.0.exe.blockmap"
+          foreach ($file in @($installer, $zip, $latest, $blockmap, "Lulu-Finity-Source-0.13.0.zip")) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          if ((Get-Item $installer).Length -lt 50000000 -or (Get-Item $zip).Length -lt 50000000) {
+            throw "El paquete parece incompleto."
+          }
+          try {
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $installer) -ErrorAction Stop
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $zip) -ErrorAction Stop
+            $recent = Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -gt (Get-Date).AddMinutes(-15) }
+            if ($recent) { throw "Microsoft Defender reportó una detección." }
+          } catch {
+            if ($_.Exception.Message -like '*reportó una detección*') { throw }
+            Write-Warning $_.Exception.Message
+          }
+
+      - name: Publicar Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v0.13.0"
+          $files = @(
+            "app/dist/Lulu-Finity-Setup-0.13.0.exe",
+            "app/dist/Lulu-Finity-0.13.0-x64.zip",
+            "app/dist/latest.yml",
+            "app/dist/Lulu-Finity-Setup-0.13.0.exe.blockmap",
+            "Lulu-Finity-Source-0.13.0.zip"
+          )
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $files --clobber
+            gh release edit $tag --title "Lulu Finity 0.13.0" --notes-file "app/CHANGELOG.md"
+          } else {
+            gh release create $tag $files --target main --title "Lulu Finity 0.13.0" --notes-file "app/CHANGELOG.md"
+          }
+
+      - name: Subir artefacto de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.13.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.13.0.exe
+            app/dist/Lulu-Finity-0.13.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.13.0.exe.blockmap
+            Lulu-Finity-Source-0.13.0.zip
+          if-no-files-found: error
+          retention-days: 30
