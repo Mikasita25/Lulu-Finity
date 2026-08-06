@@ -1,3 +1,5 @@
 node_modules/
 .env
 *.log
+.lulu-usage.json
+.lulu-usage.json.tmp

@@ -1,26 +1,21 @@
 # Railway API Relay de Lulu Finity
 
-Este servicio mantiene las API keys de EulerStream en Railway. La aplicación de escritorio solamente conoce la URL del relay y, opcionalmente, un token de acceso propio; nunca recibe las keys del proveedor.
+Este servicio conserva las API keys de EulerStream en Railway, rota las claves al alcanzar límites y entrega a la aplicación un contador diario aproximado.
 
-## Despliegue en Railway
+## Uso diario
 
-1. Crea un servicio desde el repositorio `Mikasita25/Lulu-Finity`.
-2. En **Settings → Root Directory** usa `/railway-relay`.
-3. Agrega `EULER_API_KEYS` como arreglo JSON, por ejemplo `["key1","key2","key3"]`.
-4. Agrega `CLIENT_TOKENS` con uno o más tokens largos para autorizar la app. Déjalo vacío solamente para una prueba privada.
-5. Genera un dominio público en Railway.
-6. En Lulu Finity usa `wss://TU-DOMINIO.up.railway.app/v1/tiktok/live` y el mismo token de cliente.
+- El límite predeterminado es **7500 usos por día**.
+- Cada conexión de Lulu suma aproximadamente **2 usos**.
+- `GET /usage` devuelve el total utilizado, porcentaje, conexiones estimadas y hora de reinicio.
+- El contador se reinicia cada día UTC.
+- El archivo `.lulu-usage.json` conserva el contador mientras el almacenamiento siga disponible. Para persistencia entre despliegues, configura un Railway Volume y `USAGE_STATE_FILE=/data/lulu-usage.json`.
+
+## Despliegue
+
+Configura `EULER_API_KEYS`, conserva una sola réplica y genera un dominio público. Los endpoints disponibles son `GET /health`, `GET /usage` y el WebSocket `/v1/tiktok/live`.
 
 ## Rotación
 
-- Se elige la key con menos conexiones activas.
-- Una respuesta de límite temporal o concurrencia pone esa key en enfriamiento y usa la siguiente.
-- Una cuota mensual agotada usa un enfriamiento más largo.
-- Una key inválida se desactiva hasta reiniciar/corregir las variables.
-- Durante la rotación la conexión entre Lulu Finity y Railway permanece abierta.
+Se elige la key con menor carga. Los límites temporales usan un enfriamiento corto, las cuotas agotadas un enfriamiento largo y las claves inválidas se desactivan hasta corregirlas.
 
-## Variables
-
-Consulta `.env.example`. `MAX_CONNECTIONS_PER_KEY` debe coincidir con el límite real de tu plan. El endpoint `GET /health` muestra únicamente cantidades y nunca secretos.
-
-Mantén una sola réplica del servicio porque el estado del pool está en memoria. Usa únicamente keys que te pertenezcan y verifica que el contrato de tu proveedor permita repartir tráfico entre ellas.
+Consulta `.env.example` para todos los valores configurables.
