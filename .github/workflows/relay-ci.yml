@@ -1,0 +1,30 @@
+name: Validar relay de Railway
+
+on:
+  pull_request:
+    paths:
+      - "railway-relay/**"
+      - ".github/workflows/relay-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "railway-relay/**"
+      - ".github/workflows/relay-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - working-directory: railway-relay
+        run: npm install --no-audit --no-fund
+      - working-directory: railway-relay
+        run: npm run check
+      - working-directory: railway-relay
+        run: npm test
