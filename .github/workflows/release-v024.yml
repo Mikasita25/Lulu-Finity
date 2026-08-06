@@ -26,6 +26,8 @@ jobs:
       - name: Reconstruir Lulu Finity 0.24.0
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.23.0/Lulu-Finity-Source-0.23.0.zip" -OutFile base.zip
           $baseHash = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
           if ($baseHash -ne "dffea4d9e024b56049cd4884d23864b8b7281db2ceaf27e524533fd6b68c4eab") { throw "La fuente 0.23.0 no coincide: $baseHash" }
@@ -37,7 +39,7 @@ jobs:
           [IO.File]::WriteAllText("apply-v024.b64", $base64, [Text.Encoding]::ASCII)
           python -c "import base64,gzip,pathlib; pathlib.Path('apply-v024.py').write_bytes(gzip.decompress(base64.b64decode(pathlib.Path('apply-v024.b64').read_text())))"
           $scriptHash = (Get-FileHash "apply-v024.py" -Algorithm SHA256).Hash.ToLower()
-          if ($scriptHash -ne "533ce85794a98fbc01bd067d8b1ef97dcc60e3fbe72588205b86d151876e6a18") { throw "El parche 0.24.0 no coincide: $scriptHash" }
+          if ($scriptHash -ne "a1dea3fbc2b0aae05504dcf7c576cc169e60d6f225832157a3d40a6dcfd92144") { throw "El parche 0.24.0 no coincide: $scriptHash" }
           python apply-v024.py app
 
           node --check app/src/main.js
