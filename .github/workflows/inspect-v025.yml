@@ -1,0 +1,28 @@
+name: Inspeccionar fuente 0.24 para 0.25
+on:
+  push:
+    branches: [agent/v025-final]
+    paths: [".github/workflows/inspect-v025.yml"]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descargar fuente 0.24.0
+        run: |
+          curl -fL https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.24.0/Lulu-Finity-Source-0.24.0.zip -o base.zip
+          unzip -q base.zip -d app
+      - name: Mostrar estructura y secciones relevantes
+        run: |
+          echo '=== package ==='
+          cat app/package.json
+          echo '=== menu/theme/html ==='
+          grep -nEi 'YouTube|Spotify|Rankings|Ranking|Ajustes|Miku|Comandos|Mensajes autom|TikTok|nav-|data-section|section-' app/src/index.html | head -n 260 || true
+          echo '=== renderer ==='
+          grep -nEi 'youtube|spotify|ranking|miku|theme|tiktok|auto.?chat|settings|section' app/src/renderer.js | head -n 320 || true
+          echo '=== css ==='
+          grep -nEi 'miku|theme|panel|card|background|opacity|ranking|sidebar|nav' app/src/styles.css | head -n 320 || true
+          echo '=== files ==='
+          find app/src -maxdepth 2 -type f -printf '%p %s\n' | sort
