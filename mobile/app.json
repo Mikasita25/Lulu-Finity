@@ -8,15 +8,10 @@
     "android": {
       "package": "com.mikasita.lulufinity.mobile",
       "versionCode": 1,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#100A14"
-      },
       "permissions": ["POST_NOTIFICATIONS", "VIBRATE"]
     },
-    "plugins": [["expo-notifications", {"color": "#FF5FC8"}], "expo-document-picker", ["expo-splash-screen", {"backgroundColor": "#09070D", "image": "./assets/splash-icon.png", "imageWidth": 180, "resizeMode": "contain", "dark": {"image": "./assets/splash-icon.png", "backgroundColor": "#09070D"}}]],
+    "plugins": [["expo-notifications", {"color": "#FF5FC8"}], "expo-document-picker", "expo-splash-screen"],
     "extra": {"relayUrl": "wss://lulu-finity-production.up.railway.app/v1/tiktok/live"},
-    "icon": "./assets/icon.png",
     "platforms": ["android"]
   }
 }
