@@ -1,0 +1,140 @@
+name: Lulu Finity 0.30.0
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v0300/**"
+      - ".github/workflows/v0300.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v0300/**"
+      - ".github/workflows/v0300.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir y validar 0.30.0
+        run: |
+          curl --fail --location --silent --show-error https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.29.0/Lulu-Finity-Source-0.29.0.zip -o base.zip
+          echo "020038fd8351461ed43d57535a2e667fec0cf766cff80fc7e5b8ce19d6c8d8e4  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v0300/apply-v0300.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.30.0'||p.dependencies['@ghostery/adblocker-electron']!=='2.18.1') process.exit(1)"
+          cd app/railway-relay && npm test
+      - name: Validar presets y regresiones críticas
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          r=Path('app/src/renderer.js').read_text(encoding='utf-8')
+          h=Path('app/src/index.html').read_text(encoding='utf-8')
+          m=Path('app/src/main.js').read_text(encoding='utf-8')
+          required_presets=("id:'mouse'","id:'minion'","id:'anime-kawaii'","id:'anime-chibi'","id:'anime-senpai'","id:'anime-villain'","id:'virtual-idol'","id:'baby'","id:'demon'","id:'robot'","id:'epic'","id:'turbo'")
+          for token in required_presets: assert r.count(token)==1, token
+          for token in ('const FUN_VOICE_PRESETS','function applyFunVoicePreset()','function testFunVoicePreset()','function copyFunVoicePresetToUserBuilder()',"$('applyFunVoicePresetBtn')?.addEventListener","$('testFunVoicePresetBtn')?.addEventListener"):
+              assert token in r, token
+          for ident in ('funVoicePresetSelect','applyFunVoicePresetBtn','testFunVoicePresetBtn','copyFunVoicePresetBtn','funVoicePresetHint'):
+              assert f'id="{ident}"' in h, ident
+          for voice in ('es-MX-DaliaNeural','es-MX-JorgeNeural','es-US-PalomaNeural','es-US-AlonsoNeural','es-ES-AlvaroNeural','es-AR-ElenaNeural'):
+              assert voice in m, voice
+          assert 'function setupAudioActivityIndicators()' in r
+          assert 'async function connectFromUi()' in r
+          assert 'function setupEvents()' in r
+          assert 'rollbackVersionBtn' in h
+          assert 'filtros tipo AdBlock/Brave' in h
+          assert '<span class="version" id="versionLabel">v0.30.0</span>' in h
+          assert "app.getPath('localAppData')" not in m and 'app.getPath("localAppData")' not in m
+          assert 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live' in m
+          assert '__LULU_RELAY_CLIENT_TOKEN__' in m
+          PY
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir 0.30.0
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.29.0/Lulu-Finity-Source-0.29.0.zip" -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne "020038fd8351461ed43d57535a2e667fec0cf766cff80fc7e5b8ce19d6c8d8e4") { throw "Fuente 0.29.0 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v0300/apply-v0300.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló relay" }; Pop-Location
+          New-Item -ItemType Directory source-v0300 -Force | Out-Null
+          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v0300/$file" -Force } }
+          foreach ($folder in @("src","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v0300/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v0300/*" -DestinationPath "Lulu-Finity-Source-0.30.0.zip" -Force
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          if ((Get-Content $path -Raw).Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "No se inyectó el token" }
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:win -- --publish never
+      - name: Verificar y publicar 0.30.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.30.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.30.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.30.0.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.30.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @('FUN_VOICE_PRESETS','Ratón','Minion (broma)','Anime kawaii','Villano anime','copyFunVoicePresetBtn','@ghostery/adblocker-electron','rollbackVersionBtn','v0.30.0')) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
+          if ($text.Contains("app.getPath('localAppData')") -or $text.Contains('app.getPath("localAppData")')) { throw "Regresó LocalAppData" }
+          $tag = "v0.30.0"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.30.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.30.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.30.0" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.30.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.30.0.exe
+            app/dist/Lulu-Finity-0.30.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.30.0.exe.blockmap
+            Lulu-Finity-Source-0.30.0.zip
+          if-no-files-found: error
+          retention-days: 30
