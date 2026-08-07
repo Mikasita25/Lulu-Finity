@@ -1,0 +1,144 @@
+name: Publicar Lulu Finity 0.25.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "build-v025/**"
+      - ".github/workflows/release-v025.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir Lulu Finity 0.25.0
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.24.0/Lulu-Finity-Source-0.24.0.zip" -OutFile base.zip
+          $baseHash = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
+          if ($baseHash -ne "b4d4f7d0e5c1aeda5cc32cb45c86f70f19bb9a620ce216458b8cc682fac96bbd") { throw "La fuente 0.24.0 no coincide: $baseHash" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v025/apply-v025.py app
+          if ($LASTEXITCODE -ne 0) { throw "Falló el parche 0.25.0" }
+
+          curl.exe -L --fail "https://lh7-rt.googleusercontent.com/slidesz/AGV_vUeYvNQEUJiTDPusTpPf0hgOPJYMNeWUvrgqt5DXONh76kHUECBsEwBVHkTeA0kMZQ2cFbSBviBOd7RsV-ondQKOLhbkZ39bZyelJs8bTKythQ0p8V3wo14NgIUKFpQLop48Xu0vcnbJ2sVCyRMaXGMNapGLd8u1vywMgNBeMWHnYheaZcvZaA=nw?key=dG7mjVQevJNbzxrZlHrj8Q" -o app/src/miku-classic-user.jpg
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar Miku Classic" }
+          curl.exe -L --fail "https://lh7-rt.googleusercontent.com/slidesz/AGV_vUcmvvrv_cZpqHkvotkDRsY2o7EzL-VQwlrByhZtT3er02wtLMbJOPPSIhWC3rkYQbfK7H2udxo8ixNmRQ3UQuOzk7UOWU5DeD9zFI4gClDdOHs1lDgC_wD-RJpKpJEnCYP8cJNg0fx0M1ewadsnsYbytq2SdTyZUBpoMLNU8R0jeOWDb9U=nw?key=dG7mjVQevJNbzxrZlHrj8Q" -o app/src/miku-soft-user.png
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar Miku Soft" }
+          curl.exe -L --fail "https://lh7-rt.googleusercontent.com/slidesz/AGV_vUewg3v08L_mG8eXgNDLKOgUU10W1ss2OLp6QlwSlkB6pqoXMdKCg2qpvaUOfsDoEH1HaFmCP05FQyiEahMmdN2gs37BaFZQ3G-L4ASUwwVTXWox7TOSyfuSfKL1KySHoW2zVTUIzeljUYKiqc7O6nza7jQwPaqd8o0xG1IKs6ueRDiQjCuq8w=nw?key=dG7mjVQevJNbzxrZlHrj8Q" -o app/src/miku-dark-user.png
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar Miku Dark" }
+          curl.exe -L --fail "https://lh7-rt.googleusercontent.com/slidesz/AGV_vUeiI-kC_lo6E47UYdR97DxqhViSA3jIWHlEKKvVvOC83sq6kDpjZcLKOo7SfpniVbUd8SwTxirL0DXMznp5rsPyEyaVDQdvjgWApKcfB8IHKqOtIT4yWAPLY29_ZLB8Wk0wxpjgPmRjzmJxEQK3GUkxA8g2lJQFpjyJsPTTIPp--06pKwZUHA=nw?key=dG7mjVQevJNbzxrZlHrj8Q" -o app/src/lulu-about-user.jpg
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar la imagen de Sobre Lulu" }
+
+          foreach ($file in @("app/src/miku-classic-user.jpg","app/src/miku-soft-user.png","app/src/miku-dark-user.png","app/src/lulu-about-user.jpg")) {
+            if (!(Test-Path $file) -or (Get-Item $file).Length -lt 20000) { throw "Falta o está incompleta la imagen $file" }
+          }
+
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          $package = Get-Content app/package.json -Raw | ConvertFrom-Json
+          if ($package.version -ne "0.25.0") { throw "Versión inesperada: $($package.version)" }
+          if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita administrador." }
+          $html = Get-Content app/src/index.html -Raw
+          $renderer = Get-Content app/src/renderer.js -Raw
+          $css = Get-Content app/src/styles.css -Raw
+          foreach ($token in @(">Música</button>",">Cuenta</button>",">Overlays</button>","id=`"page-account`"","Mensajes automáticos en el LIVE","miku-classic-user.jpg","miku-soft-user.png","miku-dark-user.png","lulu-about-user.jpg")) {
+            if (!(($html + $renderer + $css).Contains($token))) { throw "Falta $token" }
+          }
+          if (($html + $renderer + $css).Contains("Overlays sobre Lulu")) { throw "El nombre de la categoría debe ser solo Overlays." }
+          $main = Get-Content app/src/main.js -Raw
+          if (!$main.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta el marcador del token." }
+          if ($main.Contains("relayClientToken === '__LULU_RELAY_CLIENT_TOKEN__'")) { throw "Regresó la validación defectuosa del token." }
+
+          New-Item -ItemType Directory source-v025 -Force | Out-Null
+          foreach ($file in @("package.json", "NOTICE.md", "README.md", "CHANGELOG.md", ".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v025/$file" -Force } }
+          foreach ($folder in @("src", "build", "railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v025/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v025/*" -DestinationPath "Lulu-Finity-Source-0.25.0.zip" -Force
+
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Configura LULU_RELAY_CLIENT_TOKEN en GitHub Actions." }
+          if ($env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "LULU_RELAY_CLIENT_TOKEN debe tener al menos 32 caracteres." }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "No se encontró el marcador del token." }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          $final = Get-Content $path -Raw
+          if ($final.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "El token no fue inyectado." }
+          if (!$final.Contains("relayClientToken.startsWith('__LULU_RELAY_')")) { throw "Falta la comprobación segura del marcador." }
+          node --check $path
+
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm install --no-audit --no-fund
+
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win -- --publish never
+
+      - name: Verificar paquetes y app.asar final
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.25.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.25.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.25.0.exe.blockmap"
+          foreach ($file in @($installer, $zip, $latest, $blockmap, "Lulu-Finity-Source-0.25.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          if ((Get-Item $installer).Length -lt 50000000 -or (Get-Item $zip).Length -lt 50000000) { throw "El paquete parece incompleto." }
+          Expand-Archive $zip -DestinationPath verify-portable -Force
+          $asar = Get-ChildItem verify-portable -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "No se encontró app.asar dentro del ZIP final." }
+          $asarBytes = [IO.File]::ReadAllBytes($asar.FullName)
+          $asarText = [Text.Encoding]::UTF8.GetString($asarBytes)
+          if ($asarText.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "El ZIP final todavía contiene el marcador del token." }
+          if (!$asarText.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "El ZIP final no contiene el token oficial." }
+          foreach ($token in @(">Música</button>",">Cuenta</button>",">Overlays</button>","Música · Spotify","lulu-about-user.jpg","miku-classic-user.jpg","miku-soft-user.png","miku-dark-user.png")) {
+            if (!$asarText.Contains($token)) { throw "El app.asar final no contiene $token" }
+          }
+          if ($asarText.Contains("Overlays sobre Lulu")) { throw "El app.asar contiene el nombre incorrecto de Overlays." }
+
+      - name: Publicar Release 0.25.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v0.25.0"
+          $files = @("app/dist/Lulu-Finity-Setup-0.25.0.exe", "app/dist/Lulu-Finity-0.25.0-x64.zip", "app/dist/latest.yml", "app/dist/Lulu-Finity-Setup-0.25.0.exe.blockmap", "Lulu-Finity-Source-0.25.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.25.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.25.0" --notes-file "app/CHANGELOG.md" }
+
+      - name: Subir artefacto de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.25.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.25.0.exe
+            app/dist/Lulu-Finity-0.25.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.25.0.exe.blockmap
+            Lulu-Finity-Source-0.25.0.zip
+          if-no-files-found: error
+          retention-days: 30
