@@ -1,0 +1,57 @@
+name: Validar permisos integrados 0.26
+
+on:
+  pull_request:
+    paths:
+      - "build-v026/**"
+      - ".github/workflows/validate-v026.yml"
+      - ".github/workflows/release-v026.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v026/**"
+      - ".github/workflows/validate-v026.yml"
+      - ".github/workflows/release-v026.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir Lulu Finity 0.26.0
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.25.0/Lulu-Finity-Source-0.25.0.zip \
+            --output base.zip
+          echo "4f7986f5da54a99cb7f12e41706d6f76f0ab5f34e286de9ef6527e56ddc69898  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v026/apply-v026.py app
+
+      - name: Validar categorías y lógica existente
+        run: |
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.26.0') process.exit(1)"
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('app/src/index.html').read_text(encoding='utf-8')
+          assert 'data-page="permissions"' not in html
+          assert 'id="page-permissions"' not in html
+          for token in ('id="page-songs"','Quién puede pedir música','name="musicProvider"','name="musicPermissionMode"','id="allowedUsersList"'):
+              assert token in html, token
+          for token in ('id="page-voice"','Quién puede ser leído por TTS','name="ttsPermissionMode"','id="allowedTtsUsersList"'):
+              assert token in html, token
+          assert html.count('name="musicPermissionMode"') == 4
+          assert html.count('name="ttsPermissionMode"') == 4
+          renderer = Path('app/src/renderer.js').read_text(encoding='utf-8')
+          for token in ('musicPermissionMode','ttsPermissionMode','allowedMusicUsers','allowedTtsUsers'):
+              assert token in renderer, token
+          PY
