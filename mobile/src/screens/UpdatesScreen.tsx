@@ -28,6 +28,10 @@ export function UpdatesScreen() {
     if (url) await Linking.openURL(url);
   };
 
+  const checkNow = async () => {
+    await check(true);
+  };
+
   return (
     <Screen>
       <AppHeader title="Actualizaciones" subtitle="Mantén Lulú Finity Mobile al día sin confundirla con la versión de PC." />
@@ -82,7 +86,7 @@ export function UpdatesScreen() {
       ) : null}
 
       {error ? <Text selectable className="mb-4 rounded-2xl bg-red-500/10 p-4 text-xs leading-5 text-red-200">{error}</Text> : null}
-      <Button label={loading ? 'Buscando…' : 'Buscar actualización'} disabled={loading} onPress={() => check(true)} variant="secondary" icon={<RefreshCw size={17} color="white" />} />
+      <Button label={loading ? 'Buscando…' : 'Buscar actualización'} disabled={loading} onPress={checkNow} variant="secondary" icon={<RefreshCw size={17} color="white" />} />
     </Screen>
   );
 }
