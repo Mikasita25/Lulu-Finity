@@ -1,0 +1,134 @@
+name: Publicar Lulu Finity 0.27.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "build-v027/**"
+      - "railway-relay/**"
+      - ".github/workflows/release-v027.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir Lulu Finity 0.27.0
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.26.0/Lulu-Finity-Source-0.26.0.zip" -OutFile base.zip
+          $baseHash = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
+          if ($baseHash -ne "bb6372afd481477be99d1cd47c631dce7307f52c286e97a4ed31077c85e3e04c") { throw "La fuente 0.26.0 no coincide: $baseHash" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v027/apply-v027.py app
+          if ($LASTEXITCODE -ne 0) { throw "Falló el parche 0.27.0" }
+
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          Push-Location app/railway-relay
+          npm test
+          if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas del relay incluido." }
+          Pop-Location
+          $package = Get-Content app/package.json -Raw | ConvertFrom-Json
+          if ($package.version -ne "0.27.0") { throw "Versión inesperada: $($package.version)" }
+          if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita administrador." }
+          $html = Get-Content app/src/index.html -Raw
+          $renderer = Get-Content app/src/renderer.js -Raw
+          $main = Get-Content app/src/main.js -Raw
+          foreach ($token in @("youtubeUseBraveInput","tts-section-tabs","Servidor seguro de Lulu Finity","relayUserUsageBar","commandOverlaySetupCard","Configura Overlays para tu Directo.","Personaliza tu economía.")) {
+            if (!(($html + $renderer + $main).Contains($token))) { throw "Falta $token" }
+          }
+          if ($html.Contains('data-page="filters"') -or $html.Contains('id="page-filters"')) { throw "Filtros sigue como categoría independiente." }
+          if (!$main.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta el marcador del token." }
+          if ($main.Contains("relayClientToken === '__LULU_RELAY_CLIENT_TOKEN__'")) { throw "Regresó la validación defectuosa del token." }
+
+          New-Item -ItemType Directory source-v027 -Force | Out-Null
+          foreach ($file in @("package.json", "NOTICE.md", "README.md", "CHANGELOG.md", ".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v027/$file" -Force } }
+          foreach ($folder in @("src", "build", "railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v027/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v027/*" -DestinationPath "Lulu-Finity-Source-0.27.0.zip" -Force
+
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Configura LULU_RELAY_CLIENT_TOKEN en GitHub Actions." }
+          if ($env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "LULU_RELAY_CLIENT_TOKEN debe tener al menos 32 caracteres." }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "No se encontró el marcador del token." }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          $final = Get-Content $path -Raw
+          if ($final.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "El token no fue inyectado." }
+          if (!$final.Contains("relayClientToken.startsWith('__LULU_RELAY_')")) { throw "Falta la comprobación segura del marcador." }
+          node --check $path
+
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm install --no-audit --no-fund
+
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win -- --publish never
+
+      - name: Verificar paquetes y app.asar final
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.27.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.27.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.27.0.exe.blockmap"
+          foreach ($file in @($installer, $zip, $latest, $blockmap, "Lulu-Finity-Source-0.27.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          if ((Get-Item $installer).Length -lt 50000000 -or (Get-Item $zip).Length -lt 50000000) { throw "El paquete parece incompleto." }
+          Expand-Archive $zip -DestinationPath verify-portable -Force
+          $asar = Get-ChildItem verify-portable -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "No se encontró app.asar dentro del ZIP final." }
+          $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          if ($asarText.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "El ZIP final todavía contiene el marcador del token." }
+          if (!$asarText.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "El ZIP final no contiene el token oficial." }
+          foreach ($token in @("youtubeUseBraveInput","tts-section-tabs","Servidor seguro de Lulu Finity","relayUserUsageBar","commandOverlaySetupCard","browser:brave-status")) {
+            if (!$asarText.Contains($token)) { throw "El app.asar final no contiene $token" }
+          }
+          if ($asarText.Contains('data-page="filters"') -or $asarText.Contains('id="page-filters"')) { throw "El app.asar conserva Filtros como categoría." }
+
+      - name: Publicar Release 0.27.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v0.27.0"
+          $files = @("app/dist/Lulu-Finity-Setup-0.27.0.exe", "app/dist/Lulu-Finity-0.27.0-x64.zip", "app/dist/latest.yml", "app/dist/Lulu-Finity-Setup-0.27.0.exe.blockmap", "Lulu-Finity-Source-0.27.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.27.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.27.0" --notes-file "app/CHANGELOG.md" }
+
+      - name: Subir artefacto de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.27.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.27.0.exe
+            app/dist/Lulu-Finity-0.27.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.27.0.exe.blockmap
+            Lulu-Finity-Source-0.27.0.zip
+          if-no-files-found: error
+          retention-days: 30

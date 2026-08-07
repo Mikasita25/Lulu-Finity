@@ -35,3 +35,18 @@ test('reinicia el contador al cambiar el día UTC', () => {
   assert.equal(meter.snapshot().used, 0);
   assert.equal(meter.snapshot().date, '2026-08-07');
 });
+
+
+test('cuenta conexiones diarias por usuario sin guardar el nombre', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lulu-usage-user-'));
+  const stateFile = path.join(directory, 'usage.json');
+  const meter = new DailyUsageMeter({ limit:7500, perConnection:2, userLimit:600, stateFile, now:()=>new Date('2026-08-06T10:00:00Z') });
+  meter.recordConnection(2, 'CreadorLIVE');
+  const individual = meter.userSnapshot('@creadorlive');
+  assert.equal(individual.used, 2);
+  assert.equal(individual.remaining, 598);
+  assert.equal(individual.limit, 600);
+  const persisted = fs.readFileSync(stateFile, 'utf8');
+  assert.equal(persisted.includes('CreadorLIVE'), false);
+  assert.equal(persisted.includes('creadorlive'), false);
+});

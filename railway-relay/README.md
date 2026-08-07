@@ -6,7 +6,8 @@ Este servicio conserva las API keys de EulerStream en Railway, rota las claves a
 
 - El límite predeterminado es **7500 usos por día**.
 - Cada conexión de Lulu suma aproximadamente **2 usos**.
-- `GET /usage` devuelve el total utilizado, porcentaje, conexiones estimadas y hora de reinicio.
+- `GET /usage` devuelve el uso global. Con `?uniqueId=usuario` también devuelve el uso individual.
+- Cada usuario tiene **600 conexiones diarias** por defecto; el identificador se guarda como hash en el contador local del relay.
 - El contador se reinicia cada día UTC.
 - El archivo `.lulu-usage.json` conserva el contador mientras el almacenamiento siga disponible. Para persistencia entre despliegues, configura un Railway Volume y `USAGE_STATE_FILE=/data/lulu-usage.json`.
 
