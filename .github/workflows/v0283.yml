@@ -1,0 +1,146 @@
+name: Lulu Finity 0.28.3
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v0283/**"
+      - ".github/workflows/v0283.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v0283/**"
+      - ".github/workflows/v0283.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir 0.28.3
+        run: |
+          curl --fail --location --silent --show-error https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.28.2/Lulu-Finity-Source-0.28.2.zip --output base.zip
+          echo "4290e51e2fe4730f6c86626fde9deec0e835e5c3eb52ee556b9e40dd8ad6e8ae  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v0283/apply-v0283.py app
+      - name: Validar arranque y rollback
+        run: |
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.28.3') process.exit(1)"
+          python - <<'PY'
+          from pathlib import Path
+          m=Path('app/src/main.js').read_text(encoding='utf-8')
+          p=Path('app/src/preload.js').read_text(encoding='utf-8')
+          r=Path('app/src/renderer.js').read_text(encoding='utf-8')
+          h=Path('app/src/index.html').read_text(encoding='utf-8')
+          assert r.count('function setupAudioActivityIndicators()') == 1
+          assert r.count('async function connectFromUi()') == 1
+          assert r.count('function setupEvents()') == 1
+          assert 'async function downloadVerifiedRollbackInstaller()' in m
+          assert 'async function rollbackToStableVersion()' in m
+          assert "ipcMain.handle('update:rollback'" in m
+          assert 'update:rollback-v027' not in m
+          assert "const ROLLBACK_VERSION = '0.27.0';" in m
+          assert 'Lulu-Finity-Setup-0.27.0.exe' in m
+          assert 'ea5b446a4eabf8bf359494a9a3391a597ff7cb523b79baddcfad205b16fce140' in m
+          assert 'Readable.fromWeb(response.body)' in m and 'pipeline(' in m
+          assert "rollbackVersion: () => ipcRenderer.invoke('update:rollback')" in p
+          assert 'rollbackToV027' not in p+r
+          assert 'id="rollbackVersionBtn">Regresar una versión</button>' in h
+          assert 'versión 0.27.0 hasta que la creadora lo solucione (:' in h
+          assert 'api.rollbackVersion()' in r
+          assert '<span class="version" id="versionLabel">v0.28.3</span>' in h
+          assert "app.getPath('localAppData')" not in m and 'app.getPath("localAppData")' not in m
+          assert 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live' in m
+          assert '__LULU_RELAY_CLIENT_TOKEN__' in m
+          PY
+          curl --fail --location --silent --show-error --range 0-0 https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.27.0/Lulu-Finity-Setup-0.27.0.exe --output /dev/null
+          cd app/railway-relay && npm test
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir 0.28.3
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.28.2/Lulu-Finity-Source-0.28.2.zip" -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne "4290e51e2fe4730f6c86626fde9deec0e835e5c3eb52ee556b9e40dd8ad6e8ae") { throw "La fuente 0.28.2 no coincide." }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v0283/apply-v0283.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló el relay." }; Pop-Location
+          New-Item -ItemType Directory source-v0283 -Force | Out-Null
+          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v0283/$file" -Force } }
+          foreach ($folder in @("src","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v0283/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v0283/*" -DestinationPath "Lulu-Finity-Source-0.28.3.zip" -Force
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "LULU_RELAY_CLIENT_TOKEN no está configurado correctamente." }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "No se encontró el marcador del token." }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          if ((Get-Content $path -Raw).Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "El token no fue inyectado." }
+          node --check $path
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:win -- --publish never
+      - name: Verificar y publicar 0.28.3
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.28.3.exe"
+          $zip = "app/dist/Lulu-Finity-0.28.3-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.28.3.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.28.3.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          Expand-Archive $zip -DestinationPath verify-portable -Force
+          $asar = Get-ChildItem verify-portable -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "No se encontró app.asar." }
+          $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @('function setupAudioActivityIndicators()','async function connectFromUi()','async function rollbackToStableVersion()','update:rollback','Regresar una versión','Lulu-Finity-Setup-0.27.0.exe','v0.28.3')) { if (!$asarText.Contains($token)) { throw "El app.asar final no contiene $token" } }
+          if ($asarText.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$asarText.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token del relay inválido en app.asar." }
+          if ($asarText.Contains("app.getPath('localAppData')") -or $asarText.Contains('app.getPath("localAppData")')) { throw "Regresó LocalAppData." }
+          $tag = "v0.28.3"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.28.3.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.28.3" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.28.3" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.28.3
+          path: |
+            app/dist/Lulu-Finity-Setup-0.28.3.exe
+            app/dist/Lulu-Finity-0.28.3-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.28.3.exe.blockmap
+            Lulu-Finity-Source-0.28.3.zip
+          if-no-files-found: error
+          retention-days: 30
