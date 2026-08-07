@@ -36,24 +36,33 @@ jobs:
           Expand-Archive base.zip -DestinationPath app -Force
           python build-v028/apply-v028.py app
           if ($LASTEXITCODE -ne 0) { throw "Falló el parche 0.28.0" }
+
           node --check app/src/main.js
           node --check app/src/preload.js
           node --check app/src/renderer.js
+
           Push-Location app/railway-relay
           npm test
           if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas del relay incluido." }
           Pop-Location
+
           $package = Get-Content app/package.json -Raw | ConvertFrom-Json
           if ($package.version -ne "0.28.0") { throw "Versión inesperada: $($package.version)" }
           if ($package.build.win.requestedExecutionLevel -ne "asInvoker") { throw "La aplicación solicita administrador." }
+
           $html = Get-Content app/src/index.html -Raw
           $main = Get-Content app/src/main.js -Raw
           $renderer = Get-Content app/src/renderer.js -Raw
           $preload = Get-Content app/src/preload.js -Raw
-          foreach ($token in @("data-page=`"control`"","Anti anuncios de YouTube","Tu uso diario","data-category-tabs=`"songs`"","data-category-tabs=`"settings`"","renderControlCenter","__LULU_AD_STATE__","setYoutubeAdGuardMuted")) {
+
+          foreach ($token in @("Anti anuncios de YouTube","Tu uso diario","data-category-tabs=`"songs`"","data-category-tabs=`"settings`"","voiceActivityBars","musicActivityBars","commandActivityBars","setupAudioActivityIndicators","__LULU_AD_STATE__","setYoutubeAdGuardMuted","v0.28.0")) {
             if (!(($html + $main + $renderer).Contains($token))) { throw "Falta $token" }
           }
+          if ($html.Contains('data-page="control"') -or $html.Contains('id="page-control"') -or $renderer.Contains('renderControlCenter') -or $renderer.Contains('setupControlCenter')) { throw "Control sigue presente." }
           if ($html.Contains("youtubeUseBraveInput") -or $main.Contains("browser:brave-status") -or $preload.Contains("getBraveStatus")) { throw "La opción de Brave sigue presente." }
+          foreach ($token in @("*://*.youtube.com/api/stats/ads*","*://*.youtube.com/pagead/*","*://*.youtube.com/get_midroll_info*")) {
+            if ($main.Contains($token)) { throw "El anti anuncios todavía bloquea $token y puede retrasar la reproducción." }
+          }
           if (!$main.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta el marcador del token." }
           if ($main.Contains("relayClientToken === '__LULU_RELAY_CLIENT_TOKEN__'")) { throw "Regresó la validación defectuosa del token." }
 
@@ -106,9 +115,10 @@ jobs:
           $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
           if ($asarText.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "El ZIP final todavía contiene el marcador del token." }
           if (!$asarText.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "El ZIP final no contiene el token oficial." }
-          foreach ($token in @("data-page=`"control`"","Anti anuncios de YouTube","Tu uso diario","renderControlCenter","__LULU_AD_STATE__","data-category-tabs=`"songs`"")) {
+          foreach ($token in @("Anti anuncios de YouTube","Tu uso diario","voiceActivityBars","musicActivityBars","commandActivityBars","setupAudioActivityIndicators","__LULU_AD_STATE__","data-category-tabs=`"songs`"","v0.28.0")) {
             if (!$asarText.Contains($token)) { throw "El app.asar final no contiene $token" }
           }
+          if ($asarText.Contains('data-page="control"') -or $asarText.Contains('id="page-control"') -or $asarText.Contains('renderControlCenter') -or $asarText.Contains('setupControlCenter')) { throw "El app.asar conserva Control." }
           if ($asarText.Contains("youtubeUseBraveInput") -or $asarText.Contains("browser:brave-status")) { throw "El app.asar conserva Brave." }
 
       - name: Publicar Release 0.28.0
@@ -119,8 +129,12 @@ jobs:
           $tag = "v0.28.0"
           $files = @("app/dist/Lulu-Finity-Setup-0.28.0.exe", "app/dist/Lulu-Finity-0.28.0-x64.zip", "app/dist/latest.yml", "app/dist/Lulu-Finity-Setup-0.28.0.exe.blockmap", "Lulu-Finity-Source-0.28.0.zip")
           gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.28.0" --notes-file "app/CHANGELOG.md" }
-          else { gh release create $tag $files --target main --title "Lulu Finity 0.28.0" --notes-file "app/CHANGELOG.md" }
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $files --clobber
+            gh release edit $tag --title "Lulu Finity 0.28.0" --notes-file "app/CHANGELOG.md"
+          } else {
+            gh release create $tag $files --target main --title "Lulu Finity 0.28.0" --notes-file "app/CHANGELOG.md"
+          }
 
       - name: Subir artefacto de Windows
         uses: actions/upload-artifact@v4

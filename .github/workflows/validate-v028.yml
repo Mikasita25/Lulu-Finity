@@ -46,24 +46,43 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           from bs4 import BeautifulSoup
-          html=Path('app/src/index.html').read_text(encoding='utf-8')
-          main=Path('app/src/main.js').read_text(encoding='utf-8')
-          renderer=Path('app/src/renderer.js').read_text(encoding='utf-8')
-          preload=Path('app/src/preload.js').read_text(encoding='utf-8')
+
+          html = Path('app/src/index.html').read_text(encoding='utf-8')
+          main = Path('app/src/main.js').read_text(encoding='utf-8')
+          renderer = Path('app/src/renderer.js').read_text(encoding='utf-8')
+          preload = Path('app/src/preload.js').read_text(encoding='utf-8')
+
           assert 'youtubeUseBraveInput' not in html
           assert 'browser:brave-status' not in main
           assert 'getBraveStatus' not in preload
-          for token in ('__LULU_AD_STATE__','MutationObserver','setYoutubeAdGuardMuted','}, 100);'):
+
+          assert 'data-page="control"' not in html
+          assert 'id="page-control"' not in html
+          assert 'renderControlCenter' not in renderer
+          assert 'setupControlCenter' not in renderer
+          assert '<span class="version" id="versionLabel">v0.28.0</span>' in html
+
+          for token in ('__LULU_AD_STATE__', 'MutationObserver', 'setYoutubeAdGuardMuted', '}, 100);'):
               assert token in main, token
-          for scope in ('control','songs','account','commands','rankings','economy','settings'):
+          for token in ('*://*.youtube.com/api/stats/ads*', '*://*.youtube.com/pagead/*', '*://*.youtube.com/get_midroll_info*'):
+              assert token not in main, token
+
+          for scope in ('songs', 'account', 'commands', 'rankings', 'economy', 'settings'):
               assert f'data-category-tabs="{scope}"' in html, scope
+          assert 'tts-section-tabs' in html
           assert 'data-category-tabs="dashboard"' not in html
-          assert 'Tu uso diario' in html
+
+          for token in ('voiceActivityBars', 'musicActivityBars', 'commandActivityBars', 'Tu uso diario'):
+              assert token in html, token
           assert "getRelayUsage: () => ipcRenderer.invoke('relay:usage')" in preload
-          assert 'renderControlCenter' in renderer and 'setupControlCenter' in renderer
-          soup=BeautifulSoup(html,'html.parser')
-          ids=[node.get('id') for node in soup.find_all(id=True)]
-          assert len(ids)==len(set(ids)), 'IDs duplicados'
+          assert 'setupAudioActivityIndicators' in renderer
+
+          init = renderer[renderer.index('async function init()'):]
+          assert init.index('const initial = await api.getState();') < init.index('state.settings = initial.settings;') < init.index('setupAudioActivityIndicators();')
+
+          soup = BeautifulSoup(html, 'html.parser')
+          ids = [node.get('id') for node in soup.find_all(id=True)]
+          assert len(ids) == len(set(ids)), 'IDs duplicados'
           PY
 
       - name: Probar relay incluido
