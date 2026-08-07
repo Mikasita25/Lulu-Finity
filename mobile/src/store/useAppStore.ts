@@ -5,6 +5,7 @@ import type {
   AccentTheme,
   AppMode,
   Goal,
+  InteractionRule,
   LeaderboardEntry,
   LiveEvent,
   LiveStats,
@@ -20,6 +21,7 @@ const emptyStats: LiveStats = {
   followers: 0,
   shares: 0,
   comments: 0,
+  stickers: 0,
 };
 
 const defaultSounds: SoundSettings = {
@@ -28,6 +30,7 @@ const defaultSounds: SoundSettings = {
   like: { enabled: false, volume: 0.45 },
   share: { enabled: false, volume: 0.7 },
   comment: { enabled: false, volume: 0.5 },
+  sticker: { enabled: false, volume: 0.75 },
   member: { enabled: false, volume: 0.6 },
   subscribe: { enabled: true, volume: 0.9 },
   goal: { enabled: true, volume: 1 },
@@ -46,6 +49,7 @@ type AppState = {
   events: LiveEvent[];
   leaderboard: Record<string, LeaderboardEntry>;
   goals: Goal[];
+  interactionRules: InteractionRule[];
   accentTheme: AccentTheme;
   darkMode: boolean;
   hapticsEnabled: boolean;
@@ -70,6 +74,9 @@ type AppState = {
   updateGoal: (id: string, patch: Partial<Goal>) => void;
   removeGoal: (id: string) => void;
   resetGoal: (id: string) => void;
+  addInteractionRule: (rule: Omit<InteractionRule, 'id' | 'lastTriggeredAt'>) => void;
+  updateInteractionRule: (id: string, patch: Partial<InteractionRule>) => void;
+  removeInteractionRule: (id: string) => void;
   setAccentTheme: (theme: AccentTheme) => void;
   setDarkMode: (enabled: boolean) => void;
   setHapticsEnabled: (enabled: boolean) => void;
@@ -110,6 +117,7 @@ function bumpLeaderboard(
     diamonds: 0,
     likes: 0,
     comments: 0,
+    stickers: 0,
     shares: 0,
     follows: 0,
     members: 0,
@@ -126,6 +134,7 @@ function bumpLeaderboard(
     diamonds: old.diamonds + (event.type === 'gift' ? Math.max(0, event.diamonds ?? 0) : 0),
     likes: old.likes + (event.type === 'like' ? Math.max(1, event.count ?? 1) : 0),
     comments: old.comments + (event.type === 'comment' ? 1 : 0),
+    stickers: old.stickers + (event.type === 'sticker' ? 1 : 0),
     shares: old.shares + (event.type === 'share' ? 1 : 0),
     follows: old.follows + (event.type === 'follow' ? 1 : 0),
     members: old.members + (event.type === 'member' ? 1 : 0),
@@ -138,6 +147,7 @@ function bumpLeaderboard(
     next.gifts * 25 +
     next.likes * 0.08 +
     next.comments * 5 +
+    next.stickers * 6 +
     next.shares * 12 +
     next.follows * 18 +
     next.members * 4 +
@@ -160,6 +170,7 @@ export const useAppStore = create<AppState>()(
       events: [],
       leaderboard: {},
       goals: [],
+      interactionRules: [],
       accentTheme: 'lulu',
       darkMode: true,
       hapticsEnabled: true,
@@ -209,6 +220,8 @@ export const useAppStore = create<AppState>()(
           nextStats.shares += 1;
         } else if (event.type === 'comment') {
           nextStats.comments += 1;
+        } else if (event.type === 'sticker') {
+          nextStats.stickers += 1;
         } else if (event.type === 'member' && event.memberCount) {
           nextStats.viewers = Math.max(0, event.memberCount);
         }
@@ -283,6 +296,24 @@ export const useAppStore = create<AppState>()(
             return { ...goal, startValue, completedAt: undefined };
           }),
         })),
+      addInteractionRule: (rule) =>
+        set((state) => ({
+          interactionRules: [
+            ...state.interactionRules,
+            {
+              ...rule,
+              id: `rule-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            },
+          ],
+        })),
+      updateInteractionRule: (id, patch) =>
+        set((state) => ({
+          interactionRules: state.interactionRules.map((rule) =>
+            rule.id === id ? { ...rule, ...patch } : rule,
+          ),
+        })),
+      removeInteractionRule: (id) =>
+        set((state) => ({ interactionRules: state.interactionRules.filter((rule) => rule.id !== id) })),
       setAccentTheme: (accentTheme) => set({ accentTheme }),
       setDarkMode: (darkMode) => set({ darkMode }),
       setHapticsEnabled: (hapticsEnabled) => set({ hapticsEnabled }),
@@ -306,6 +337,7 @@ export const useAppStore = create<AppState>()(
         return {
           ...current,
           ...saved,
+          interactionRules: Array.isArray(saved.interactionRules) ? saved.interactionRules : [],
           soundSettings: { ...defaultSounds, ...(saved.soundSettings ?? {}) },
         };
       },
@@ -316,6 +348,7 @@ export const useAppStore = create<AppState>()(
         mode: state.mode,
         events: state.events,
         goals: state.goals,
+        interactionRules: state.interactionRules,
         accentTheme: state.accentTheme,
         darkMode: state.darkMode,
         hapticsEnabled: state.hapticsEnabled,
