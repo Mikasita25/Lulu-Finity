@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reconstruct current source and report relay adapter
+      - name: Reconstruct current source and report LIVE listeners
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -23,11 +23,11 @@ jobs:
           from pathlib import Path
           path = Path('app/src/main.js')
           lines = path.read_text(encoding='utf-8').splitlines()
-          starts = [i for i,line in enumerate(lines) if 'class RailwayRelayConnection' in line]
+          starts = [i for i,line in enumerate(lines) if 'function attachLiveEvents' in line]
           if not starts:
-              raise SystemExit('No se encontró RailwayRelayConnection')
-          start = max(0, starts[0] - 8)
-          end = min(len(lines), starts[0] + 220)
+              raise SystemExit('No se encontró attachLiveEvents')
+          start = max(0, starts[0] - 5)
+          end = min(len(lines), starts[0] + 260)
           for i in range(start, end):
               print(f'{i+1}: {lines[i]}')
           PY
