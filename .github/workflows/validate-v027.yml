@@ -52,7 +52,7 @@ jobs:
           assert 'data-page="filters"' not in html
           assert 'id="page-filters"' not in html
           for token in (
-              'youtubeUseBraveInput', 'voice-section-tabs', 'data-voice-section="filters"',
+              'youtubeUseBraveInput', 'tts-section-tabs', 'data-tts-tab="filters"',
               'Enlaza TikTok para poder mandar mensajes desde tu cuenta.',
               'Crea acciones personalizadas para tu chat.',
               'Configura Overlays para tu Directo.', 'Personaliza tu economía.',
