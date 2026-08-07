@@ -1,0 +1,170 @@
+name: Lulu Finity 0.31.0
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v0310/**"
+      - ".github/workflows/v0310.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v0310/**"
+      - ".github/workflows/v0310.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir y validar 0.31.0
+        run: |
+          curl --fail --location --silent --show-error https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.30.0/Lulu-Finity-Source-0.30.0.zip -o base.zip
+          echo "2379f8e463f20c623759740975b43f9d1e21304978695c9f8d24380d725af167  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v0310/apply-v0310.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.31.0') process.exit(1)"
+          cd app
+          npm install --ignore-scripts --no-audit --no-fund
+          npm ls edge-tts-universal @ghostery/adblocker-electron --depth=0
+          cd railway-relay && npm test
+      - name: Validar proveedores y compatibilidad de voces
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          m=Path('app/src/main.js').read_text(encoding='utf-8')
+          r=Path('app/src/renderer.js').read_text(encoding='utf-8')
+          h=Path('app/src/index.html').read_text(encoding='utf-8')
+          required_main=(
+            "https://api.streamelements.com/kappa/v2/speech",
+            "provider: 'stream'",
+            'async function synthesizeStreamElementsVoice(request)',
+            "if (provider === 'stream') return synthesizeStreamElementsVoice(request);",
+            "onlineVoiceProvider: 'edge'",
+            "const STREAM_ELEMENTS_VOICE_IDS = new Set",
+          )
+          for token in required_main: assert token in m, token
+          required_renderer=(
+            "online:stream:",
+            "StreamElements / voces externas",
+            "onlineProvider:preset.provider",
+            "provider:'stream', voice:'Ivy'",
+            "provider:'stream', voice:'Mizuki'",
+            "provider:'stream', voice:'Takumi'",
+            "provider:'stream', voice:'Seoyeon'",
+            "audio.preservesPitch = false",
+          )
+          for token in required_renderer: assert token in r, token
+          assert 'Microsoft ya no es la base de estos presets' in h
+          assert '<span class="version" id="versionLabel">v0.31.0</span>' in h
+          assert "app.getPath('localAppData')" not in m and 'app.getPath("localAppData")' not in m
+          assert 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live' in m
+          assert '__LULU_RELAY_CLIENT_TOKEN__' in m
+          assert '@ghostery/adblocker-electron' in Path('app/package.json').read_text(encoding='utf-8')
+          PY
+      - name: Probar voces externas reales
+        run: |
+          python - <<'PY'
+          import urllib.parse, urllib.request
+          voices = ['Mia','Ivy','Justin','Brian','Matthew','Mizuki','Koharu','Takumi','Haruto','Seoyeon']
+          for voice in voices:
+              params = urllib.parse.urlencode({'voice': voice, 'text': 'Hola Lulu'})
+              req = urllib.request.Request(
+                  'https://api.streamelements.com/kappa/v2/speech?' + params,
+                  headers={'User-Agent':'Lulu-Finity-CI/0.31.0','Accept':'audio/mpeg,audio/*'}
+              )
+              with urllib.request.urlopen(req, timeout=20) as res:
+                  data = res.read()
+                  ctype = (res.headers.get('content-type') or '').lower()
+                  if res.status != 200 or len(data) < 500 or ('audio' not in ctype and not data.startswith(b'ID3')):
+                      raise SystemExit(f'{voice}: respuesta inválida status={res.status} bytes={len(data)} type={ctype}')
+                  print(f'{voice}: OK {len(data)} bytes {ctype}')
+          PY
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir 0.31.0
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.30.0/Lulu-Finity-Source-0.30.0.zip" -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne "2379f8e463f20c623759740975b43f9d1e21304978695c9f8d24380d725af167") { throw "Fuente 0.30.0 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v0310/apply-v0310.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló relay" }; Pop-Location
+          New-Item -ItemType Directory source-v0310 -Force | Out-Null
+          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v0310/$file" -Force } }
+          foreach ($folder in @("src","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v0310/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v0310/*" -DestinationPath "Lulu-Finity-Source-0.31.0.zip" -Force
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          if ((Get-Content $path -Raw).Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "No se inyectó el token" }
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:win -- --publish never
+      - name: Verificar y publicar 0.31.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.31.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.31.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.31.0.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.31.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @("api.streamelements.com/kappa/v2/speech","StreamElements / voces externas","online:stream:","Mizuki","Ivy","@ghostery/adblocker-electron","persist:lulu-youtube","v0.31.0")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
+          if ($text.Contains("app.getPath('localAppData')") -or $text.Contains('app.getPath("localAppData")')) { throw "Regresó LocalAppData" }
+          $tag = "v0.31.0"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.31.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.31.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.31.0" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.31.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.31.0.exe
+            app/dist/Lulu-Finity-0.31.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.31.0.exe.blockmap
+            Lulu-Finity-Source-0.31.0.zip
+          if-no-files-found: error
+          retention-days: 30
