@@ -9,6 +9,11 @@ const alias: Record<string, LiveEvent['type'] | undefined> = {
   chat: 'comment',
   comment: 'comment',
   webcastchatmessage: 'comment',
+  emote: 'sticker',
+  sticker: 'sticker',
+  emotechat: 'sticker',
+  webcastemotechatmessage: 'sticker',
+  webcaststickerchatmessage: 'sticker',
   gift: 'gift',
   webcastgiftmessage: 'gift',
   like: 'like',
@@ -53,9 +58,99 @@ function avatar(user: any) {
   );
 }
 
+function firstObject(value: unknown): any | undefined {
+  if (Array.isArray(value)) return value.find((item) => item && typeof item === 'object');
+  return value && typeof value === 'object' ? value : undefined;
+}
+
+function stickerFrom(payload: any) {
+  const extra = firstObject(payload?.textExtra ?? payload?.text_extra);
+  const candidate =
+    firstObject(payload?.sticker) ??
+    firstObject(payload?.stickerDetails) ??
+    firstObject(payload?.stickerInfo) ??
+    firstObject(payload?.emote) ??
+    firstObject(payload?.emoteDetails) ??
+    firstObject(payload?.emotes) ??
+    firstObject(payload?.emoteList) ??
+    firstObject(payload?.emote_list) ??
+    firstObject(payload?.comment?.emotes) ??
+    (extra && (extra?.emote || extra?.sticker || extra));
+
+  if (!candidate) return undefined;
+
+  const id = text(
+    candidate?.stickerId,
+    candidate?.sticker_id,
+    candidate?.emoteId,
+    candidate?.emote_id,
+    candidate?.id,
+    candidate?.emoticonId,
+  );
+  const name = text(
+    candidate?.stickerName,
+    candidate?.sticker_name,
+    candidate?.emoteName,
+    candidate?.emote_name,
+    candidate?.name,
+    candidate?.displayName,
+    candidate?.shortcode,
+    candidate?.text,
+  );
+  const imageUrl = text(
+    candidate?.imageUrl,
+    candidate?.image_url,
+    candidate?.url,
+    candidate?.image?.urlList?.[0],
+    candidate?.image?.url_list?.[0],
+    candidate?.picture?.urlList?.[0],
+  );
+
+  if (!id && !name && !imageUrl) return undefined;
+  return { id, name: name || (id ? `Sticker ${id}` : 'Sticker'), imageUrl };
+}
+
+function eventIdentity(payload: any) {
+  const user = payload?.user ?? payload?.sender ?? payload?.fromUser ?? {};
+  const uniqueId = text(
+    payload?.uniqueId,
+    user?.uniqueId,
+    user?.displayId,
+    user?.username,
+    user?.userId,
+  ).replace(/^@/, '');
+  const nickname = text(
+    payload?.nickname,
+    user?.nickname,
+    user?.displayName,
+    user?.uniqueId,
+    uniqueId,
+    'Usuario',
+  );
+  return { user, uniqueId, nickname };
+}
+
+function eventTimestamp(payload: any) {
+  const rawTimestamp = number(payload?.timestamp ?? payload?.createTime, Date.now());
+  return rawTimestamp > 0 && rawTimestamp < 1_000_000_000_000 ? rawTimestamp * 1000 : rawTimestamp;
+}
+
+function baseEvent(raw: any, payload: any, type: LiveEvent['type'], suffix = ''): LiveEvent {
+  const { user, uniqueId, nickname } = eventIdentity(payload);
+  return {
+    id:
+      text(payload?.id, payload?.msgId, raw?.id) ||
+      `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}${suffix}`,
+    type,
+    timestamp: eventTimestamp(payload),
+    uniqueId,
+    nickname,
+    profilePictureUrl: avatar(user) || text(payload?.profilePictureUrl),
+  };
+}
+
 function normalizeOne(raw: any): ParsedRealtimeMessage[] {
   if (!raw) return [];
-
   if (Array.isArray(raw)) return raw.flatMap(normalizeOne);
   if (Array.isArray(raw?.events)) return raw.events.flatMap(normalizeOne);
 
@@ -96,10 +191,7 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
       {
         kind: 'stats',
         viewers: number(
-          payload?.viewerCount ??
-            payload?.roomUserCount ??
-            payload?.userCount ??
-            payload?.memberCount,
+          payload?.viewerCount ?? payload?.roomUserCount ?? payload?.userCount ?? payload?.memberCount,
           NaN,
         ),
         likes: number(payload?.totalLikeCount ?? payload?.likeCount, NaN),
@@ -107,6 +199,7 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
     ];
   }
 
+  const sticker = stickerFrom(payload);
   let normalizedType = alias[rawType];
   if (!normalizedType && rawType.includes('social')) {
     const socialSignal = compactType(
@@ -115,36 +208,19 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
     if (socialSignal.includes('share')) normalizedType = 'share';
     else if (socialSignal.includes('follow')) normalizedType = 'follow';
   }
+  if (!normalizedType && (rawType.includes('emote') || rawType.includes('sticker'))) normalizedType = 'sticker';
   if (!normalizedType && rawType.includes('gift')) normalizedType = 'gift';
-  if (!normalizedType && rawType.includes('chat')) normalizedType = 'comment';
+  if (!normalizedType && rawType.includes('chat')) normalizedType = sticker ? 'sticker' : 'comment';
   if (!normalizedType && rawType.includes('like')) normalizedType = 'like';
   if (!normalizedType && rawType.includes('follow')) normalizedType = 'follow';
   if (!normalizedType && rawType.includes('share')) normalizedType = 'share';
   if (!normalizedType && rawType.includes('member')) normalizedType = 'member';
   if (!normalizedType && rawType.includes('sub')) normalizedType = 'subscribe';
+  if (!normalizedType && sticker) normalizedType = 'sticker';
   if (!normalizedType) return [];
-
-  const user = payload?.user ?? payload?.sender ?? payload?.fromUser ?? {};
-  const uniqueId = text(
-    payload?.uniqueId,
-    user?.uniqueId,
-    user?.displayId,
-    user?.username,
-    user?.userId,
-  ).replace(/^@/, '');
-  const nickname = text(
-    payload?.nickname,
-    user?.nickname,
-    user?.displayName,
-    user?.uniqueId,
-    uniqueId,
-    'Usuario',
-  );
 
   const gift = payload?.giftDetails ?? payload?.extendedGiftInfo ?? payload?.gift ?? {};
   const giftType = number(gift?.giftType ?? payload?.giftType ?? 0);
-  // En regalos con streak, TikTok manda actualizaciones intermedias. Igual que PC,
-  // contamos únicamente el cierre del streak para no duplicar monedas/regalos.
   if (normalizedType === 'gift' && giftType === 1 && payload?.repeatEnd === false) return [];
   const repeatCount = Math.max(1, number(payload?.repeatCount ?? payload?.comboCount ?? 1, 1));
   const diamondEach = Math.max(
@@ -152,20 +228,36 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
     number(gift?.diamondCount ?? gift?.diamond_count ?? payload?.diamondCount ?? 0),
   );
 
-  const rawTimestamp = number(payload?.timestamp ?? payload?.createTime, Date.now());
-  const timestamp = rawTimestamp > 0 && rawTimestamp < 1_000_000_000_000 ? rawTimestamp * 1000 : rawTimestamp;
+  // Algunos payloads de chat contienen texto y un sticker a la vez. Conservamos ambos
+  // eventos para que historial/TTS y automatizaciones puedan reaccionar por separado.
+  if (normalizedType === 'comment' && sticker) {
+    const results: ParsedRealtimeMessage[] = [];
+    const comment = text(payload?.comment, payload?.text, payload?.message);
+    if (comment) {
+      const commentEvent = baseEvent(raw, payload, 'comment', '-comment');
+      commentEvent.comment = comment;
+      results.push({ kind: 'event', event: commentEvent });
+    }
+    const stickerEvent = baseEvent(raw, payload, 'sticker', '-sticker');
+    stickerEvent.stickerId = sticker.id;
+    stickerEvent.stickerName = sticker.name;
+    stickerEvent.stickerImageUrl = sticker.imageUrl;
+    results.push({ kind: 'event', event: stickerEvent });
+    return results;
+  }
 
-  const event: LiveEvent = {
-    id: text(payload?.id, payload?.msgId, raw?.id) || `${normalizedType}-${Date.now()}-${Math.random()}`,
-    type: normalizedType,
-    timestamp,
-    uniqueId,
-    nickname,
-    profilePictureUrl: avatar(user) || text(payload?.profilePictureUrl),
-  };
-
+  const event = baseEvent(raw, payload, normalizedType);
   if (normalizedType === 'comment') {
     event.comment = text(payload?.comment, payload?.text, payload?.message);
+  } else if (normalizedType === 'sticker') {
+    const resolved = sticker ?? {
+      id: text(payload?.stickerId, payload?.emoteId),
+      name: text(payload?.stickerName, payload?.emoteName, payload?.name, 'Sticker'),
+      imageUrl: text(payload?.imageUrl),
+    };
+    event.stickerId = resolved.id;
+    event.stickerName = resolved.name;
+    event.stickerImageUrl = resolved.imageUrl;
   } else if (normalizedType === 'gift') {
     event.giftName = text(gift?.giftName, gift?.name, payload?.giftName, 'Regalo');
     event.repeatCount = repeatCount;
