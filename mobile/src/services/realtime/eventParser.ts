@@ -9,11 +9,12 @@ const alias: Record<string, LiveEvent['type'] | undefined> = {
   chat: 'comment',
   comment: 'comment',
   webcastchatmessage: 'comment',
-  emote: 'sticker',
-  sticker: 'sticker',
-  emotechat: 'sticker',
-  webcastemotechatmessage: 'sticker',
-  webcaststickerchatmessage: 'sticker',
+  emote: 'fanSticker',
+  emotechat: 'fanSticker',
+  webcastemotechatmessage: 'fanSticker',
+  fansticker: 'fanSticker',
+  fan_sticker: 'fanSticker',
+  webcastfanstickermessage: 'fanSticker',
   gift: 'gift',
   webcastgiftmessage: 'gift',
   like: 'like',
@@ -63,35 +64,56 @@ function firstObject(value: unknown): any | undefined {
   return value && typeof value === 'object' ? value : undefined;
 }
 
-function stickerFrom(payload: any) {
+/**
+ * La app de PC llama `fanStickers` a los emotes/stickers exclusivos de fans.
+ * Euler/TikTok suele entregarlos como WebcastEmoteChatMessage + emoteList.
+ * No convertimos cualquier sticker visual de un comentario en Fan Sticker: exigimos
+ * una señal de emote/fan/subscriber para mantener esta métrica igual que en PC.
+ */
+function isFanStickerSignal(rawType: string, payload: any) {
+  if (rawType.includes('emote') || rawType.includes('fansticker') || rawType.includes('fan_sticker')) return true;
+  if (payload?.fanSticker || payload?.fan_sticker || payload?.fanStickerInfo || payload?.fan_sticker_info) return true;
+  if (Array.isArray(payload?.emoteList) || Array.isArray(payload?.emote_list)) return true;
+  if (payload?.subscriberEmote || payload?.subscriber_emote) return true;
+  return false;
+}
+
+function fanStickerFrom(payload: any) {
   const extra = firstObject(payload?.textExtra ?? payload?.text_extra);
   const candidate =
-    firstObject(payload?.sticker) ??
-    firstObject(payload?.stickerDetails) ??
-    firstObject(payload?.stickerInfo) ??
+    firstObject(payload?.fanSticker) ??
+    firstObject(payload?.fan_sticker) ??
+    firstObject(payload?.fanStickerInfo) ??
+    firstObject(payload?.fan_sticker_info) ??
+    firstObject(payload?.subscriberEmote) ??
+    firstObject(payload?.subscriber_emote) ??
     firstObject(payload?.emote) ??
     firstObject(payload?.emoteDetails) ??
     firstObject(payload?.emotes) ??
     firstObject(payload?.emoteList) ??
     firstObject(payload?.emote_list) ??
     firstObject(payload?.comment?.emotes) ??
-    (extra && (extra?.emote || extra?.sticker || extra));
+    (extra && (extra?.emote || extra?.fanSticker || extra?.fan_sticker));
 
   if (!candidate) return undefined;
 
   const id = text(
-    candidate?.stickerId,
-    candidate?.sticker_id,
+    candidate?.fanStickerId,
+    candidate?.fan_sticker_id,
     candidate?.emoteId,
     candidate?.emote_id,
+    candidate?.stickerId,
+    candidate?.sticker_id,
     candidate?.id,
     candidate?.emoticonId,
   );
   const name = text(
-    candidate?.stickerName,
-    candidate?.sticker_name,
+    candidate?.fanStickerName,
+    candidate?.fan_sticker_name,
     candidate?.emoteName,
     candidate?.emote_name,
+    candidate?.stickerName,
+    candidate?.sticker_name,
     candidate?.name,
     candidate?.displayName,
     candidate?.shortcode,
@@ -107,7 +129,7 @@ function stickerFrom(payload: any) {
   );
 
   if (!id && !name && !imageUrl) return undefined;
-  return { id, name: name || (id ? `Sticker ${id}` : 'Sticker'), imageUrl };
+  return { id, name: name || (id ? `Fan Sticker ${id}` : 'Fan Sticker'), imageUrl };
 }
 
 function eventIdentity(payload: any) {
@@ -199,8 +221,10 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
     ];
   }
 
-  const sticker = stickerFrom(payload);
+  const hasFanStickerSignal = isFanStickerSignal(rawType, payload);
+  const fanSticker = hasFanStickerSignal ? fanStickerFrom(payload) : undefined;
   let normalizedType = alias[rawType];
+
   if (!normalizedType && rawType.includes('social')) {
     const socialSignal = compactType(
       payload?.displayType ?? payload?.label ?? payload?.action ?? payload?.socialType,
@@ -208,15 +232,14 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
     if (socialSignal.includes('share')) normalizedType = 'share';
     else if (socialSignal.includes('follow')) normalizedType = 'follow';
   }
-  if (!normalizedType && (rawType.includes('emote') || rawType.includes('sticker'))) normalizedType = 'sticker';
+  if (!normalizedType && hasFanStickerSignal) normalizedType = 'fanSticker';
   if (!normalizedType && rawType.includes('gift')) normalizedType = 'gift';
-  if (!normalizedType && rawType.includes('chat')) normalizedType = sticker ? 'sticker' : 'comment';
+  if (!normalizedType && rawType.includes('chat')) normalizedType = 'comment';
   if (!normalizedType && rawType.includes('like')) normalizedType = 'like';
   if (!normalizedType && rawType.includes('follow')) normalizedType = 'follow';
   if (!normalizedType && rawType.includes('share')) normalizedType = 'share';
   if (!normalizedType && rawType.includes('member')) normalizedType = 'member';
   if (!normalizedType && rawType.includes('sub')) normalizedType = 'subscribe';
-  if (!normalizedType && sticker) normalizedType = 'sticker';
   if (!normalizedType) return [];
 
   const gift = payload?.giftDetails ?? payload?.extendedGiftInfo ?? payload?.gift ?? {};
@@ -228,36 +251,18 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
     number(gift?.diamondCount ?? gift?.diamond_count ?? payload?.diamondCount ?? 0),
   );
 
-  // Algunos payloads de chat contienen texto y un sticker a la vez. Conservamos ambos
-  // eventos para que historial/TTS y automatizaciones puedan reaccionar por separado.
-  if (normalizedType === 'comment' && sticker) {
-    const results: ParsedRealtimeMessage[] = [];
-    const comment = text(payload?.comment, payload?.text, payload?.message);
-    if (comment) {
-      const commentEvent = baseEvent(raw, payload, 'comment', '-comment');
-      commentEvent.comment = comment;
-      results.push({ kind: 'event', event: commentEvent });
-    }
-    const stickerEvent = baseEvent(raw, payload, 'sticker', '-sticker');
-    stickerEvent.stickerId = sticker.id;
-    stickerEvent.stickerName = sticker.name;
-    stickerEvent.stickerImageUrl = sticker.imageUrl;
-    results.push({ kind: 'event', event: stickerEvent });
-    return results;
-  }
-
   const event = baseEvent(raw, payload, normalizedType);
   if (normalizedType === 'comment') {
     event.comment = text(payload?.comment, payload?.text, payload?.message);
-  } else if (normalizedType === 'sticker') {
-    const resolved = sticker ?? {
-      id: text(payload?.stickerId, payload?.emoteId),
-      name: text(payload?.stickerName, payload?.emoteName, payload?.name, 'Sticker'),
+  } else if (normalizedType === 'fanSticker') {
+    const resolved = fanSticker ?? {
+      id: text(payload?.fanStickerId, payload?.fan_sticker_id, payload?.emoteId, payload?.emote_id),
+      name: text(payload?.fanStickerName, payload?.fan_sticker_name, payload?.emoteName, payload?.emote_name, 'Fan Sticker'),
       imageUrl: text(payload?.imageUrl),
     };
-    event.stickerId = resolved.id;
-    event.stickerName = resolved.name;
-    event.stickerImageUrl = resolved.imageUrl;
+    event.fanStickerId = resolved.id;
+    event.fanStickerName = resolved.name;
+    event.fanStickerImageUrl = resolved.imageUrl;
   } else if (normalizedType === 'gift') {
     event.giftName = text(gift?.giftName, gift?.name, payload?.giftName, 'Regalo');
     event.repeatCount = repeatCount;
