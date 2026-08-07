@@ -107,11 +107,7 @@ jobs:
           node --check app/src/live-games.js
           node build-v0320/test-live-games.js app/src/live-games.js
           Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló relay" }; Pop-Location
-          New-Item -ItemType Directory source-v0320 -Force | Out-Null
-          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v0320/$file" -Force } }
-          foreach ($folder in @("src","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v0320/$folder" -Recurse -Force } }
-          Compress-Archive -Path "source-v0320/*" -DestinationPath "Lulu-Finity-Source-0.32.0.zip" -Force
-      - name: Inyectar token oficial del relay
+      - name: Inyectar token oficial del relay (compatibilidad 0.32)
         shell: pwsh
         env:
           LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
@@ -130,7 +126,7 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npm run build:win -- --publish never
-      - name: Verificar y publicar 0.32.0
+      - name: Verificar y publicar 0.32.0 sin código fuente
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -140,7 +136,8 @@ jobs:
           $zip = "app/dist/Lulu-Finity-0.32.0-x64.zip"
           $latest = "app/dist/latest.yml"
           $blockmap = "app/dist/Lulu-Finity-Setup-0.32.0.exe.blockmap"
-          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.32.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          foreach ($file in @($installer,$zip,$latest,$blockmap)) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          if (Test-Path "Lulu-Finity-Source-0.32.0.zip") { throw "Seguridad: no se permite publicar un ZIP de código fuente" }
           Expand-Archive $zip -DestinationPath verify -Force
           $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
           if (!$asar) { throw "Falta app.asar" }
@@ -150,7 +147,7 @@ jobs:
           if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
           if ($text.Contains("app.getPath('localAppData')") -or $text.Contains('app.getPath("localAppData")')) { throw "Regresó LocalAppData" }
           $tag = "v0.32.0"
-          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.32.0.zip")
+          $files = @($installer,$zip,$latest,$blockmap)
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.32.0" --notes-file "app/CHANGELOG.md" }
           else { gh release create $tag $files --target main --title "Lulu Finity 0.32.0" --notes-file "app/CHANGELOG.md" }
@@ -162,6 +159,5 @@ jobs:
             app/dist/Lulu-Finity-0.32.0-x64.zip
             app/dist/latest.yml
             app/dist/Lulu-Finity-Setup-0.32.0.exe.blockmap
-            Lulu-Finity-Source-0.32.0.zip
           if-no-files-found: error
           retention-days: 30
