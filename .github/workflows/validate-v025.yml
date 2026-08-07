@@ -1,0 +1,72 @@
+name: Validar Lulu Finity 0.25.0
+
+on:
+  pull_request:
+    paths:
+      - "build-v025/**"
+      - ".github/workflows/validate-v025.yml"
+      - ".github/workflows/release-v025.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v025/**"
+      - ".github/workflows/validate-v025.yml"
+      - ".github/workflows/release-v025.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir fuente 0.25.0
+        run: |
+          curl --fail --location --silent --show-error https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.24.0/Lulu-Finity-Source-0.24.0.zip --output base.zip
+          echo "b4d4f7d0e5c1aeda5cc32cb45c86f70f19bb9a620ce216458b8cc682fac96bbd  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v025/apply-v025.py app
+
+      - name: Añadir imágenes elegidas
+        run: |
+          curl --fail --location --silent --show-error 'https://lh7-rt.googleusercontent.com/slidesz/AGV_vUeYvNQEUJiTDPusTpPf0hgOPJYMNeWUvrgqt5DXONh76kHUECBsEwBVHkTeA0kMZQ2cFbSBviBOd7RsV-ondQKOLhbkZ39bZyelJs8bTKythQ0p8V3wo14NgIUKFpQLop48Xu0vcnbJ2sVCyRMaXGMNapGLd8u1vywMgNBeMWHnYheaZcvZaA=nw?key=dG7mjVQevJNbzxrZlHrj8Q' -o app/src/miku-classic-user.jpg
+          curl --fail --location --silent --show-error 'https://lh7-rt.googleusercontent.com/slidesz/AGV_vUcmvvrv_cZpqHkvotkDRsY2o7EzL-VQwlrByhZtT3er02wtLMbJOPPSIhWC3rkYQbfK7H2udxo8ixNmRQ3UQuOzk7UOWU5DeD9zFI4gClDdOHs1lDgC_wD-RJpKpJEnCYP8cJNg0fx0M1ewadsnsYbytq2SdTyZUBpoMLNU8R0jeOWDb9U=nw?key=dG7mjVQevJNbzxrZlHrj8Q' -o app/src/miku-soft-user.png
+          curl --fail --location --silent --show-error 'https://lh7-rt.googleusercontent.com/slidesz/AGV_vUewg3v08L_mG8eXgNDLKOgUU10W1ss2OLp6QlwSlkB6pqoXMdKCg2qpvaUOfsDoEH1HaFmCP05FQyiEahMmdN2gs37BaFZQ3G-L4ASUwwVTXWox7TOSyfuSfKL1KySHoW2zVTUIzeljUYKiqc7O6nza7jQwPaqd8o0xG1IKs6ueRDiQjCuq8w=nw?key=dG7mjVQevJNbzxrZlHrj8Q' -o app/src/miku-dark-user.png
+          curl --fail --location --silent --show-error 'https://lh7-rt.googleusercontent.com/slidesz/AGV_vUeiI-kC_lo6E47UYdR97DxqhViSA3jIWHlEKKvVvOC83sq6kDpjZcLKOo7SfpniVbUd8SwTxirL0DXMznp5rsPyEyaVDQdvjgWApKcfB8IHKqOtIT4yWAPLY29_ZLB8Wk0wxpjgPmRjzmJxEQK3GUkxA8g2lJQFpjyJsPTTIPp--06pKwZUHA=nw?key=dG7mjVQevJNbzxrZlHrj8Q' -o app/src/lulu-about-user.jpg
+          for f in app/src/miku-classic-user.jpg app/src/miku-soft-user.png app/src/miku-dark-user.png app/src/lulu-about-user.jpg; do test -s "$f"; test "$(stat -c%s "$f")" -gt 20000; done
+          file app/src/miku-classic-user.jpg app/src/miku-soft-user.png app/src/miku-dark-user.png app/src/lulu-about-user.jpg
+
+      - name: Validar interfaz existente y cambios 0.25
+        run: |
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.25.0') process.exit(1)"
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('app/src/index.html').read_text(encoding='utf-8')
+          renderer=Path('app/src/renderer.js').read_text(encoding='utf-8')
+          css=Path('app/src/styles.css').read_text(encoding='utf-8')
+          assert '>Música</button>' in html
+          assert '>Cuenta</button>' in html
+          assert '>Overlays</button>' in html
+          assert '>Rankings</button>' not in html
+          assert 'id="page-account"' in html
+          assert html.count('id="openTikTokChatBtn"') == 1
+          assert html.count('id="tiktokAutoChatEnabledInput"') == 1
+          assert html.index('id="page-account"') < html.index('id="openTikTokChatBtn"') < html.index('id="page-commands"')
+          assert html.index('id="page-commands"') < html.index('id="tiktokAutoChatEnabledInput"') < html.index('id="page-permissions"')
+          assert 'min="20" max="100"' in html
+          assert 'insertAdjacentHTML(\'beforebegin\', \'<button class="nav-item" data-page="spotify"' not in renderer
+          assert "visibleNavPage = pageName === 'spotify' ? 'songs' : pageName" in renderer
+          assert 'lulu-about-user.jpg' in renderer
+          for asset in ('miku-classic-user.jpg','miku-soft-user.png','miku-dark-user.png'):
+              assert asset in css
+          assert 'var(--panel-opacity)' in css
+          assert 'Overlays sobre Lulu' not in html + renderer + css
+          PY
