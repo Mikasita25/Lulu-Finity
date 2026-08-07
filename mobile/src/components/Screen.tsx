@@ -30,9 +30,9 @@ export function Screen({ children, scroll = true, contentClassName = '', scrollP
     <LinearGradient
       colors={['#09070D', '#140A18', '#09070D']}
       locations={[0, 0.48, 1]}
-      className="flex-1"
+      style={{ flex: 1 }}
     >
-      <SafeAreaView className="flex-1" edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
         {content}
       </SafeAreaView>
     </LinearGradient>
