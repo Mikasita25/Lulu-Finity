@@ -1,0 +1,167 @@
+name: Lulu Finity 0.32.0
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v0320/**"
+      - ".github/workflows/v0320.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v0320/**"
+      - ".github/workflows/v0320.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir y validar 0.32.0
+        run: |
+          curl --fail --location --silent --show-error https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.29.0/Lulu-Finity-Source-0.29.0.zip -o base.zip
+          echo "020038fd8351461ed43d57535a2e667fec0cf766cff80fc7e5b8ce19d6c8d8e4  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v0320/apply-v0320.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/live-games.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.32.0') process.exit(1)"
+          node build-v0320/test-live-games.js app/src/live-games.js
+          cd app
+          npm install --ignore-scripts --no-audit --no-fund
+          npm ls @ghostery/adblocker-electron edge-tts-universal --depth=0
+          cd railway-relay && npm test
+      - name: Validar juegos y regresiones críticas
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          m=Path('app/src/main.js').read_text(encoding='utf-8')
+          r=Path('app/src/renderer.js').read_text(encoding='utf-8')
+          h=Path('app/src/index.html').read_text(encoding='utf-8')
+          p=Path('app/src/preload.js').read_text(encoding='utf-8')
+          g=Path('app/src/live-games.js').read_text(encoding='utf-8')
+          required_main=(
+            "const { LiveGameManager } = require('./live-games')",
+            "const STREAM_WIDGET_TYPES = new Set(['playlist', 'wallet', 'game'])",
+            "ipcMain.handle('games:play'",
+            "setStreamWidgetState('game'",
+            "widgets: { playlist:",
+            "wss://lulu-finity-production.up.railway.app/v1/tiktok/live",
+            "@ghostery/adblocker-electron",
+          )
+          for token in required_main: assert token in m, token
+          required_renderer=(
+            "const LIVE_GAME_DEFINITIONS",
+            "!blackjack",
+            "!pedir",
+            "!plantar",
+            "!rasca",
+            "!ruleta",
+            "!dados",
+            "!ppt",
+            "!slots",
+            "api.playLiveGame",
+            "onLiveGameResult",
+            "gameWidgetPreviewFrame",
+          )
+          for token in required_renderer: assert token in r or token in h or token in p, token
+          for game in ('blackjack','scratch','roulette','dice','rps','slots'):
+            assert f"'{game}'" in g, game
+          assert 'Juegos del LIVE' in h
+          assert '<span class="version" id="versionLabel">v0.32.0</span>' in h
+          assert 'Voces divertidas' not in h
+          assert 'FUN_VOICE_PRESETS' not in r
+          assert 'STREAM_ELEMENTS_TTS_URL' not in m
+          assert "app.getPath('localAppData')" not in m and 'app.getPath("localAppData")' not in m
+          assert '__LULU_RELAY_CLIENT_TOKEN__' in m
+          PY
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir 0.32.0
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.29.0/Lulu-Finity-Source-0.29.0.zip" -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne "020038fd8351461ed43d57535a2e667fec0cf766cff80fc7e5b8ce19d6c8d8e4") { throw "Fuente 0.29.0 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v0320/apply-v0320.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/live-games.js
+          node build-v0320/test-live-games.js app/src/live-games.js
+          Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló relay" }; Pop-Location
+          New-Item -ItemType Directory source-v0320 -Force | Out-Null
+          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v0320/$file" -Force } }
+          foreach ($folder in @("src","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v0320/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v0320/*" -DestinationPath "Lulu-Finity-Source-0.32.0.zip" -Force
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          if ((Get-Content $path -Raw).Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "No se inyectó el token" }
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:win -- --publish never
+      - name: Verificar y publicar 0.32.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.32.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.32.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.32.0.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.32.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @("games:play","Juegos del LIVE","!blackjack","!rasca","!ruleta","!dados","!ppt","!slots","persist:lulu-youtube","v0.32.0")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          if ($text.Contains("FUN_VOICE_PRESETS") -or $text.Contains("STREAM_ELEMENTS_TTS_URL")) { throw "Regresaron las voces divertidas/StreamElements" }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
+          if ($text.Contains("app.getPath('localAppData')") -or $text.Contains('app.getPath("localAppData")')) { throw "Regresó LocalAppData" }
+          $tag = "v0.32.0"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.32.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.32.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.32.0" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.32.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.32.0.exe
+            app/dist/Lulu-Finity-0.32.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.32.0.exe.blockmap
+            Lulu-Finity-Source-0.32.0.zip
+          if-no-files-found: error
+          retention-days: 30
