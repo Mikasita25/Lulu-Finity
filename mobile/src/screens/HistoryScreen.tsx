@@ -15,7 +15,7 @@ const filters: { id: Filter; label: string }[] = [
   { id: 'all', label: 'Todos' },
   { id: 'gift', label: 'Regalos' },
   { id: 'comment', label: 'Chat' },
-  { id: 'sticker', label: 'Stickers' },
+  { id: 'fanSticker', label: 'Fan Stickers' },
   { id: 'like', label: 'Likes' },
   { id: 'follow', label: 'Follow' },
   { id: 'share', label: 'Share' },
@@ -35,7 +35,6 @@ export function HistoryScreen() {
   return (
     <Screen>
       <AppHeader title="Historial" subtitle="Hasta 500 eventos persistidos en el dispositivo." />
-
       <View className="mb-4 flex-row flex-wrap gap-2">
         {filters.map((item) => (
           <Text
@@ -49,12 +48,9 @@ export function HistoryScreen() {
           </Text>
         ))}
       </View>
-
       <GlassCard>
         <View className="px-4">
-          {filtered.map((event) => (
-            <EventRow key={event.id} event={event} />
-          ))}
+          {filtered.map((event) => <EventRow key={event.id} event={event} />)}
           {!filtered.length ? (
             <View className="items-center py-12">
               <History size={30} color="#685D67" />
@@ -63,15 +59,9 @@ export function HistoryScreen() {
           ) : null}
         </View>
       </GlassCard>
-
       {events.length ? (
         <View className="mt-4">
-          <Button
-            label="Borrar historial"
-            variant="danger"
-            onPress={clearHistory}
-            icon={<Trash2 size={17} color="#FDA4AF" />}
-          />
+          <Button label="Borrar historial" variant="danger" onPress={clearHistory} icon={<Trash2 size={17} color="#FDA4AF" />} />
         </View>
       ) : null}
     </Screen>
