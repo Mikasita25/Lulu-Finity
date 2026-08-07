@@ -13,6 +13,12 @@ import { accentByTheme } from '@/theme/palette';
 
 type Voice = Awaited<ReturnType<typeof getTtsVoices>>[number];
 
+const LANGUAGE_CHOICES = [
+  ['es-MX', 'Español MX'],
+  ['es-ES', 'Español ES'],
+  ['en-US', 'English US'],
+] as const;
+
 function ToggleRow({
   title,
   subtitle,
@@ -57,7 +63,10 @@ function Choice({
       style={active ? { borderColor: accent, backgroundColor: `${accent}20` } : undefined}
       className={`rounded-xl border px-3 py-2 ${active ? '' : 'border-white/10 bg-white/[0.04]'}`}
     >
-      <Text style={active ? { color: accent } : undefined} className={active ? 'text-xs font-black' : 'text-xs font-bold text-white/55'}>
+      <Text
+        style={active ? { color: accent } : undefined}
+        className={active ? 'text-xs font-black' : 'text-xs font-bold text-white/55'}
+      >
         {label}
       </Text>
     </Pressable>
@@ -69,7 +78,9 @@ export function TtsScreen() {
   const accentTheme = useAppStore((state) => state.accentTheme);
   const accent = accentByTheme[accentTheme];
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [preview, setPreview] = useState('Hola, soy el TTS de Lulú Finity. Ya puedo leer los comentarios del LIVE.');
+  const [preview, setPreview] = useState(
+    'Hola, soy el TTS de Lulú Finity. Ya puedo leer los comentarios del LIVE.',
+  );
 
   useEffect(() => {
     let active = true;
@@ -84,14 +95,19 @@ export function TtsScreen() {
   }, []);
 
   const matchingVoices = useMemo(() => {
-    const prefix = settings.language.split('-')[0].toLowerCase();
-    const preferred = voices.filter((voice) => voice.language.toLowerCase().startsWith(prefix));
+    const prefix = (settings.language.split('-')[0] ?? 'es').toLowerCase();
+    const preferred = voices.filter((voice) =>
+      voice.language.toLowerCase().startsWith(prefix),
+    );
     return (preferred.length ? preferred : voices).slice(0, 10);
   }, [voices, settings.language]);
 
   return (
     <Screen>
-      <AppHeader title="TTS Bot" subtitle="La voz de tus comentarios de TikTok LIVE, directamente en Android." />
+      <AppHeader
+        title="TTS Bot"
+        subtitle="La voz de tus comentarios de TikTok LIVE, directamente en Android."
+      />
 
       <GlassCard>
         <View className="p-5">
@@ -133,13 +149,12 @@ export function TtsScreen() {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Idioma" subtitle="Android usará una voz instalada compatible con el idioma elegido." />
+      <SectionTitle
+        title="Idioma"
+        subtitle="Android usará una voz instalada compatible con el idioma elegido."
+      />
       <View className="flex-row flex-wrap gap-2">
-        {[
-          ['es-MX', 'Español MX'],
-          ['es-ES', 'Español ES'],
-          ['en-US', 'English US'],
-        ].map(([value, label]) => (
+        {LANGUAGE_CHOICES.map(([value, label]) => (
           <Choice
             key={value}
             label={label}
@@ -150,50 +165,87 @@ export function TtsScreen() {
         ))}
       </View>
 
-      <SectionTitle title="Voz" subtitle="Las opciones dependen de las voces instaladas en tu teléfono." />
+      <SectionTitle
+        title="Voz"
+        subtitle="Las opciones dependen de las voces instaladas en tu teléfono."
+      />
       <GlassCard>
         <View className="p-4">
           <Pressable
             onPress={() => settings.updateTts({ voice: '' })}
-            style={!settings.voice ? { borderColor: accent, backgroundColor: `${accent}18` } : undefined}
+            style={
+              !settings.voice
+                ? { borderColor: accent, backgroundColor: `${accent}18` }
+                : undefined
+            }
             className={`mb-2 rounded-2xl border p-4 ${settings.voice ? 'border-white/10 bg-white/[0.035]' : ''}`}
           >
-            <Text style={!settings.voice ? { color: accent } : undefined} className={settings.voice ? 'text-sm font-black text-white' : 'text-sm font-black'}>
+            <Text
+              style={!settings.voice ? { color: accent } : undefined}
+              className={settings.voice ? 'text-sm font-black text-white' : 'text-sm font-black'}
+            >
               Predeterminada del sistema
             </Text>
-            <Text className="mt-1 text-xs text-white/35">Android elige automáticamente la mejor voz.</Text>
+            <Text className="mt-1 text-xs text-white/35">
+              Android elige automáticamente la mejor voz.
+            </Text>
           </Pressable>
           {matchingVoices.map((voice) => {
             const active = settings.voice === voice.identifier;
             return (
               <Pressable
                 key={voice.identifier}
-                onPress={() => settings.updateTts({ voice: voice.identifier, language: voice.language })}
+                onPress={() =>
+                  settings.updateTts({ voice: voice.identifier, language: voice.language })
+                }
                 style={active ? { borderColor: accent, backgroundColor: `${accent}18` } : undefined}
                 className={`mb-2 rounded-2xl border p-4 ${active ? '' : 'border-white/10 bg-white/[0.035]'}`}
               >
-                <Text style={active ? { color: accent } : undefined} className={active ? 'text-sm font-black' : 'text-sm font-black text-white'}>
+                <Text
+                  style={active ? { color: accent } : undefined}
+                  className={active ? 'text-sm font-black' : 'text-sm font-black text-white'}
+                >
                   {voice.name}
                 </Text>
-                <Text className="mt-1 text-xs text-white/35">{voice.language} · {voice.quality}</Text>
+                <Text className="mt-1 text-xs text-white/35">
+                  {voice.language} · {voice.quality}
+                </Text>
               </Pressable>
             );
           })}
-          {!voices.length ? <Text className="p-3 text-xs text-white/35">Cargando voces instaladas…</Text> : null}
+          {!voices.length ? (
+            <Text className="p-3 text-xs text-white/35">Cargando voces instaladas…</Text>
+          ) : null}
         </View>
       </GlassCard>
 
       <SectionTitle title="Ritmo" />
-      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">Velocidad</Text>
+      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">
+        Velocidad
+      </Text>
       <View className="mb-4 flex-row flex-wrap gap-2">
         {[0.8, 1, 1.15, 1.3].map((rate) => (
-          <Choice key={rate} label={`${rate}x`} active={settings.rate === rate} accent={accent} onPress={() => settings.updateTts({ rate })} />
+          <Choice
+            key={rate}
+            label={`${rate}x`}
+            active={settings.rate === rate}
+            accent={accent}
+            onPress={() => settings.updateTts({ rate })}
+          />
         ))}
       </View>
-      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">Tono</Text>
+      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">
+        Tono
+      </Text>
       <View className="flex-row flex-wrap gap-2">
         {[0.85, 1, 1.15, 1.3].map((pitch) => (
-          <Choice key={pitch} label={`${pitch}x`} active={settings.pitch === pitch} accent={accent} onPress={() => settings.updateTts({ pitch })} />
+          <Choice
+            key={pitch}
+            label={`${pitch}x`}
+            active={settings.pitch === pitch}
+            accent={accent}
+            onPress={() => settings.updateTts({ pitch })}
+          />
         ))}
       </View>
 
@@ -214,9 +266,25 @@ export function TtsScreen() {
             className="min-h-[100px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-5 text-white"
           />
           <View className="mt-4 gap-3">
-            <Button label="Probar TTS" onPress={() => previewTts(preview)} icon={<AudioLines size={17} color="white" />} />
-            <Button label="Detener voz" variant="secondary" onPress={stopTts} icon={<Square size={15} color="white" />} />
-            <Button label="Restablecer TTS" variant="secondary" onPress={settings.resetTts} icon={<RotateCcw size={16} color="white" />} />
+            <Button
+              label="Probar TTS"
+              onPress={async () => {
+                await previewTts(preview);
+              }}
+              icon={<AudioLines size={17} color="white" />}
+            />
+            <Button
+              label="Detener voz"
+              variant="secondary"
+              onPress={stopTts}
+              icon={<Square size={15} color="white" />}
+            />
+            <Button
+              label="Restablecer TTS"
+              variant="secondary"
+              onPress={settings.resetTts}
+              icon={<RotateCcw size={16} color="white" />}
+            />
           </View>
         </View>
       </GlassCard>
