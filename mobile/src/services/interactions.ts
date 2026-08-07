@@ -32,11 +32,11 @@ function matchesRule(rule: InteractionRule, event: LiveEvent) {
       : normalize(commandFrom(comment)) === normalize(trigger);
   }
 
-  if (rule.triggerType === 'sticker') {
-    if (event.type !== 'sticker') return false;
+  if (rule.triggerType === 'fanSticker') {
+    if (event.type !== 'fanSticker') return false;
     return (
-      matchesValue(event.stickerName ?? '', rule.triggerValue, rule.matchMode) ||
-      matchesValue(event.stickerId ?? '', rule.triggerValue, rule.matchMode)
+      matchesValue(event.fanStickerName ?? '', rule.triggerValue, rule.matchMode) ||
+      matchesValue(event.fanStickerId ?? '', rule.triggerValue, rule.matchMode)
     );
   }
 
@@ -48,16 +48,19 @@ function matchesRule(rule: InteractionRule, event: LiveEvent) {
 }
 
 function renderTemplate(template: string, event: LiveEvent) {
+  const fanSticker = event.fanStickerName || event.fanStickerId || 'Fan Sticker';
   const values: Record<string, string> = {
     user: event.uniqueId ? `@${event.uniqueId}` : '',
     name: event.nickname || event.uniqueId || 'Usuario',
     comment: event.comment ?? '',
-    sticker: event.stickerName || event.stickerId || 'sticker',
+    fansticker: fanSticker,
+    // Alias conservado para las reglas creadas en la build anterior.
+    sticker: fanSticker,
     gift: event.giftName ?? 'regalo',
     count: String(event.repeatCount ?? event.count ?? 1),
   };
 
-  return template.replace(/\{(user|name|comment|sticker|gift|count)\}/gi, (_, key: string) => {
+  return template.replace(/\{(user|name|comment|fanSticker|sticker|gift|count)\}/gi, (_, key: string) => {
     return values[key.toLowerCase()] ?? '';
   });
 }
@@ -98,15 +101,15 @@ export function previewRule(rule: InteractionRule) {
     type:
       rule.triggerType === 'command'
         ? 'comment'
-        : rule.triggerType === 'sticker'
-          ? 'sticker'
+        : rule.triggerType === 'fanSticker'
+          ? 'fanSticker'
           : rule.triggerType,
     timestamp: Date.now(),
     uniqueId: 'lulu_fan',
     nickname: 'Lulu Fan',
     comment: rule.triggerType === 'command' ? `${rule.triggerValue || '!hola'} prueba` : undefined,
-    stickerName: rule.triggerType === 'sticker' ? rule.triggerValue || 'Corazón' : undefined,
-    stickerId: rule.triggerType === 'sticker' ? 'sticker-preview' : undefined,
+    fanStickerName: rule.triggerType === 'fanSticker' ? rule.triggerValue || 'Fan Sticker corazón' : undefined,
+    fanStickerId: rule.triggerType === 'fanSticker' ? 'fan-sticker-preview' : undefined,
     giftName: rule.triggerType === 'gift' ? rule.triggerValue || 'Rosa' : undefined,
     repeatCount: 1,
   };
