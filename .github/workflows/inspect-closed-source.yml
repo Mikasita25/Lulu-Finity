@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reconstruct current source and report LIVE listeners
+      - name: Reconstruct current source and report connector references
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -21,13 +21,8 @@ jobs:
           python build-v0320/apply-v0320.py app
           python - <<'PY'
           from pathlib import Path
-          path = Path('app/src/main.js')
-          lines = path.read_text(encoding='utf-8').splitlines()
-          starts = [i for i,line in enumerate(lines) if 'function attachLiveEvents' in line]
-          if not starts:
-              raise SystemExit('No se encontró attachLiveEvents')
-          start = max(0, starts[0] - 5)
-          end = min(len(lines), starts[0] + 260)
-          for i in range(start, end):
-              print(f'{i+1}: {lines[i]}')
+          lines = Path('app/src/main.js').read_text(encoding='utf-8').splitlines()
+          for i,line in enumerate(lines, 1):
+              if 'connectorModule' in line or 'tiktok-live-connector' in line:
+                  print(f'{i}: {line}')
           PY
