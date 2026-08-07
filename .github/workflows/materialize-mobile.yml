@@ -1,0 +1,34 @@
+name: Materializar Lulu Finity Mobile
+
+on:
+  push:
+    branches:
+      - agent/lulu-finity-mobile-android
+    paths:
+      - ".mobile-source.tar.gz"
+      - ".github/workflows/materialize-mobile.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Materializar proyecto móvil
+        run: |
+          set -euo pipefail
+          tar -xzf .mobile-source.tar.gz
+          rm .mobile-source.tar.gz .github/workflows/materialize-mobile.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No hay cambios para materializar."
+            exit 0
+          fi
+          git commit -m "Añadir base de Lulú Finity Mobile para Android"
+          git push origin HEAD:agent/lulu-finity-mobile-android
