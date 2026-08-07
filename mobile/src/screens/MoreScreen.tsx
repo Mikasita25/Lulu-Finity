@@ -7,6 +7,7 @@ import {
   Settings,
   UserRound,
   Volume2,
+  Zap,
 } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { AppHeader } from '@/components/AppHeader';
@@ -15,6 +16,12 @@ import { useAppStore } from '@/store/useAppStore';
 
 const items = [
   { route: 'TTS', title: 'TTS Bot', subtitle: 'Leer comentarios del LIVE con voz', icon: AudioLines },
+  {
+    route: 'Interactions',
+    title: 'Comandos y stickers',
+    subtitle: 'Sonidos, TTS y acciones por disparador',
+    icon: Zap,
+  },
   { route: 'History', title: 'Historial', subtitle: 'Eventos y filtros', icon: History },
   { route: 'Sounds', title: 'Sonidos', subtitle: 'Alertas y preview', icon: Volume2 },
   { route: 'Appearance', title: 'Apariencia', subtitle: 'Temas, colores y ranking RGB', icon: Palette },
