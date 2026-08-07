@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reconstruct current source and report connector references
+      - name: Reconstruct current source and report connector fallback
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -21,10 +21,8 @@ jobs:
           python build-v0320/apply-v0320.py app
           python - <<'PY'
           from pathlib import Path
-          needles = ('tiktok-live-connector', 'TikTokLiveConnection', 'WebcastPushConnection')
-          for file in Path('app/src').glob('*.js'):
-              lines = file.read_text(encoding='utf-8').splitlines()
-              for number, line in enumerate(lines, 1):
-                  if any(needle in line for needle in needles):
-                      print(f'{file}:{number}: {line.strip()}')
+          path = Path('app/src/main.js')
+          lines = path.read_text(encoding='utf-8').splitlines()
+          for number in range(3140, min(3241, len(lines) + 1)):
+              print(f'{number}: {lines[number-1]}')
           PY
