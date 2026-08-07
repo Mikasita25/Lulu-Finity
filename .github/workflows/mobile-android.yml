@@ -1,0 +1,69 @@
+name: Lulú Finity Mobile Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/lulu-finity-mobile-android
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-android.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_PUBLIC_LULU_RELAY_URL: wss://lulu-finity-production.up.railway.app/v1/tiktok/live
+      EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: mobile/package.json
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Dependencias
+        run: npm install --no-audit --no-fund
+      - name: Validar versiones Expo
+        run: npx expo install --check
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Expo Doctor
+        run: npm run doctor
+      - name: Generar proyecto Android
+        run: npx expo prebuild --platform android --clean --no-install
+      - name: Compilar APK Android
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug assembleRelease --no-daemon
+      - name: Publicar APKs como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Mobile-Android
+          path: |
+            mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14

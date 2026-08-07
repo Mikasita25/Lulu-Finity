@@ -25,6 +25,11 @@ const emptyStats: LiveStats = {
 const defaultSounds: SoundSettings = {
   gift: { enabled: true, volume: 0.9 },
   follow: { enabled: false, volume: 0.75 },
+  like: { enabled: false, volume: 0.45 },
+  share: { enabled: false, volume: 0.7 },
+  comment: { enabled: false, volume: 0.5 },
+  member: { enabled: false, volume: 0.6 },
+  subscribe: { enabled: true, volume: 0.9 },
   goal: { enabled: true, volume: 1 },
   rank: { enabled: false, volume: 0.8 },
 };
@@ -174,11 +179,16 @@ export const useAppStore = create<AppState>()(
       setMode: (mode) => set({ mode }),
       setRelay: (relayState, relayMessage = '') => set({ relayState, relayMessage }),
       resetSession: () =>
-        set({
+        set((state) => ({
           stats: { ...emptyStats },
           leaderboard: {},
           lastGoalCompletion: undefined,
-        }),
+          goals: state.goals.map((goal) => ({
+            ...goal,
+            startValue: 0,
+            completedAt: undefined,
+          })),
+        })),
       setViewerCount: (viewers) =>
         set((state) => ({ stats: { ...state.stats, viewers: Math.max(0, Math.round(viewers)) } })),
       setTotalLikes: (likes) =>
@@ -281,7 +291,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           soundSettings: {
             ...state.soundSettings,
-            [slot]: { ...state.soundSettings[slot], ...patch },
+            [slot]: { ...(state.soundSettings[slot] ?? defaultSounds[slot]), ...patch },
           },
         })),
       setRankingRgb: (rankingRgb) => set({ rankingRgb }),
@@ -291,6 +301,14 @@ export const useAppStore = create<AppState>()(
     {
       name: 'lulu-finity-mobile-v1',
       storage: createJSONStorage(() => AsyncStorage),
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<AppState>;
+        return {
+          ...current,
+          ...saved,
+          soundSettings: { ...defaultSounds, ...(saved.soundSettings ?? {}) },
+        };
+      },
       partialize: (state) => ({
         onboardingDone: state.onboardingDone,
         username: state.username,
