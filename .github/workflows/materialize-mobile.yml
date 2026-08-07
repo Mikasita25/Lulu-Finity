@@ -5,7 +5,7 @@ on:
     branches:
       - agent/lulu-finity-mobile-android
     paths:
-      - ".mobile-source.tar.gz"
+      - ".mobile-source.part-*"
       - ".github/workflows/materialize-mobile.yml"
 
 permissions:
@@ -21,8 +21,10 @@ jobs:
       - name: Materializar proyecto móvil
         run: |
           set -euo pipefail
+          cat .mobile-source.part-* > .mobile-source.tar.gz
+          echo "3c274abe1fccd43950d7fcb55db5a125f2acef5729333c839bfab2b490f2d057  .mobile-source.tar.gz" | sha256sum --check
           tar -xzf .mobile-source.tar.gz
-          rm .mobile-source.tar.gz .github/workflows/materialize-mobile.yml
+          rm .mobile-source.tar.gz .mobile-source.part-* .github/workflows/materialize-mobile.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
