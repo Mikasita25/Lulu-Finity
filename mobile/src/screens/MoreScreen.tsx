@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import {
+  AudioLines,
   ChevronRight,
   History,
   Palette,
@@ -13,6 +14,7 @@ import { GlassCard } from '@/components/GlassCard';
 import { useAppStore } from '@/store/useAppStore';
 
 const items = [
+  { route: 'TTS', title: 'TTS Bot', subtitle: 'Leer comentarios del LIVE con voz', icon: AudioLines },
   { route: 'History', title: 'Historial', subtitle: 'Eventos y filtros', icon: History },
   { route: 'Sounds', title: 'Sonidos', subtitle: 'Alertas y preview', icon: Volume2 },
   { route: 'Appearance', title: 'Apariencia', subtitle: 'Temas, colores y ranking RGB', icon: Palette },
