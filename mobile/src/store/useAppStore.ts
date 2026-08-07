@@ -21,7 +21,7 @@ const emptyStats: LiveStats = {
   followers: 0,
   shares: 0,
   comments: 0,
-  stickers: 0,
+  fanStickers: 0,
 };
 
 const defaultSounds: SoundSettings = {
@@ -30,7 +30,7 @@ const defaultSounds: SoundSettings = {
   like: { enabled: false, volume: 0.45 },
   share: { enabled: false, volume: 0.7 },
   comment: { enabled: false, volume: 0.5 },
-  sticker: { enabled: false, volume: 0.75 },
+  fanSticker: { enabled: false, volume: 0.75 },
   member: { enabled: false, volume: 0.6 },
   subscribe: { enabled: true, volume: 0.9 },
   goal: { enabled: true, volume: 1 },
@@ -117,7 +117,7 @@ function bumpLeaderboard(
     diamonds: 0,
     likes: 0,
     comments: 0,
-    stickers: 0,
+    fanStickers: 0,
     shares: 0,
     follows: 0,
     members: 0,
@@ -134,7 +134,7 @@ function bumpLeaderboard(
     diamonds: old.diamonds + (event.type === 'gift' ? Math.max(0, event.diamonds ?? 0) : 0),
     likes: old.likes + (event.type === 'like' ? Math.max(1, event.count ?? 1) : 0),
     comments: old.comments + (event.type === 'comment' ? 1 : 0),
-    stickers: old.stickers + (event.type === 'sticker' ? 1 : 0),
+    fanStickers: old.fanStickers + (event.type === 'fanSticker' ? 1 : 0),
     shares: old.shares + (event.type === 'share' ? 1 : 0),
     follows: old.follows + (event.type === 'follow' ? 1 : 0),
     members: old.members + (event.type === 'member' ? 1 : 0),
@@ -147,13 +147,38 @@ function bumpLeaderboard(
     next.gifts * 25 +
     next.likes * 0.08 +
     next.comments * 5 +
-    next.stickers * 6 +
+    next.fanStickers * 6 +
     next.shares * 12 +
     next.follows * 18 +
     next.members * 4 +
     next.subscribes * 80;
 
   return { ...current, [key]: next };
+}
+
+function migrateEvent(input: unknown): LiveEvent | null {
+  if (!input || typeof input !== 'object') return null;
+  const legacy = input as any;
+  if (legacy.type !== 'sticker') return legacy as LiveEvent;
+  return {
+    ...legacy,
+    type: 'fanSticker',
+    fanStickerId: legacy.fanStickerId ?? legacy.stickerId,
+    fanStickerName: legacy.fanStickerName ?? legacy.stickerName,
+    fanStickerImageUrl: legacy.fanStickerImageUrl ?? legacy.stickerImageUrl,
+    stickerId: undefined,
+    stickerName: undefined,
+    stickerImageUrl: undefined,
+  } as LiveEvent;
+}
+
+function migrateRule(input: unknown): InteractionRule | null {
+  if (!input || typeof input !== 'object') return null;
+  const legacy = input as any;
+  return {
+    ...legacy,
+    triggerType: legacy.triggerType === 'sticker' ? 'fanSticker' : legacy.triggerType,
+  } as InteractionRule;
 }
 
 export const useAppStore = create<AppState>()(
@@ -220,8 +245,8 @@ export const useAppStore = create<AppState>()(
           nextStats.shares += 1;
         } else if (event.type === 'comment') {
           nextStats.comments += 1;
-        } else if (event.type === 'sticker') {
-          nextStats.stickers += 1;
+        } else if (event.type === 'fanSticker') {
+          nextStats.fanStickers += 1;
         } else if (event.type === 'member' && event.memberCount) {
           nextStats.viewers = Math.max(0, event.memberCount);
         }
@@ -333,12 +358,22 @@ export const useAppStore = create<AppState>()(
       name: 'lulu-finity-mobile-v1',
       storage: createJSONStorage(() => AsyncStorage),
       merge: (persisted, current) => {
-        const saved = (persisted ?? {}) as Partial<AppState>;
+        const saved = (persisted ?? {}) as Partial<AppState> & { soundSettings?: any; events?: unknown[]; interactionRules?: unknown[] };
+        const legacyFanStickerSound = saved.soundSettings?.fanSticker ?? saved.soundSettings?.sticker;
         return {
           ...current,
           ...saved,
-          interactionRules: Array.isArray(saved.interactionRules) ? saved.interactionRules : [],
-          soundSettings: { ...defaultSounds, ...(saved.soundSettings ?? {}) },
+          events: Array.isArray(saved.events)
+            ? saved.events.map(migrateEvent).filter((event): event is LiveEvent => Boolean(event))
+            : [],
+          interactionRules: Array.isArray(saved.interactionRules)
+            ? saved.interactionRules.map(migrateRule).filter((rule): rule is InteractionRule => Boolean(rule))
+            : [],
+          soundSettings: {
+            ...defaultSounds,
+            ...(saved.soundSettings ?? {}),
+            fanSticker: legacyFanStickerSound ?? defaultSounds.fanSticker,
+          },
         };
       },
       partialize: (state) => ({
