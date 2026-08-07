@@ -1,7 +1,7 @@
 export type LiveEventType =
   | 'gift'
   | 'comment'
-  | 'sticker'
+  | 'fanSticker'
   | 'like'
   | 'follow'
   | 'share'
@@ -24,9 +24,9 @@ export type LiveEvent = {
   count?: number;
   total?: number;
   memberCount?: number;
-  stickerId?: string;
-  stickerName?: string;
-  stickerImageUrl?: string;
+  fanStickerId?: string;
+  fanStickerName?: string;
+  fanStickerImageUrl?: string;
 };
 
 export type LiveStats = {
@@ -37,7 +37,7 @@ export type LiveStats = {
   followers: number;
   shares: number;
   comments: number;
-  stickers: number;
+  fanStickers: number;
 };
 
 export type LeaderboardEntry = {
@@ -48,7 +48,7 @@ export type LeaderboardEntry = {
   diamonds: number;
   likes: number;
   comments: number;
-  stickers: number;
+  fanStickers: number;
   shares: number;
   follows: number;
   members: number;
@@ -68,7 +68,7 @@ export type SoundSlot =
   | 'like'
   | 'share'
   | 'comment'
-  | 'sticker'
+  | 'fanSticker'
   | 'member'
   | 'subscribe'
   | 'goal'
@@ -79,7 +79,7 @@ export type SoundSettings = Record<SoundSlot, SoundSetting>;
 
 export type InteractionTriggerType =
   | 'command'
-  | 'sticker'
+  | 'fanSticker'
   | 'gift'
   | 'follow'
   | 'share'
