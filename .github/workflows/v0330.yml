@@ -31,7 +31,16 @@ jobs:
       - name: Reconstruir 0.32.0
         run: python build-v0320/apply-v0320.py app
       - name: Aplicar Automatizaciones 0.33.0
-        run: python build-v0330/apply-v0330.py app
+        run: |
+          set +e
+          python build-v0330/apply-v0330.py app > apply-v0330.log 2>&1
+          code=$?
+          cat apply-v0330.log
+          if [ $code -ne 0 ]; then
+            message=$(tail -n 6 apply-v0330.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+            echo "::error title=Parche Lulu 0.33::$message"
+            exit $code
+          fi
       - name: Validar sintaxis y versión
         run: |
           node --check app/src/main.js
