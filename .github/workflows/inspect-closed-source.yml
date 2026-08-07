@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reconstruct current source and report connector fallback
+      - name: Reconstruct current source and report relay adapter
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -23,6 +23,11 @@ jobs:
           from pathlib import Path
           path = Path('app/src/main.js')
           lines = path.read_text(encoding='utf-8').splitlines()
-          for number in range(3140, min(3241, len(lines) + 1)):
-              print(f'{number}: {lines[number-1]}')
+          starts = [i for i,line in enumerate(lines) if 'class RailwayRelayConnection' in line]
+          if not starts:
+              raise SystemExit('No se encontró RailwayRelayConnection')
+          start = max(0, starts[0] - 8)
+          end = min(len(lines), starts[0] + 220)
+          for i in range(start, end):
+              print(f'{i+1}: {lines[i]}')
           PY
