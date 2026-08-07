@@ -2,7 +2,7 @@ from pathlib import Path
 import json, sys
 root=Path(sys.argv[1])
 main=root/'src/main.js'; rend=root/'src/renderer.js'; html=root/'src/index.html'; pkg=root/'package.json'; pre=root/'src/preload.js'; ch=root/'CHANGELOG.md'
-m=main.read_text(); r=rend.read_text(); h=html.read_text(); p=json.loads(pkg.read_text()); c=ch.read_text()
+m=main.read_text(encoding='utf-8'); r=rend.read_text(encoding='utf-8'); h=html.read_text(encoding='utf-8'); p=json.loads(pkg.read_text(encoding='utf-8')); c=ch.read_text(encoding='utf-8')
 
 def rep(text,a,b,label):
     if a not in text: raise SystemExit(f'missing anchor {label}')
@@ -291,9 +291,9 @@ h=h.replace('voces online', 'voces online')
 h=h.replace('<span class="version" id="versionLabel">v0.30.0</span>', '<span class="version" id="versionLabel">v0.31.0</span>')
 h=h.replace('Lulu Finity 0.30.0', 'Lulu Finity 0.31.0')
 # package version
-p['version']='0.31.0'; pkg.write_text(json.dumps(p,ensure_ascii=False,indent=2)+"\n")
+p['version']='0.31.0'; pkg.write_text(json.dumps(p,ensure_ascii=False,indent=2)+"\n", encoding='utf-8')
 # changelog
 entry="""# Cambios\n\n## 0.31.0\n\n- Añade voces externas reales mediante StreamElements; ya no todo el TTS online depende de Microsoft/Edge.\n- El selector de voz muestra grupos separados para StreamElements y Microsoft.\n- Incluye voces como Mia, Miguel, Ivy, Justin, Brian, Mizuki, Koharu, Takumi, Haruto y Seoyeon.\n- Los 12 presets divertidos ahora usan voces de StreamElements como base: Ratón, Minion (broma), Anime kawaii/chibi, Senpai, Villano anime, Idol virtual, Bebé, Demonio, Robot, Narrador épico y Meme turbo.\n- Mantiene compatibilidad con configuraciones antiguas `online:<voz>` interpretándolas como Microsoft.\n- Conserva el anti anuncios avanzado de YouTube, rollback a 0.27 y correcciones de arranque.\n\n"""
-ch.write_text(entry+c)
-main.write_text(m); rend.write_text(r); html.write_text(h)
+ch.write_text(entry+c, encoding='utf-8')
+main.write_text(m, encoding='utf-8'); rend.write_text(r, encoding='utf-8'); html.write_text(h, encoding='utf-8')
 print('patched 0.31.0')
