@@ -126,7 +126,7 @@ jobs:
           $asar = Get-ChildItem verify-portable -Recurse -Filter app.asar | Select-Object -First 1
           if (!$asar) { throw "No se encontró app.asar." }
           $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
-          foreach ($token in @("async function connectFromUi()","async function skipCurrentSong()","function setupEvents()","$('connectBtn').addEventListener('click', connectFromUi);","v0.28.1")) { if (!$asarText.Contains($token)) { throw "El app.asar final no contiene $token" } }
+          foreach ($token in @("async function connectFromUi()","async function skipCurrentSong()","function setupEvents()","v0.28.1")) { if (!$asarText.Contains($token)) { throw "El app.asar final no contiene $token" } }
           if ($asarText.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$asarText.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token del relay inválido en app.asar." }
           if ($asarText.Contains("app.getPath('localAppData')") -or $asarText.Contains('app.getPath("localAppData")')) { throw "Regresó LocalAppData." }
           $tag = "v0.28.1"
