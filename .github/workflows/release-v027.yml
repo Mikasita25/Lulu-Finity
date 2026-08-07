@@ -48,7 +48,7 @@ jobs:
           $html = Get-Content app/src/index.html -Raw
           $renderer = Get-Content app/src/renderer.js -Raw
           $main = Get-Content app/src/main.js -Raw
-          foreach ($token in @("youtubeUseBraveInput","voice-section-tabs","Servidor seguro de Lulu Finity","relayUserUsageBar","commandOverlaySetupCard","Configura Overlays para tu Directo.","Personaliza tu economía.")) {
+          foreach ($token in @("youtubeUseBraveInput","tts-section-tabs","Servidor seguro de Lulu Finity","relayUserUsageBar","commandOverlaySetupCard","Configura Overlays para tu Directo.","Personaliza tu economía.")) {
             if (!(($html + $renderer + $main).Contains($token))) { throw "Falta $token" }
           }
           if ($html.Contains('data-page="filters"') -or $html.Contains('id="page-filters"')) { throw "Filtros sigue como categoría independiente." }
@@ -104,7 +104,7 @@ jobs:
           $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
           if ($asarText.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "El ZIP final todavía contiene el marcador del token." }
           if (!$asarText.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "El ZIP final no contiene el token oficial." }
-          foreach ($token in @("youtubeUseBraveInput","voice-section-tabs","Servidor seguro de Lulu Finity","relayUserUsageBar","commandOverlaySetupCard","browser:brave-status")) {
+          foreach ($token in @("youtubeUseBraveInput","tts-section-tabs","Servidor seguro de Lulu Finity","relayUserUsageBar","commandOverlaySetupCard","browser:brave-status")) {
             if (!$asarText.Contains($token)) { throw "El app.asar final no contiene $token" }
           }
           if ($asarText.Contains('data-page="filters"') -or $asarText.Contains('id="page-filters"')) { throw "El app.asar conserva Filtros como categoría." }
