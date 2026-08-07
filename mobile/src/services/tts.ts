@@ -58,9 +58,16 @@ export function handleTtsEvent(event: LiveEvent) {
   return speak(text);
 }
 
+// Los comandos usan la misma voz configurada en TTS Bot, pero no necesitan tener
+// activada la lectura global de comentarios. Así un sticker puede hablar aunque el
+// chat normal esté silenciado.
+export function speakTtsText(text: string) {
+  return speak(cleanText(text).slice(0, 400));
+}
+
 export async function previewTts(text: string) {
   await stopTts();
-  return speak(cleanText(text).slice(0, 400));
+  return speakTtsText(text);
 }
 
 export async function stopTts() {
