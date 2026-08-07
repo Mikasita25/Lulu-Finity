@@ -8,6 +8,7 @@ def rep(text,a,b,label):
     if a not in text: raise SystemExit(f'missing anchor {label}')
     return text.replace(a,b,1)
 
+# main constants/provider list
 anchor="const FALLBACK_ONLINE_VOICES = [\n"
 stream_code="""const STREAM_ELEMENTS_TTS_URL = 'https://api.streamelements.com/kappa/v2/speech';
 const STREAM_ELEMENTS_VOICES = [
@@ -38,6 +39,7 @@ const STREAM_ELEMENTS_VOICE_IDS = new Set(STREAM_ELEMENTS_VOICES.map((voice) => 
 
 """+anchor
 m=rep(m,anchor,stream_code,'stream list')
+# Edge normalized provider
 old="""    gender: String(voice?.Gender || voice?.gender || '')
   };
 }"""
@@ -47,6 +49,7 @@ new="""    gender: String(voice?.Gender || voice?.gender || ''),
   };
 }"""
 m=rep(m,old,new,'normalize provider')
+# listOnlineVoices return mixed
 old="""    return { voices, fallback: false };
   } catch (error) {
     console.warn('No se pudo cargar la lista de voces online:', error?.message || error);
@@ -61,6 +64,7 @@ new="""    return { voices: [...STREAM_ELEMENTS_VOICES, ...voices], fallback: fa
   }
 }"""
 m=rep(m,old,new,'list mixed')
+# Add stream synth before synthesizeOnlineVoice
 anchor="async function synthesizeOnlineVoice(request) {\n"
 stream_synth="""async function synthesizeStreamElementsVoice(request) {
   const text = String(request?.text || '').trim().slice(0, 450);
@@ -78,10 +82,7 @@ stream_synth="""async function synthesizeStreamElementsVoice(request) {
       method: 'GET',
       redirect: 'follow',
       signal: controller.signal,
-      headers: {
-        'Accept': 'audio/mpeg,audio/*;q=0.9,*/*;q=0.1',
-        'User-Agent': `Lulu-Finity/${app.getVersion()}`
-      }
+      headers: { 'Accept': 'audio/mpeg,audio/*;q=0.9,*/*;q=0.1' }
     });
     if (!response.ok) throw new Error(`StreamElements respondió ${response.status}.`);
     const contentType = String(response.headers.get('content-type') || 'audio/mpeg').toLowerCase();
@@ -99,6 +100,7 @@ stream_synth="""async function synthesizeStreamElementsVoice(request) {
 
 """+anchor
 m=rep(m,anchor,stream_synth,'stream synth')
+# route provider in synthesize function
 old="""async function synthesizeOnlineVoice(request) {
   const text = String(request?.text || '').trim().slice(0, 500);
   const voice = String(request?.voice || '').trim();
@@ -120,8 +122,10 @@ new="""async function synthesizeOnlineVoice(request) {
 
   const module = await getEdgeTtsModule();"""
 m=rep(m,old,new,'provider route')
+# default provider setting main
 m=rep(m,"  onlineVoice: 'es-MX-DaliaNeural',\n","  onlineVoice: 'es-MX-DaliaNeural',\n  onlineVoiceProvider: 'edge',\n",'default provider')
 
+# renderer: presets all true non-Microsoft
 start=r.index("const FUN_VOICE_PRESETS = Object.freeze([")
 end=r.index("]);\n\nfunction selectedFunVoicePreset", start)+3
 new_presets="""const FUN_VOICE_PRESETS = Object.freeze([
@@ -139,9 +143,11 @@ new_presets="""const FUN_VOICE_PRESETS = Object.freeze([
   { id:'turbo', label:'⚡ Meme turbo', provider:'stream', voice:'Justin', rate:1.55, pitch:1.20, volume:0.92, description:'Voz Justin realmente distinta, acelerada para mensajes caóticos.' }
 ]);"""
 r=r[:start]+new_presets+r[end:]
+# fun config/provider + apply
 r=rep(r,"return { mode:'online', onlineVoice:preset.voice, voiceURI:'', rate:preset.rate, pitch:preset.pitch, volume:preset.volume };","return { mode:'online', onlineProvider:preset.provider || 'edge', onlineVoice:preset.voice, voiceURI:'', rate:preset.rate, pitch:preset.pitch, volume:preset.volume };",'fun config')
 r=rep(r,"  state.settings.onlineVoice = preset.voice;\n","  state.settings.onlineVoice = preset.voice;\n  state.settings.onlineVoiceProvider = preset.provider || 'edge';\n",'fun apply provider')
 r=rep(r,"  const value = `online:${preset.voice}`;\n","  const value = `online:${preset.provider || 'edge'}:${preset.voice}`;\n",'copy preset')
+# selected/parse provider
 old="""function selectedVoiceValue() {
   return state.settings.voiceMode === 'online'
     ? `online:${state.settings.onlineVoice || 'es-MX-DaliaNeural'}`
@@ -169,6 +175,7 @@ function parseVoiceValue(value) {
   return null;
 }"""
 r=rep(r,old,new,'parse selected')
+# voiceLabel provider aware
 old="""  if (parsed.mode === 'online') {
     const voice = state.onlineVoices.find((item) => item.shortName === parsed.onlineVoice);
     return voice ? `${voice.localName || voice.name || voice.shortName} — ${voice.locale}` : parsed.onlineVoice;
@@ -178,6 +185,7 @@ new="""  if (parsed.mode === 'online') {
     return voice ? `${voice.localName || voice.name || voice.shortName} — ${voice.locale} · ${voice.providerLabel || (voice.provider === 'stream' ? 'StreamElements' : 'Microsoft')}` : parsed.onlineVoice;
   }"""
 r=rep(r,old,new,'voice label')
+# renderVoiceOptions replace online block and total no need separate groups but provider label
 old="""  const onlineMatches = state.onlineVoices.filter((voice) => (languageMatches(voice.locale, filter) || `online:${voice.shortName}` === selected) && (!search || normalizeText(`${voice.localName} ${voice.name} ${voice.shortName} ${voice.locale} ${voice.gender}`).includes(search) || `online:${voice.shortName}` === selected));
   if (onlineMatches.length) {
     const group = document.createElement('optgroup');
@@ -211,6 +219,7 @@ new="""  const onlineMatches = state.onlineVoices.filter((voice) => {
     select.appendChild(group);
   }"""
 r=rep(r,old,new,'render online groups')
+# preferred logic use correct provider
 old="""    if (preferredOnline) {
       select.value = `online:${preferredOnline.shortName}`;
       state.settings.voiceMode = 'online';
@@ -224,7 +233,9 @@ new="""    if (preferredOnline) {
       state.settings.onlineVoice = preferredOnline.shortName;
     } else if (preferredSystem) {"""
 r=rep(r,old,new,'preferred provider')
+# status text changed
 r=r.replace('voces online disponibles', 'voces online disponibles (StreamElements + Microsoft)')
+# runSpeech request provider + stream playback effect
 old="""        const result = await api.synthesizeOnlineVoice({
           text,
           voice: voiceConfig?.onlineVoice || state.settings.onlineVoice,
@@ -236,22 +247,30 @@ old="""        const result = await api.synthesizeOnlineVoice({
         audio.volume = tuning.volume;
         state.onlineAudio = audio;"""
 new="""        const onlineProvider = voiceConfig?.onlineProvider || state.settings.onlineVoiceProvider || 'edge';
-        const result = await api.synthesizeOnlineVoice({
-          text,
-          provider: onlineProvider,
-          voice: voiceConfig?.onlineVoice || state.settings.onlineVoice,
-          rate: tuning.rate,
-          pitch: tuning.pitch
-        });
-        if (finished || token !== state.speechToken) { finish(false); return; }
-        const audio = new Audio(`data:${result.mimeType || 'audio/mpeg'};base64,${result.data}`);
-        audio.volume = tuning.volume;
+        const onlineVoice = voiceConfig?.onlineVoice || state.settings.onlineVoice;
+        let audio;
         if (onlineProvider === 'stream') {
+          const streamUrl = new URL('https://api.streamelements.com/kappa/v2/speech');
+          streamUrl.searchParams.set('voice', onlineVoice);
+          streamUrl.searchParams.set('text', String(text).slice(0, 450));
+          audio = new Audio(streamUrl.toString());
           audio.preservesPitch = false;
           audio.playbackRate = clamp(tuning.rate * Math.sqrt(tuning.pitch), 0.5, 2);
+        } else {
+          const result = await api.synthesizeOnlineVoice({
+            text,
+            provider: onlineProvider,
+            voice: onlineVoice,
+            rate: tuning.rate,
+            pitch: tuning.pitch
+          });
+          audio = new Audio(`data:${result.mimeType || 'audio/mpeg'};base64,${result.data}`);
         }
+        if (finished || token !== state.speechToken) { finish(false); return; }
+        audio.volume = tuning.volume;
         state.onlineAudio = audio;"""
 r=rep(r,old,new,'synth provider playback')
+# voice select change handler
 old="""    if (mode === 'online') { state.settings.voiceMode = 'online'; state.settings.onlineVoice = id; }
     else { state.settings.voiceMode = 'system'; state.settings.voiceURI = id; }"""
 new="""    if (mode === 'online') {
@@ -263,12 +282,17 @@ new="""    if (mode === 'online') {
       }
     } else { state.settings.voiceMode = 'system'; state.settings.voiceURI = id; }"""
 r=rep(r,old,new,'select change')
+# Need handler destructuring maybe preceding mode/id comes from split; inspect later. We'll validate.
 
+# HTML wording
 h=h.replace('Presets de broma creados combinando voces online con velocidad y tono. No son clones de actores.', 'Presets de broma con voces externas reales de StreamElements y efectos de velocidad/tono. Microsoft ya no es la base de estos presets.')
 h=h.replace('Voces neuronales online', 'Voces online de varios proveedores')
+h=h.replace('voces online', 'voces online')
 h=h.replace('<span class="version" id="versionLabel">v0.30.0</span>', '<span class="version" id="versionLabel">v0.31.0</span>')
 h=h.replace('Lulu Finity 0.30.0', 'Lulu Finity 0.31.0')
+# package version
 p['version']='0.31.0'; pkg.write_text(json.dumps(p,ensure_ascii=False,indent=2)+"\n")
+# changelog
 entry="""# Cambios\n\n## 0.31.0\n\n- Añade voces externas reales mediante StreamElements; ya no todo el TTS online depende de Microsoft/Edge.\n- El selector de voz muestra grupos separados para StreamElements y Microsoft.\n- Incluye voces como Mia, Miguel, Ivy, Justin, Brian, Mizuki, Koharu, Takumi, Haruto y Seoyeon.\n- Los 12 presets divertidos ahora usan voces de StreamElements como base: Ratón, Minion (broma), Anime kawaii/chibi, Senpai, Villano anime, Idol virtual, Bebé, Demonio, Robot, Narrador épico y Meme turbo.\n- Mantiene compatibilidad con configuraciones antiguas `online:<voz>` interpretándolas como Microsoft.\n- Conserva el anti anuncios avanzado de YouTube, rollback a 0.27 y correcciones de arranque.\n\n"""
 ch.write_text(entry+c)
 main.write_text(m); rend.write_text(r); html.write_text(h)
