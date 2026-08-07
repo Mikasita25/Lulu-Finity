@@ -1,0 +1,71 @@
+name: Validar Lulu Finity 0.28
+
+on:
+  pull_request:
+    paths:
+      - "build-v028/**"
+      - ".github/workflows/validate-v028.yml"
+      - ".github/workflows/release-v028.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v028/**"
+      - ".github/workflows/validate-v028.yml"
+      - ".github/workflows/release-v028.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar herramienta de parche
+        run: python -m pip install --disable-pip-version-check beautifulsoup4
+
+      - name: Reconstruir Lulu Finity 0.28.0
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.27.0/Lulu-Finity-Source-0.27.0.zip \
+            --output base.zip
+          echo "1b0b7004a0ba0792dd3e449a7051e56bb34777d79c3d1d6b61c7dfb09aaf9b44  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v028/apply-v028.py app
+
+      - name: Validar aplicación
+        run: |
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.28.0') process.exit(1)"
+          python - <<'PY'
+          from pathlib import Path
+          from bs4 import BeautifulSoup
+          html=Path('app/src/index.html').read_text(encoding='utf-8')
+          main=Path('app/src/main.js').read_text(encoding='utf-8')
+          renderer=Path('app/src/renderer.js').read_text(encoding='utf-8')
+          preload=Path('app/src/preload.js').read_text(encoding='utf-8')
+          assert 'youtubeUseBraveInput' not in html
+          assert 'browser:brave-status' not in main
+          assert 'getBraveStatus' not in preload
+          for token in ('__LULU_AD_STATE__','MutationObserver','setYoutubeAdGuardMuted','}, 100);'):
+              assert token in main, token
+          for scope in ('control','songs','account','commands','rankings','economy','settings'):
+              assert f'data-category-tabs="{scope}"' in html, scope
+          assert 'data-category-tabs="dashboard"' not in html
+          assert 'Tu uso diario' in html
+          assert "getRelayUsage: () => ipcRenderer.invoke('relay:usage')" in preload
+          assert 'renderControlCenter' in renderer and 'setupControlCenter' in renderer
+          soup=BeautifulSoup(html,'html.parser')
+          ids=[node.get('id') for node in soup.find_all(id=True)]
+          assert len(ids)==len(set(ids)), 'IDs duplicados'
+          PY
+
+      - name: Probar relay incluido
+        working-directory: app/railway-relay
+        run: npm test
