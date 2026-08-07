@@ -15,6 +15,7 @@ const filters: { id: Filter; label: string }[] = [
   { id: 'all', label: 'Todos' },
   { id: 'gift', label: 'Regalos' },
   { id: 'comment', label: 'Chat' },
+  { id: 'sticker', label: 'Stickers' },
   { id: 'like', label: 'Likes' },
   { id: 'follow', label: 'Follow' },
   { id: 'share', label: 'Share' },
@@ -51,7 +52,9 @@ export function HistoryScreen() {
 
       <GlassCard>
         <View className="px-4">
-          {filtered.map((event) => <EventRow key={event.id} event={event} />)}
+          {filtered.map((event) => (
+            <EventRow key={event.id} event={event} />
+          ))}
           {!filtered.length ? (
             <View className="items-center py-12">
               <History size={30} color="#685D67" />
