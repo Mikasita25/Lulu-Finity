@@ -11,6 +11,10 @@ export function eventText(event: LiveEvent) {
   if (event.type === 'gift')
     return `envió ${event.giftName ?? 'un regalo'}${(event.repeatCount ?? 1) > 1 ? ` ×${event.repeatCount}` : ''}`;
   if (event.type === 'comment') return event.comment || 'comentó';
+  if (event.type === 'sticker') {
+    const name = event.stickerName || 'Sticker';
+    return event.stickerId ? `envió ${name} · ID ${event.stickerId}` : `envió ${name}`;
+  }
   if (event.type === 'like') return `envió ${compactNumber(event.count ?? 1)} likes`;
   if (event.type === 'follow') return 'comenzó a seguirte';
   if (event.type === 'share') return 'compartió el LIVE';
