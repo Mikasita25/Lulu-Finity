@@ -24,16 +24,32 @@ jobs:
         with:
           node-version: 22
       - name: Reconstruir y validar 0.32.0
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl --fail --location --silent --show-error https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.29.0/Lulu-Finity-Source-0.29.0.zip -o base.zip
+          gh release download v0.29.0 --pattern "Lulu-Finity-Source-0.29.0.zip" --output base.zip
           echo "020038fd8351461ed43d57535a2e667fec0cf766cff80fc7e5b8ce19d6c8d8e4  base.zip" | sha256sum --check
           unzip -q base.zip -d app
           python build-v0320/apply-v0320.py app
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          for file in Path('app/src').glob('*.js'):
+              text = file.read_text(encoding='utf-8')
+              if 'tiktok-live-connector' in text:
+                  raise SystemExit(f'La app todavía usa tiktok-live-connector en {file}; no se puede cerrar la distribución mientras siga enlazado.')
+          path = Path('app/package.json')
+          package = json.loads(path.read_text(encoding='utf-8'))
+          package['private'] = True
+          package['license'] = 'UNLICENSED'
+          package.setdefault('dependencies', {}).pop('tiktok-live-connector', None)
+          path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
           node --check app/src/main.js
           node --check app/src/preload.js
           node --check app/src/renderer.js
           node --check app/src/live-games.js
-          node -e "const p=require('./app/package.json'); if(p.version!=='0.32.0') process.exit(1)"
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.32.0'||p.license!=='UNLICENSED'||p.private!==true||p.dependencies?.['tiktok-live-connector']) process.exit(1)"
           node build-v0320/test-live-games.js app/src/live-games.js
           cd app
           npm install --ignore-scripts --no-audit --no-fund
@@ -95,22 +111,34 @@ jobs:
           node-version: 22
       - name: Reconstruir 0.32.0
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.29.0/Lulu-Finity-Source-0.29.0.zip" -OutFile base.zip
+          gh release download v0.29.0 --pattern "Lulu-Finity-Source-0.29.0.zip" --output base.zip
           if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne "020038fd8351461ed43d57535a2e667fec0cf766cff80fc7e5b8ce19d6c8d8e4") { throw "Fuente 0.29.0 incorrecta" }
           Expand-Archive base.zip -DestinationPath app -Force
           python build-v0320/apply-v0320.py app
+          @'
+          from pathlib import Path
+          import json
+          for file in Path('app/src').glob('*.js'):
+              text = file.read_text(encoding='utf-8')
+              if 'tiktok-live-connector' in text:
+                  raise SystemExit(f'La app todavía usa tiktok-live-connector en {file}; no se puede cerrar la distribución mientras siga enlazado.')
+          path = Path('app/package.json')
+          package = json.loads(path.read_text(encoding='utf-8'))
+          package['private'] = True
+          package['license'] = 'UNLICENSED'
+          package.setdefault('dependencies', {}).pop('tiktok-live-connector', None)
+          path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          '@ | python -
           node --check app/src/main.js
           node --check app/src/preload.js
           node --check app/src/renderer.js
           node --check app/src/live-games.js
           node build-v0320/test-live-games.js app/src/live-games.js
           Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló relay" }; Pop-Location
-          New-Item -ItemType Directory source-v0320 -Force | Out-Null
-          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v0320/$file" -Force } }
-          foreach ($folder in @("src","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v0320/$folder" -Recurse -Force } }
-          Compress-Archive -Path "source-v0320/*" -DestinationPath "Lulu-Finity-Source-0.32.0.zip" -Force
       - name: Inyectar token oficial del relay
         shell: pwsh
         env:
@@ -140,7 +168,8 @@ jobs:
           $zip = "app/dist/Lulu-Finity-0.32.0-x64.zip"
           $latest = "app/dist/latest.yml"
           $blockmap = "app/dist/Lulu-Finity-Setup-0.32.0.exe.blockmap"
-          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.32.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          foreach ($file in @($installer,$zip,$latest,$blockmap)) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          if (Test-Path "Lulu-Finity-Source-0.32.0.zip") { throw "No debe generarse un paquete público de código fuente" }
           Expand-Archive $zip -DestinationPath verify -Force
           $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
           if (!$asar) { throw "Falta app.asar" }
@@ -150,7 +179,7 @@ jobs:
           if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
           if ($text.Contains("app.getPath('localAppData')") -or $text.Contains('app.getPath("localAppData")')) { throw "Regresó LocalAppData" }
           $tag = "v0.32.0"
-          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.32.0.zip")
+          $files = @($installer,$zip,$latest,$blockmap)
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.32.0" --notes-file "app/CHANGELOG.md" }
           else { gh release create $tag $files --target main --title "Lulu Finity 0.32.0" --notes-file "app/CHANGELOG.md" }
@@ -162,6 +191,5 @@ jobs:
             app/dist/Lulu-Finity-0.32.0-x64.zip
             app/dist/latest.yml
             app/dist/Lulu-Finity-Setup-0.32.0.exe.blockmap
-            Lulu-Finity-Source-0.32.0.zip
           if-no-files-found: error
           retention-days: 30
