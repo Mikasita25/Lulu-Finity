@@ -1,0 +1,144 @@
+name: Lulu Finity 0.29.0
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v0290/**"
+      - ".github/workflows/v0290.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v0290/**"
+      - ".github/workflows/v0290.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir y validar 0.29.0
+        run: |
+          curl --fail --location --silent --show-error https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.28.2/Lulu-Finity-Source-0.28.2.zip -o base.zip
+          echo "4290e51e2fe4730f6c86626fde9deec0e835e5c3eb52ee556b9e40dd8ad6e8ae  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v0290/apply-v0290.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.29.0'||p.dependencies['@ghostery/adblocker-electron']!=='2.18.1') process.exit(1)"
+          cd app
+          npm install --ignore-scripts --no-audit --no-fund
+          npm ls @ghostery/adblocker-electron --depth=0
+          cd railway-relay && npm test
+      - name: Validar aislamiento y capas anti anuncios
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          m=Path('app/src/main.js').read_text(encoding='utf-8')
+          h=Path('app/src/index.html').read_text(encoding='utf-8')
+          required=(
+            "import('@ghostery/adblocker-electron')",
+            'ElectronBlocker.fromPrebuiltAdsOnly(fetch',
+            'enableBlockingInSession(youtubeSession)',
+            'disableBlockingInSession(youtubeSession)',
+            "const YOUTUBE_PARTITION = 'persist:lulu-youtube'",
+            "const TIKTOK_CHAT_PARTITION = 'persist:lulu-tiktok-chat'",
+            'async function ensureYoutubeNetworkAdBlocker()',
+            'function installYoutubeAdBlocker()',
+            'const skipYouTubeAds = () => {',
+            'void ensureYoutubeNetworkAdBlocker();',
+          )
+          for token in required: assert token in m, token
+          assert 'filtros tipo AdBlock/Brave' in h
+          assert '<span class="version" id="versionLabel">v0.29.0</span>' in h
+          assert "app.getPath('localAppData')" not in m and 'app.getPath("localAppData")' not in m
+          assert 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live' in m
+          assert '__LULU_RELAY_CLIENT_TOKEN__' in m
+          PY
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir 0.29.0
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.28.2/Lulu-Finity-Source-0.28.2.zip" -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne "4290e51e2fe4730f6c86626fde9deec0e835e5c3eb52ee556b9e40dd8ad6e8ae") { throw "Fuente 0.28.2 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v0290/apply-v0290.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló relay" }; Pop-Location
+          New-Item -ItemType Directory source-v0290 -Force | Out-Null
+          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v0290/$file" -Force } }
+          foreach ($folder in @("src","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v0290/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v0290/*" -DestinationPath "Lulu-Finity-Source-0.29.0.zip" -Force
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          if ((Get-Content $path -Raw).Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "No se inyectó el token" }
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm install --no-audit --no-fund
+          npm ls @ghostery/adblocker-electron --depth=0
+          npm run build:win -- --publish never
+      - name: Verificar y publicar 0.29.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.29.0.exe"
+          $zip = "app/dist/Lulu-Finity-0.29.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.29.0.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.29.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @("@ghostery/adblocker-electron","ElectronBlocker.fromPrebuiltAdsOnly","persist:lulu-youtube","skipYouTubeAds","v0.29.0")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
+          if ($text.Contains("app.getPath('localAppData')") -or $text.Contains('app.getPath("localAppData")')) { throw "Regresó LocalAppData" }
+          $tag = "v0.29.0"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.29.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.29.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.29.0" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.29.0
+          path: |
+            app/dist/Lulu-Finity-Setup-0.29.0.exe
+            app/dist/Lulu-Finity-0.29.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.29.0.exe.blockmap
+            Lulu-Finity-Source-0.29.0.zip
+          if-no-files-found: error
+          retention-days: 30
