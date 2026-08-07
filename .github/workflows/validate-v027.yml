@@ -1,0 +1,87 @@
+name: Validar Lulu Finity 0.27
+
+on:
+  pull_request:
+    paths:
+      - "build-v027/**"
+      - "railway-relay/**"
+      - ".github/workflows/validate-v027.yml"
+      - ".github/workflows/release-v027.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v027/**"
+      - "railway-relay/**"
+      - ".github/workflows/validate-v027.yml"
+      - ".github/workflows/release-v027.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir Lulu Finity 0.27.0
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.26.0/Lulu-Finity-Source-0.26.0.zip \
+            --output base.zip
+          echo "bb6372afd481477be99d1cd47c631dce7307f52c286e97a4ed31077c85e3e04c  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v027/apply-v027.py app
+
+      - name: Validar aplicación
+        run: |
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node -e "const p=require('./app/package.json'); if(p.version!=='0.27.0') process.exit(1)"
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('app/src/index.html').read_text(encoding='utf-8')
+          renderer = Path('app/src/renderer.js').read_text(encoding='utf-8')
+          main = Path('app/src/main.js').read_text(encoding='utf-8')
+          preload = Path('app/src/preload.js').read_text(encoding='utf-8')
+          css = Path('app/src/styles.css').read_text(encoding='utf-8')
+          assert 'data-page="filters"' not in html
+          assert 'id="page-filters"' not in html
+          for token in (
+              'youtubeUseBraveInput', 'voice-section-tabs', 'data-voice-section="filters"',
+              'Enlaza TikTok para poder mandar mensajes desde tu cuenta.',
+              'Crea acciones personalizadas para tu chat.',
+              'Configura Overlays para tu Directo.', 'Personaliza tu economía.',
+              'Servidor seguro de Lulu Finity', 'relayUserUsageBar',
+              'Te quedan 600 conexiones.', 'commandOverlaySetupCard'
+          ):
+              assert token in html, token
+          assert html.index('Mensajes automáticos en el LIVE') > html.index('Acciones por stickers')
+          for token in ('youtubeUseBrave', 'browser:brave-status', 'fetchRelayUsage(username'):
+              assert token in main, token
+          for token in ('getBraveStatus', "getRelayUsage: (username = '')"):
+              assert token in preload, token
+          for token in ('commandOverlaySetupCard', 'usesImageOverlay', 'relayUserUsageBar'):
+              assert token in renderer, token
+          assert 'var(--theme-a)' in css
+          PY
+
+      - name: Probar relay
+        working-directory: railway-relay
+        run: npm test
+
+      - name: Validar límite individual del relay
+        run: |
+          grep -q 'server-v027-loader' railway-relay/src/public-server.js
+          grep -q 'userSnapshot' railway-relay/src/usage-meter.js
+          grep -q '600' railway-relay/.env.example
+          node - <<'NODE'
+          const fs=require('fs'),zlib=require('zlib');
+          const e=fs.readFileSync('railway-relay/src/server-v027-part-00.txt','utf8').trim()+fs.readFileSync('railway-relay/src/server-v027-part-01.txt','utf8').trim();
+          const code=zlib.gunzipSync(Buffer.from(e,'base64')).toString('utf8');
+          if(!code.includes('USER_DAILY_CONNECTION_LIMIT') || !code.includes('recordConnection(1, uniqueId)')) process.exit(1);
+          NODE
