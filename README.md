@@ -4,7 +4,7 @@ Aplicación de escritorio para Windows que escucha comentarios de TikTok LIVE, l
 
 ## Funciones
 
-- Conexión a comentarios de TikTok LIVE mediante el relay configurado para Lulu Finity.
+- Conexión a comentarios de TikTok LIVE mediante `tiktok-live-connector`.
 - Voces instaladas en Windows y voces neuronales online opcionales.
 - Cola de comentarios, filtros y límites por usuario.
 - Solicitudes `!cancion` con selección automática del primer resultado normal de YouTube.
@@ -15,17 +15,15 @@ Aplicación de escritorio para Windows que escucha comentarios de TikTok LIVE, l
 
 1. Cambia `version` en `package.json`.
 2. Confirma los cambios en `main`.
-3. GitHub Actions compilará únicamente los artefactos necesarios para ejecutar/actualizar Lulu Finity.
-4. No se debe publicar ningún paquete `Lulu-Finity-Source-*` ni una copia del código fuente.
+3. GitHub Actions compilará el instalador, el ZIP y `latest.yml`.
+4. La Release `v<versión>` se crea o actualiza automáticamente.
 
-La actualización automática de Windows utiliza el instalador NSIS.
+La actualización automática de Windows utiliza el instalador NSIS. Las copias abiertas desde el ZIP reciben el aviso y abren la página de la versión nueva.
 
 ## Avisos
 
-Algunas funciones dependen de servicios y componentes de terceros sujetos a sus propias licencias y condiciones. Esas licencias no otorgan derechos sobre el código original de Lulu Finity.
+TikTok LIVE Connector y las voces online se apoyan en servicios no oficiales que pueden cambiar sin previo aviso. Las voces online requieren internet; el texto que se lee se envía al servicio de voz para generar el audio.
 
 ## Licencia
 
-**Software propietario. Todos los derechos reservados.**
-
-El código fuente original de Lulu Finity no se distribuye bajo una licencia de código abierto. No se concede permiso para copiar, modificar, redistribuir, sublicenciar ni publicar el código fuente de Lulu Finity, salvo autorización expresa de su titular.
+AGPL-3.0-or-later.
