@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createHash } = require('crypto');
 
 function positiveNumber(value, fallback) {
   const parsed = Number(value);
@@ -20,9 +21,10 @@ class DailyUsageMeter {
   constructor(options = {}) {
     this.limit = Math.round(positiveNumber(options.limit, 7500));
     this.perConnection = positiveNumber(options.perConnection, 2);
+    this.userLimit = Math.round(positiveNumber(options.userLimit, 600));
     this.stateFile = String(options.stateFile || path.join(process.cwd(), '.lulu-usage.json')).trim();
     this.now = typeof options.now === 'function' ? options.now : () => new Date();
-    this.state = { date: utcDayKey(this.now()), used: 0 };
+    this.state = { date: utcDayKey(this.now()), used: 0, users: {} };
     this.load();
   }
 
@@ -33,7 +35,8 @@ class DailyUsageMeter {
       if (parsed && typeof parsed === 'object') {
         this.state = {
           date: String(parsed.date || this.state.date),
-          used: Math.max(0, Number(parsed.used) || 0)
+          used: Math.max(0, Number(parsed.used) || 0),
+          users: parsed.users && typeof parsed.users === 'object' ? Object.fromEntries(Object.entries(parsed.users).filter(([key, value]) => /^[a-f0-9]{32}$/.test(key) && Number.isFinite(Number(value)) && Number(value) >= 0).map(([key, value]) => [key, Number(value)])) : {}
         };
       }
     } catch (error) {
@@ -45,7 +48,7 @@ class DailyUsageMeter {
   rollover(date = this.now()) {
     const key = utcDayKey(date);
     if (this.state.date === key) return false;
-    this.state = { date: key, used: 0 };
+    this.state = { date: key, used: 0, users: {} };
     this.persist();
     return true;
   }
@@ -62,12 +65,33 @@ class DailyUsageMeter {
     }
   }
 
-  recordConnection(count = 1) {
+  userKey(value) {
+    const normalized = String(value || '').trim().replace(/^@/, '').toLowerCase();
+    return normalized ? createHash('sha256').update(normalized).digest('hex').slice(0, 32) : '';
+  }
+
+  userSnapshot(user, date = this.now()) {
+    this.rollover(date);
+    const key = this.userKey(user);
+    const used = key ? Math.max(0, Number(this.state.users?.[key]) || 0) : 0;
+    const remaining = Math.max(0, this.userLimit - used);
+    return {
+      used,
+      limit: this.userLimit,
+      remaining,
+      percent: Math.round((used / this.userLimit) * 1000) / 10,
+      resetAt: nextUtcReset(date)
+    };
+  }
+
+  recordConnection(count = 1, user = '') {
     this.rollover();
     const connections = Math.max(0, Number(count) || 0);
     this.state.used += connections * this.perConnection;
+    const key = this.userKey(user);
+    if (key && connections) this.state.users[key] = Math.max(0, Number(this.state.users[key]) || 0) + connections;
     this.persist();
-    return this.snapshot();
+    return { ...this.snapshot(), user: this.userSnapshot(user) };
   }
 
   snapshot(date = this.now()) {
