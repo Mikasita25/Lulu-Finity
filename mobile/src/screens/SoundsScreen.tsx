@@ -16,9 +16,9 @@ const slots: { id: SoundSlot; label: string; hint: string }[] = [
   { id: 'share', label: 'Compartido', hint: 'Cuando alguien comparte el LIVE.' },
   { id: 'comment', label: 'Comentario', hint: 'Opcional para mensajes del chat.' },
   {
-    id: 'sticker',
-    label: 'Sticker / emote',
-    hint: 'Sonido general para cualquier sticker. Para sonidos distintos por sticker usa Comandos y stickers.',
+    id: 'fanSticker',
+    label: 'Fan Sticker',
+    hint: 'Sonido general para los Fan Stickers. Para uno distinto por sticker usa Automatizaciones.',
   },
   { id: 'member', label: 'Entrada al LIVE', hint: 'Cuando entra un espectador, si el proveedor lo reporta.' },
   { id: 'subscribe', label: 'Suscripción', hint: 'Para nuevas suscripciones del LIVE.' },
