@@ -9,6 +9,9 @@ Hotfix de TTS, seguridad de cuenta e interfaz para la fuente reproducible 1.0.1.
 - Muestra el dominio oficial y una explicación extensa de privacidad: el servidor de Lulú solo opera la API WebSocket del LIVE, nunca recibe la sesión, detalla los datos transmitidos, bloquea permisos y permite borrar toda la sesión local.
 - Migra únicamente la Voz Oficial retirada a Microsoft Dalia; conserva las selecciones Microsoft existentes.
 - Mantiene el scroll en ventanas no maximizadas, navegación, búsqueda y diálogos.
+- Carga cada módulo bajo demanda: el arranque no crea reproductores, TTS, overlays, rankings, economía, juegos ni automatizaciones.
+- En modo de uso musical solo conserva el proveedor elegido; el buscador temporal de YouTube se libera al terminar.
+- Expone en Rendimiento qué módulos se han activado sin despertarlos para consultar su estado.
 
 ```bash
 python build-v1002/apply-v1002.py app

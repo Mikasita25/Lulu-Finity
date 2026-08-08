@@ -55,6 +55,11 @@ for token in (
     "page-title-updated",
     "tikTokOriginSummary",
     "getTikTokSessionSummary",
+    "activeRuntimeModules",
+    "releaseInactiveMusicProvider",
+    "scheduleYoutubeResolverRelease",
+    "setYoutubeVolume",
+    "setSpotifyVolume",
 ):
     assert token in main, token
 for token in ("TIKTOK_TTS_ENDPOINTS", "requestTikTokSpeech", "text_speaker", "sessionid="):
@@ -101,13 +106,44 @@ for security_copy in (
     assert security_copy in html, security_copy
 
 assert styles.count("Lulu Finity 1.0.2 — ventanas ajustables y desplazamiento vertical") == 1
+
+# Regresión de recursos: abrir Lulu y permanecer en Música no debe despertar
+# funciones no utilizadas ni crear los dos reproductores web a la vez.
+startup = re.search(r"app\.whenReady\(\)\.then\(async \(\) => \{(.*?)\n\}\);", main, re.S)
+assert startup, "No se encontró el arranque de Electron"
+for forbidden in ("getLocalVoiceManager(", "startOverlayServer(", "connectLive(", "createYoutubeWindow(", "createSpotifyWindow("):
+    assert forbidden not in startup.group(1), f"Arranque ansioso: {forbidden}"
+
+renderer_init = re.search(r"async function init\(\) \{(.*?)\n\}\n\ninit\(\)", renderer, re.S)
+assert renderer_init, "No se encontró init del renderer"
+for forbidden in ("loadLocalVoices(", "loadSystemVoices(", "publishAutomationWidgets(", "setYouTubeVolume(", "setSpotifyVolume("):
+    assert forbidden not in renderer_init.group(1), f"Renderer ansioso: {forbidden}"
+
+assert "economy: null" in main
+assert "localTts:localVoiceManager?" in main
+assert "if (!activeRuntimeModules.has('rankings') && rankingClientCount() === 0) return;" in main
+assert "!state.loadedPages.has('automations')" in renderer
+assert "if(!hasActiveAudioActivity())return" in renderer
+assert "if (youtubeWindow && !youtubeWindow.isDestroyed()) void ensureYoutubeNetworkAdBlocker();" in main
+youtube_adblock_setter = re.search(r"function setYoutubeNetworkAdBlockEnabled\(enabled\) \{(.*?)\n\}", main, re.S)
+assert youtube_adblock_setter
+assert "session.fromPartition(YOUTUBE_PARTITION);\n  if (!youtubeAdBlockEnabled)" not in youtube_adblock_setter.group(1)
+assert "ipcMain.handle('youtube:set-volume', async (_event, volume) => setYoutubeVolume(volume));" in main
+assert "ipcMain.handle('spotify:set-volume', async (_event, volume) => setSpotifyVolume(volume));" in main
+assert "getAutomationEngine().evaluateAutomations" in main
+assert "getLiveGameManagerClass()" in main and "getLocalVoiceManagerClass()" in main
+assert "youtubeResolverIdleTimer=setTimeout" in main and ",15000)" in main
+for module_label in ("Rankings", "Automatizaciones", "Juegos", "Economía"):
+    assert f"['{module_label}'" in renderer, module_label
+
 changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 assert "## 1.0.2" in changelog
 assert "más de 70 voces auténticas de TikTok" in changelog
 assert "Conserva las voces online de Microsoft/Edge" in changelog
+assert "carga bajo demanda" in changelog
 
 ids = re.findall(r'\bid="([^"]+)"', html)
 duplicates = sorted({item for item in ids if ids.count(item) > 1})
 assert not duplicates, f"IDs duplicados: {duplicates}"
 
-print(f"Lulu Finity {package['version']}: Microsoft, TikTok seguro, motor retirado y scroll validados con {len(ids)} IDs")
+print(f"Lulu Finity {package['version']}: carga bajo demanda, Microsoft, TikTok seguro y scroll validados con {len(ids)} IDs")

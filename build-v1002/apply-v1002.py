@@ -259,6 +259,156 @@ main = replace_once(
     "ipcMain.handle('tiktok-chat:status', async () => emitTikTokChatStatus(await inspectTikTokChatWindow()));",
     "estado de sesión aun con ventana cerrada",
 )
+
+# Activación bajo demanda: abrir Lulu o usar únicamente Música no debe cargar
+# motores de TTS, juegos, automatizaciones, rankings ni ambos proveedores web.
+main = replace_once(
+    main,
+    "const { LiveGameManager } = require('./live-games');\nconst { LocalVoiceManager } = require('./local-voice-manager');\nconst { FALLBACK_ONLINE_VOICES, prepareOnlineVoices } = require('./online-voice-catalog');\nconst { TIKTOK_VOICES, isTikTokVoiceId } = require('./tiktok-voice-catalog');\nconst { requestTikTokSpeech } = require('./tiktok-tts-client');\nconst automationEngine = require('./automation-engine');",
+    "const { FALLBACK_ONLINE_VOICES, prepareOnlineVoices } = require('./online-voice-catalog');\nconst { TIKTOK_VOICES, isTikTokVoiceId } = require('./tiktok-voice-catalog');\nconst { requestTikTokSpeech } = require('./tiktok-tts-client');\nlet LiveGameManagerClass = null;\nlet LocalVoiceManagerClass = null;\nlet automationEngine = null;\nfunction getLiveGameManagerClass(){ if(!LiveGameManagerClass) ({ LiveGameManager:LiveGameManagerClass } = require('./live-games')); return LiveGameManagerClass; }\nfunction getLocalVoiceManagerClass(){ if(!LocalVoiceManagerClass) ({ LocalVoiceManager:LocalVoiceManagerClass } = require('./local-voice-manager')); return LocalVoiceManagerClass; }\nfunction getAutomationEngine(){ if(!automationEngine) automationEngine=require('./automation-engine'); return automationEngine; }",
+    "imports pesados bajo demanda",
+)
+main = replace_once(
+    main,
+    "let youtubeMuted = false;\nlet youtubeAdGuardMuted = false;",
+    "let youtubeMuted = false;\nlet youtubeVolume = 0.8;\nlet youtubeAdGuardMuted = false;",
+    "volumen diferido YouTube",
+)
+main = replace_once(
+    main,
+    "let spotifyMuted = false;\nlet spotifyAutomationNonce = 0;",
+    "let spotifyMuted = false;\nlet spotifyVolume = 0.8;\nlet spotifyAutomationNonce = 0;",
+    "volumen diferido Spotify",
+)
+main = replace_once(
+    main,
+    "let youtubeAutomationTimer = null;\nlet youtubeAdBlockInstalled = false;",
+    "let youtubeAutomationTimer = null;\nlet youtubeResolverIdleTimer = null;\nlet youtubeAdBlockInstalled = false;",
+    "reposo del buscador YouTube",
+)
+main = replace_once(
+    main,
+    "let activeRendererPage = 'dashboard';\n\nfunction getLocalVoiceManager() {\n  if (!localVoiceManager) localVoiceManager = new LocalVoiceManager({ app, dialog, utilityProcess, workerPath:path.join(__dirname, 'local-tts-worker.js') });",
+    "let activeRendererPage = 'dashboard';\nconst activeRuntimeModules = new Set(['core']);\nfunction activateRuntimeModule(name){ if(name) activeRuntimeModules.add(String(name)); }\nfunction activateRuntimeModuleForPage(page){ const moduleByPage={voice:'tts',rankings:'rankings',automations:'automations',games:'games',economy:'economy',account:'account',songs:'music',spotify:'music',commands:'commands'}; activateRuntimeModule(moduleByPage[String(page||'')]); }\n\nfunction getLocalVoiceManager() {\n  if (!localVoiceManager) { const LocalVoiceManager=getLocalVoiceManagerClass(); localVoiceManager = new LocalVoiceManager({ app, dialog, utilityProcess, workerPath:path.join(__dirname, 'local-tts-worker.js') }); }",
+    "estado de módulos y gestor TTS diferido",
+)
+main = replace_once(
+    main,
+    "  if (!fs.existsSync(p.economy)) await writeJson(p.economy, { version: 1, balances: {}, ledger: [], processed: {} });\n  if (!fs.existsSync(p.rankings)) await writeJson(p.rankings, { version: 1, users: {}, processed: {}, updatedAt: Date.now() });",
+    "  // Economía y rankings se crean la primera vez que esas funciones se usan.",
+    "archivos de módulos bajo demanda",
+)
+main = replace_once(
+    main,
+    "  liveGameManager = new LiveGameManager({",
+    "  const LiveGameManager=getLiveGameManagerClass();\n  liveGameManager = new LiveGameManager({",
+    "juegos bajo demanda",
+)
+main = replace_once(
+    main,
+    "async function recordRankingMetric(type, source = {}, amount = 1, eventId = '') {\n  if (!RANKING_TYPES.has(type) || type === 'economy') return;",
+    "async function recordRankingMetric(type, source = {}, amount = 1, eventId = '') {\n  if (!activeRuntimeModules.has('rankings') && rankingClientCount() === 0) return;\n  if (!RANKING_TYPES.has(type) || type === 'economy') return;",
+    "rankings dormidos",
+)
+main = replace_once(
+    main,
+    "function scheduleRankingBroadcast() {\n  clearTimeout(rankingBroadcastTimer);",
+    "function scheduleRankingBroadcast() {\n  if (!activeRuntimeModules.has('rankings') && rankingClientCount() === 0) return;\n  clearTimeout(rankingBroadcastTimer);",
+    "broadcast de rankings bajo demanda",
+)
+main = replace_once(main, "async function streamWidgetInfo(type = 'playlist', forceTunnel = false) {\n  await startOverlayServer();", "async function streamWidgetInfo(type = 'playlist', forceTunnel = false) {\n  activateRuntimeModule('overlays');\n  await startOverlayServer();", "widgets activan overlays")
+main = replace_once(main, "async function rankingInfo(slot = 1, forceTunnel = false) {\n  await startOverlayServer();", "async function rankingInfo(slot = 1, forceTunnel = false) {\n  activateRuntimeModule('rankings');\n  await startOverlayServer();", "ranking activa su módulo")
+main = replace_once(main, "async function overlayInfo(screen = 1, forceTunnel = false) {\n  await startOverlayServer();", "async function overlayInfo(screen = 1, forceTunnel = false) {\n  activateRuntimeModule('overlays');\n  await startOverlayServer();", "overlay activa su módulo")
+main = replace_once(
+    main,
+    "  void ensureYoutubeNetworkAdBlocker();\n}",
+    "  if (youtubeWindow && !youtubeWindow.isDestroyed()) void ensureYoutubeNetworkAdBlocker();\n}",
+    "antibloqueo YouTube diferido",
+)
+main = replace_once(
+    main,
+    "  const youtubeSession = session.fromPartition(YOUTUBE_PARTITION);\n  if (!youtubeAdBlockEnabled) {",
+    "  if (!youtubeAdBlockEnabled) {",
+    "sesión YouTube diferida",
+)
+main = replace_once(
+    main,
+    "    if (youtubeFilterEngine && youtubeFilterEngineEnabled) {\n      try { youtubeFilterEngine.disableBlockingInSession(youtubeSession); } catch {}",
+    "    if (youtubeFilterEngine && youtubeFilterEngineEnabled) {\n      const youtubeSession = session.fromPartition(YOUTUBE_PARTITION);\n      try { youtubeFilterEngine.disableBlockingInSession(youtubeSession); } catch {}",
+    "sesión YouTube solo al apagar filtro activo",
+)
+main = replace_once(
+    main,
+    "async function resolveYoutubeRequest(rawQuery, suffix = '') {",
+    "function scheduleYoutubeResolverRelease(){\n  clearTimeout(youtubeResolverIdleTimer);\n  youtubeResolverIdleTimer=setTimeout(()=>{ if(youtubeResolverWindow&&!youtubeResolverWindow.isDestroyed()) youtubeResolverWindow.destroy(); youtubeResolverWindow=null; youtubeResolverIdleTimer=null; },15000);\n  youtubeResolverIdleTimer.unref?.();\n}\n\nasync function resolveYoutubeRequest(rawQuery, suffix = '') {",
+    "liberación del buscador YouTube",
+)
+main = replace_once(
+    main,
+    "  const task = youtubeResolveChain.then(run, run);\n  youtubeResolveChain = task.catch(() => {});\n  return task;",
+    "  const task = youtubeResolveChain.then(run, run);\n  const settled = task.finally(scheduleYoutubeResolverRelease);\n  youtubeResolveChain = settled.catch(() => {});\n  return settled;",
+    "buscador YouTube temporal",
+)
+main = replace_once(
+    main,
+    "async function controlYoutubePlayer(action, value) {",
+    "function normalizedAudioVolume(value,fallback=.8){const number=Number(value);return Number.isFinite(number)?Math.max(0,Math.min(1,number)):fallback;}\nasync function setYoutubeVolume(value){youtubeVolume=normalizedAudioVolume(value,youtubeVolume);if(!youtubeWindow||youtubeWindow.isDestroyed())return{ok:true,deferred:true,volume:youtubeVolume};return controlYoutubePlayer('volume',youtubeVolume);}\nasync function setSpotifyVolume(value){spotifyVolume=normalizedAudioVolume(value,spotifyVolume);if(!spotifyWindow||spotifyWindow.isDestroyed())return{ok:true,deferred:true,volume:spotifyVolume};return controlSpotifyPlayer('volume',spotifyVolume);}\n\nasync function controlYoutubePlayer(action, value) {",
+    "volúmenes sin crear ventanas",
+)
+main = replace_once(
+    main,
+    "  if (!(youtubeUrlKind(target) === 'watch' && youtubeAdBlockEnabled)) win.webContents.setAudioMuted(youtubeMuted);\n  const payload",
+    "  if (!(youtubeUrlKind(target) === 'watch' && youtubeAdBlockEnabled)) win.webContents.setAudioMuted(youtubeMuted);\n  await setYoutubeVolume(youtubeVolume).catch(()=>{});\n  const payload",
+    "volumen al abrir YouTube",
+)
+main = replace_once(
+    main,
+    "  win.webContents.setAudioMuted(spotifyMuted);\n  const payload = { open: true, visible: win.isVisible(), muted: spotifyMuted, target, query: String(rawQuery || '').trim() };",
+    "  win.webContents.setAudioMuted(spotifyMuted);\n  await setSpotifyVolume(spotifyVolume).catch(()=>{});\n  const payload = { open: true, visible: win.isVisible(), muted: spotifyMuted, target, query: String(rawQuery || '').trim() };",
+    "volumen al abrir Spotify",
+)
+main = replace_once(
+    main,
+    "function destroyAuxiliaryWindows() {",
+    "function releaseInactiveMusicProvider(provider='youtube'){\n  if(provider==='spotify'){ clearYoutubeAutomation(); clearTimeout(youtubeResolverIdleTimer); youtubeResolverIdleTimer=null; destroyWindowSafely(youtubeResolverWindow); destroyWindowSafely(youtubeWindow); youtubeResolverWindow=null; youtubeWindow=null; }\n  else { clearSpotifyAutomation(); destroyWindowSafely(spotifyWindow); spotifyWindow=null; }\n}\n\nfunction destroyAuxiliaryWindows() {",
+    "un solo proveedor musical",
+)
+main = replace_once(
+    main,
+    "  setYoutubeNetworkAdBlockEnabled(settings.youtubeAdBlockEnabled !== false);\n  return {\n    settings,\n    economy: await economySnapshot(),",
+    "  youtubeVolume=normalizedAudioVolume(settings.youtubeVolume,.8);\n  spotifyVolume=normalizedAudioVolume(settings.spotifyVolume,.8);\n  setYoutubeNetworkAdBlockEnabled(settings.youtubeAdBlockEnabled !== false);\n  releaseInactiveMusicProvider(settings.musicProvider);\n  return {\n    settings,\n    economy: null,",
+    "estado inicial ligero",
+)
+main = replace_once(
+    main,
+    "  await writeJson(p.settings, next);\n  scheduleRankingBroadcast();\n  return next;",
+    "  await writeJson(p.settings, next);\n  youtubeVolume=normalizedAudioVolume(next.youtubeVolume,youtubeVolume);\n  spotifyVolume=normalizedAudioVolume(next.spotifyVolume,spotifyVolume);\n  releaseInactiveMusicProvider(next.musicProvider);\n  scheduleRankingBroadcast();\n  return next;",
+    "guardar y liberar proveedor inactivo",
+)
+main = replace_once(
+    main,
+    "ipcMain.handle('runtime:set-active-page', (_event,page) => { activeRendererPage=String(page||'dashboard').slice(0,40); return {ok:true,page:activeRendererPage}; });",
+    "ipcMain.handle('runtime:set-active-page', (_event,page) => { activeRendererPage=String(page||'dashboard').slice(0,40); activateRuntimeModuleForPage(activeRendererPage); return {ok:true,page:activeRendererPage}; });",
+    "activación de módulo por página",
+)
+main = replace_once(
+    main,
+    "    live:Boolean(liveConnection), localTts:getLocalVoiceManager().status(),\n    youtube:Boolean(youtubeWindow&&!youtubeWindow.isDestroyed()), spotify:Boolean(spotifyWindow&&!spotifyWindow.isDestroyed()),\n    overlayServer:Boolean(overlayServer), overlayClients:overlayClientCount()+rankingClientCount()+streamWidgetClientCount()",
+    "    live:Boolean(liveConnection), localTts:localVoiceManager?{loaded:true,...localVoiceManager.status()}:{loaded:false,running:false,pid:null,pending:0,lastUsedAt:0},\n    youtube:Boolean(youtubeWindow&&!youtubeWindow.isDestroyed()), spotify:Boolean(spotifyWindow&&!spotifyWindow.isDestroyed()),\n    overlayServer:Boolean(overlayServer), overlayClients:overlayClientCount()+rankingClientCount()+streamWidgetClientCount(),\n    gamesLoaded:Boolean(liveGameManager), automationsLoaded:Boolean(automationEngine), active:[...activeRuntimeModules]",
+    "estado sin despertar módulos",
+)
+main = replace_once(
+    main,
+    "  youtubeResolverWindow=null;\n  return {ok:true};",
+    "  youtubeResolverWindow=null;\n  const settings={...DEFAULT_SETTINGS,...(await readJson(getDataPaths().settings,DEFAULT_SETTINGS))};\n  releaseInactiveMusicProvider(settings.musicProvider);\n  return {ok:true};",
+    "liberar proveedor musical inactivo",
+)
+main = replace_once(main, "ipcMain.handle('automations:evaluate', async (_event, details = {}) => automationEngine.evaluateAutomations(details.rules, details.event, details.context));", "ipcMain.handle('automations:evaluate', async (_event, details = {}) => getAutomationEngine().evaluateAutomations(details.rules, details.event, details.context));", "evaluador automático diferido")
+main = replace_once(main, "ipcMain.handle('goals:apply-event', async (_event, details = {}) => automationEngine.applyGoalEvent(details.goals, details.event));", "ipcMain.handle('goals:apply-event', async (_event, details = {}) => getAutomationEngine().applyGoalEvent(details.goals, details.event));", "metas diferidas")
+main = replace_once(main, "ipcMain.handle('goals:reset', async (_event, details = {}) => automationEngine.resetGoal(details.goals, details.goalId));", "ipcMain.handle('goals:reset', async (_event, details = {}) => getAutomationEngine().resetGoal(details.goals, details.goalId));", "reinicio de metas diferido")
+main = replace_once(main, "ipcMain.handle('gifts:update-stats', async (_event, details = {}) => automationEngine.updateGiftStats(details.state, details.event));", "ipcMain.handle('gifts:update-stats', async (_event, details = {}) => getAutomationEngine().updateGiftStats(details.state, details.event));", "estadísticas de regalos diferidas")
+main = replace_once(main, "ipcMain.handle('youtube:set-volume', async (_event, volume) => controlYoutubePlayer('volume', volume));", "ipcMain.handle('youtube:set-volume', async (_event, volume) => setYoutubeVolume(volume));", "IPC volumen YouTube diferido")
+main = replace_once(main, "ipcMain.handle('spotify:set-volume', async (_event, volume) => controlSpotifyPlayer('volume', volume));", "ipcMain.handle('spotify:set-volume', async (_event, volume) => setSpotifyVolume(volume));", "IPC volumen Spotify diferido")
 main_path.write_text(main, encoding="utf-8")
 
 preload_path = ROOT / "src/preload.js"
@@ -339,6 +489,12 @@ html_path.write_text(html, encoding="utf-8")
 
 renderer_path = ROOT / "src/renderer.js"
 renderer = renderer_path.read_text(encoding="utf-8")
+renderer = replace_once(
+    renderer,
+    "const modules=[['LIVE',runtime.modules?.live],['Lulu Local',runtime.modules?.localTts?.running],['YouTube',runtime.modules?.youtube],['Spotify',runtime.modules?.spotify],['Overlays',runtime.modules?.overlayServer]];",
+    "const active=new Set(runtime.modules?.active||[]);const modules=[['LIVE',runtime.modules?.live],['Lulu Local',runtime.modules?.localTts?.running],['YouTube',runtime.modules?.youtube],['Spotify',runtime.modules?.spotify],['Overlays',runtime.modules?.overlayServer],['Rankings',active.has('rankings')],['Automatizaciones',runtime.modules?.automationsLoaded],['Juegos',runtime.modules?.gamesLoaded],['Economía',active.has('economy')]];",
+    "módulos visibles sin despertarlos",
+)
 renderer = replace_once(
     renderer,
     "  onlineVoices: [],\n  onlineVoicesFallback: false,",
@@ -602,6 +758,55 @@ renderer = replace_once(
     "  const resetTikTokSessionFromUi = async () => {\n    if (!window.confirm('¿Desvincular TikTok y borrar de esta PC todas las cookies, caché y datos locales de esa sesión?')) return;\n    renderTikTokChatStatus(await api.resetTikTokChatSession());\n    toast('Sesión de TikTok eliminada', 'Lulu Finity ya no conserva datos de esa sesión en esta PC.', 'success');\n  };\n  $('resetTikTokChatBtn')?.addEventListener('click', resetTikTokSessionFromUi);\n  $('privacyResetTikTokBtn')?.addEventListener('click', resetTikTokSessionFromUi);",
     "borrado explícito de sesión TikTok",
 )
+
+renderer = replace_once(
+    renderer,
+    "  activePage: 'dashboard', loadedPages: new Set(['dashboard']), runtimeTimer: null, audioActivityTimer: null",
+    "  activePage:'dashboard', loadedPages:new Set(['dashboard']), runtimeTimer:null, audioActivityTimer:null, systemVoicesBound:false, economyLoaded:false",
+    "estado de carga diferida",
+)
+renderer = replace_once(
+    renderer,
+    "async function handleAutomationEvent(event) {\n  if (!event?.type || !state.settings) return;",
+    "async function handleAutomationEvent(event) {\n  if (!event?.type || !state.settings || !state.loadedPages.has('automations')) return;",
+    "automatizaciones dormidas hasta abrir su módulo",
+)
+renderer = replace_once(
+    renderer,
+    "function scheduleAudioActivityIndicators(){clearInterval(state.audioActivityTimer);state.audioActivityTimer=null;if(document.hidden||!['dashboard','voice','songs','spotify','commands'].includes(state.activePage))return;renderAudioActivityIndicators();state.audioActivityTimer=setInterval(renderAudioActivityIndicators,350);}",
+    "function hasActiveAudioActivity(){const provider=state.settings?.musicProvider==='spotify'?'spotify':'youtube';const current=provider==='spotify'?state.currentSpotify:state.currentSong;const player=provider==='spotify'?state.spotifyPlayer:state.player;return Boolean(state.speaking||state.audioBusy||(current&&player&&!player.paused));}\nfunction scheduleAudioActivityIndicators(){clearInterval(state.audioActivityTimer);state.audioActivityTimer=null;if(document.hidden||!['dashboard','voice','songs','spotify','commands'].includes(state.activePage))return;renderAudioActivityIndicators();if(!hasActiveAudioActivity())return;state.audioActivityTimer=setInterval(renderAudioActivityIndicators,750);}",
+    "indicadores sin sondeo en reposo",
+)
+renderer = replace_once(
+    renderer,
+    "function activatePageModules(page){if(page==='voice'&&!state.loadedPages.has(page)){void loadLocalVoices();void loadOnlineVoices(false);}if(page==='rankings'&&!state.loadedPages.has(page)){void refreshOverlayInfo(state.overlay?.screen||1);state.ranking.slot=clamp(state.ranking?.slot||1,1,4);setRankingControlValues();void refreshRankingInfo(state.ranking.slot,true);}if(page==='automations'&&!state.loadedPages.has(page)){for(const type of ['alert','goal','gift'])void refreshStreamWidgetInfo(type,true);}if(page==='settings'&&!state.loadedPages.has(page))void refreshRelayUsage();if(page==='account'&&!state.loadedPages.has(page))void api.getTikTokChatStatus().then(renderTikTokChatStatus).catch(()=>{});state.loadedPages.add(page);}",
+    "function activatePageModules(page){const first=!state.loadedPages.has(page);state.loadedPages.add(page);if(page==='voice'&&first){loadSystemVoices();if(!state.systemVoicesBound){window.speechSynthesis.onvoiceschanged=loadSystemVoices;state.systemVoicesBound=true;}void loadLocalVoices();void loadOnlineVoices(false);}if(page==='rankings'&&first){void refreshOverlayInfo(state.overlay?.screen||1);state.ranking.slot=clamp(state.ranking?.slot||1,1,4);setRankingControlValues();void refreshRankingInfo(state.ranking.slot,true);}if(page==='automations'&&first){publishAutomationWidgets();for(const type of ['alert','goal','gift'])void refreshStreamWidgetInfo(type,true);}if(page==='economy'&&first){state.economyLoaded=true;void refreshEconomy();}if(page==='settings'&&first)void refreshRelayUsage();if(page==='account'&&first)void api.getTikTokChatStatus().then(renderTikTokChatStatus).catch(()=>{});}",
+    "carga de módulos por primera apertura",
+)
+renderer = replace_once(
+    renderer,
+    "  loadSystemVoices();\n  await loadLocalVoices(false);\n  window.speechSynthesis.onvoiceschanged = loadSystemVoices;",
+    "  // Los catálogos TTS y las voces de Windows se cargan al abrir Voz.",
+    "TTS fuera del arranque",
+)
+renderer = replace_once(
+    renderer,
+    "  renderAutomationStudio();\n  publishAutomationWidgets();\n  renderDashboardMusic();",
+    "  renderAutomationStudio();\n  renderDashboardMusic();",
+    "automatizaciones fuera del arranque",
+)
+renderer = replace_once(
+    renderer,
+    "  api.setYouTubeVolume(state.settings.youtubeVolume ?? 0.8).catch(() => {});\n  api.setSpotifyVolume(state.settings.spotifyVolume ?? 0.8).catch(() => {});\n  void api.setActivePage('dashboard');",
+    "  // Ningún proveedor musical se crea hasta reproducir o mostrarlo.\n  void api.setActivePage('dashboard');",
+    "proveedores musicales fuera del arranque",
+)
+renderer = replace_once(
+    renderer,
+    "  $('songQueueStat').textContent = `${activeMusicProvider() === 'spotify' ? state.spotifyQueue.length : state.songQueue.length} en cola`;\n  renderStudioDashboard();\n}",
+    "  $('songQueueStat').textContent = `${activeMusicProvider() === 'spotify' ? state.spotifyQueue.length : state.songQueue.length} en cola`;\n  renderStudioDashboard();\n  scheduleAudioActivityIndicators();\n}",
+    "indicadores guiados por cambios",
+)
 renderer_path.write_text(renderer, encoding="utf-8")
 
 styles_path = ROOT / "src/styles.css"
@@ -647,10 +852,12 @@ entry = """# Cambios
 - Usa de forma local la sesión enlazada en Cuenta para solicitar audio directamente a TikTok; la cookie nunca se muestra ni se envía al relay.
 - Las voces Microsoft, Windows y Lulu Local funcionan sin vincular una cuenta de TikTok.
 - Permite desplazarse verticalmente por todas las funciones cuando la ventana no está maximizada.
+- Añade carga bajo demanda: al iniciar no abre YouTube/Spotify, TTS, rankings, overlays, juegos, economía ni automatizaciones; en Música solo permanece el proveedor elegido.
+- Libera el buscador temporal de YouTube después de resolver una canción y cierra el proveedor musical inactivo al cambiar de servicio.
 
 """
 if "## 1.0.2" not in changelog:
     changelog = entry + (changelog[len("# Cambios\n\n"):] if changelog.startswith("# Cambios\n\n") else changelog)
 changelog_path.write_text(changelog, encoding="utf-8")
 
-print("Lulu Finity 1.0.2: Microsoft preservado, TikTok transparente, motor fallido retirado y scroll adaptable")
+print("Lulu Finity 1.0.2: módulos bajo demanda, Microsoft/TikTok y scroll adaptable")

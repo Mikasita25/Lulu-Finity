@@ -33,7 +33,7 @@ jobs:
           echo "$BASE_SHA256  base.zip" | sha256sum --check
           unzip -q base.zip -d app
           python build-v1002/apply-v1002.py app
-      - name: Validar voces Microsoft/TikTok, seguridad y pantalla adaptable
+      - name: Validar carga bajo demanda, voces, seguridad y pantalla adaptable
         run: |
           python build-v1002/test-v1002.py app
           node --check app/src/main.js
