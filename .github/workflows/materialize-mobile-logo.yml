@@ -1,0 +1,51 @@
+name: Materializar logo móvil
+
+on:
+  push:
+    branches:
+      - agent/lulu-finity-mobile-android
+    paths:
+      - ".github/workflows/materialize-mobile-logo.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-logo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/lulu-finity-mobile-android
+
+      - name: Copiar exactamente el logo enviado
+        shell: bash
+        run: |
+          mkdir -p mobile/assets
+          curl --fail --location --retry 3 --output mobile/assets/lulu-finity-logo.jpg "https://lulu-finity-logo.serveo.net/lulu-finity-logo.jpg"
+          test "$(stat -c%s mobile/assets/lulu-finity-logo.jpg)" = "256905"
+          echo "39f292e40d27c5f08dc8d27e7ebc2fc8f491dac6a56131bb30951310bea8df7c  mobile/assets/lulu-finity-logo.jpg" | sha256sum -c -
+
+      - name: Configurar únicamente el icono
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'mobile/app.json';
+          const app = JSON.parse(fs.readFileSync(path, 'utf8'));
+          app.expo.icon = './assets/lulu-finity-logo.jpg';
+          fs.writeFileSync(path, JSON.stringify(app, null, 2) + '\n');
+          NODE
+
+      - name: Publicar cambio y retirar workflow temporal
+        shell: bash
+        run: |
+          rm -f .github/workflows/materialize-mobile-logo.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/app.json mobile/assets/lulu-finity-logo.jpg .github/workflows/materialize-mobile-logo.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "feat(mobile): usar logo enviado como icono Android"
+          git push origin HEAD:agent/lulu-finity-mobile-android
