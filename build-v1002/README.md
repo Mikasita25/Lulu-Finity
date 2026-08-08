@@ -13,6 +13,7 @@ Hotfix de TTS, seguridad de cuenta e interfaz para la fuente reproducible 1.0.1.
 - En modo de uso musical solo conserva el proveedor elegido; el buscador temporal de YouTube se libera al terminar.
 - Expone en Rendimiento qué módulos se han activado sin despertarlos para consultar su estado.
 - Mide la RAM total de todos los procesos agrupados por Windows y la desglosa por núcleo, interfaz, proveedor musical, gráficos y servicios auxiliares; ya no presenta la memoria del proceso principal como si fuera la app completa.
+- Aplica de verdad los perfiles de recursos: Ahorro libera el reproductor inactivo a los 5 segundos, Equilibrado a los 60 y Respuesta inmediata lo conserva; una canción o cola activa nunca se interrumpe.
 
 ```bash
 python build-v1002/apply-v1002.py app
