@@ -409,6 +409,12 @@ main = replace_once(
     "  youtubeResolverWindow=null;\n  const settings={...DEFAULT_SETTINGS,...(await readJson(getDataPaths().settings,DEFAULT_SETTINGS))};\n  releaseInactiveMusicProvider(settings.musicProvider);\n  return {ok:true};",
     "liberar proveedor musical inactivo",
 )
+main = replace_once(
+    main,
+    "ipcMain.handle('runtime:release-idle', async () => {\n  await localVoiceManager?.release();\n  if (youtubeResolverWindow&&!youtubeResolverWindow.isDestroyed()) youtubeResolverWindow.destroy();\n  youtubeResolverWindow=null;\n  const settings={...DEFAULT_SETTINGS,...(await readJson(getDataPaths().settings,DEFAULT_SETTINGS))};\n  releaseInactiveMusicProvider(settings.musicProvider);\n  return {ok:true};\n});",
+    "ipcMain.handle('runtime:release-idle', async (_event,details={}) => {\n  await localVoiceManager?.release();\n  clearTimeout(youtubeResolverIdleTimer);youtubeResolverIdleTimer=null;\n  destroyWindowSafely(youtubeResolverWindow);youtubeResolverWindow=null;\n  const settings={...DEFAULT_SETTINGS,...(await readJson(getDataPaths().settings,DEFAULT_SETTINGS))};\n  if(details?.keepMusic)releaseInactiveMusicProvider(settings.musicProvider);\n  else{clearYoutubeAutomation();clearSpotifyAutomation();destroyWindowSafely(youtubeWindow);destroyWindowSafely(spotifyWindow);youtubeWindow=null;spotifyWindow=null;}\n  return {ok:true,keptMusic:Boolean(details?.keepMusic)};\n});",
+    "liberación real según actividad musical",
+)
 runtime_status_old = """ipcMain.handle('runtime:status', async () => ({
   activePage:activeRendererPage,
   memoryMb:Math.round((await process.getProcessMemoryInfo()).private/1024),
@@ -484,12 +490,16 @@ preload = replace_once(
     "API TTS del preload",
 )
 preload = replace_once(preload, "  installLocalVoice: (id) => ipcRenderer.invoke('tts:install-local-voice', id),\n", "", "instalador de voz del preload")
+preload = replace_once(preload, "  releaseIdleResources: () => ipcRenderer.invoke('runtime:release-idle'),", "  releaseIdleResources: (details = {}) => ipcRenderer.invoke('runtime:release-idle', details),", "liberación contextual desde preload")
 preload_path.write_text(preload, encoding="utf-8")
 
 html_path = ROOT / "src/index.html"
 html = html_path.read_text(encoding="utf-8")
 html = replace_once(html, 'id="versionLabel">v1.0.1', 'id="versionLabel">v1.0.2', "versión de la barra")
 html = replace_once(html, 'id="updateVersionBadge">v1.0.1', 'id="updateVersionBadge">v1.0.2', "versión de actualizaciones")
+html = replace_once(html, '<small>Libera módulos con más rapidez.</small>', '<small>Cierra reproductores inactivos después de 5 segundos.</small>', "descripción real de Ahorro")
+html = replace_once(html, '<small>Recomendado.</small>', '<small>Espera 60 segundos antes de liberar un reproductor inactivo.</small>', "descripción real de Equilibrado")
+html = replace_once(html, '<small>Mantiene más funciones listas.</small>', '<small>Conserva el reproductor listo hasta que lo liberes manualmente.</small>', "descripción real de Respuesta inmediata")
 html = replace_once(
     html,
     '<div class="runtime-modules" id="runtimeModules"></div></article>',
@@ -832,7 +842,7 @@ renderer = replace_once(
 renderer = replace_once(
     renderer,
     "  activePage: 'dashboard', loadedPages: new Set(['dashboard']), runtimeTimer: null, audioActivityTimer: null",
-    "  activePage:'dashboard', loadedPages:new Set(['dashboard']), runtimeTimer:null, audioActivityTimer:null, systemVoicesBound:false, economyLoaded:false",
+    "  activePage:'dashboard', loadedPages:new Set(['dashboard']), runtimeTimer:null, audioActivityTimer:null, idleResourceTimer:null, systemVoicesBound:false, economyLoaded:false",
     "estado de carga diferida",
 )
 renderer = replace_once(
@@ -844,7 +854,7 @@ renderer = replace_once(
 renderer = replace_once(
     renderer,
     "function scheduleAudioActivityIndicators(){clearInterval(state.audioActivityTimer);state.audioActivityTimer=null;if(document.hidden||!['dashboard','voice','songs','spotify','commands'].includes(state.activePage))return;renderAudioActivityIndicators();state.audioActivityTimer=setInterval(renderAudioActivityIndicators,350);}",
-    "function hasActiveAudioActivity(){const provider=state.settings?.musicProvider==='spotify'?'spotify':'youtube';const current=provider==='spotify'?state.currentSpotify:state.currentSong;const player=provider==='spotify'?state.spotifyPlayer:state.player;return Boolean(state.speaking||state.audioBusy||(current&&player&&!player.paused));}\nfunction scheduleAudioActivityIndicators(){clearInterval(state.audioActivityTimer);state.audioActivityTimer=null;if(document.hidden||!['dashboard','voice','songs','spotify','commands'].includes(state.activePage))return;renderAudioActivityIndicators();if(!hasActiveAudioActivity())return;state.audioActivityTimer=setInterval(renderAudioActivityIndicators,750);}",
+    "function hasActiveAudioActivity(){const provider=state.settings?.musicProvider==='spotify'?'spotify':'youtube';const current=provider==='spotify'?state.currentSpotify:state.currentSong;const player=provider==='spotify'?state.spotifyPlayer:state.player;return Boolean(state.speaking||state.audioBusy||(current&&player&&!player.paused));}\nfunction hasMusicSession(){const provider=state.settings?.musicProvider==='spotify'?'spotify':'youtube';return provider==='spotify'?Boolean(state.currentSpotify||state.spotifyQueue.length):Boolean(state.currentSong||state.songQueue.length);}\nfunction scheduleIdleResourceRelease(){clearTimeout(state.idleResourceTimer);state.idleResourceTimer=null;if(hasMusicSession())return;const profile=state.settings?.performanceProfile||'balanced';const delay=profile==='saving'?5000:profile==='balanced'?60000:0;if(!delay)return;state.idleResourceTimer=setTimeout(()=>{state.idleResourceTimer=null;if(!hasMusicSession())void api.releaseIdleResources({keepMusic:false});},delay);}\nfunction scheduleAudioActivityIndicators(){clearInterval(state.audioActivityTimer);state.audioActivityTimer=null;scheduleIdleResourceRelease();if(document.hidden||!['dashboard','voice','songs','spotify','commands'].includes(state.activePage))return;renderAudioActivityIndicators();if(!hasActiveAudioActivity())return;state.audioActivityTimer=setInterval(renderAudioActivityIndicators,750);}",
     "indicadores sin sondeo en reposo",
 )
 renderer = replace_once(
@@ -876,6 +886,18 @@ renderer = replace_once(
     "  $('songQueueStat').textContent = `${activeMusicProvider() === 'spotify' ? state.spotifyQueue.length : state.songQueue.length} en cola`;\n  renderStudioDashboard();\n}",
     "  $('songQueueStat').textContent = `${activeMusicProvider() === 'spotify' ? state.spotifyQueue.length : state.songQueue.length} en cola`;\n  renderStudioDashboard();\n  scheduleAudioActivityIndicators();\n}",
     "indicadores guiados por cambios",
+)
+renderer = replace_once(
+    renderer,
+    "qsa('input[name=\"performanceProfile\"]').forEach((input)=>input.addEventListener('change',()=>{if(!input.checked)return;state.settings.performanceProfile=input.value;if(input.value==='saving')void api.releaseIdleResources();scheduleSave();void refreshRuntimeStatus();}));",
+    "qsa('input[name=\"performanceProfile\"]').forEach((input)=>input.addEventListener('change',()=>{if(!input.checked)return;state.settings.performanceProfile=input.value;scheduleIdleResourceRelease();scheduleSave();void refreshRuntimeStatus();}));",
+    "perfiles de recursos funcionales",
+)
+renderer = replace_once(
+    renderer,
+    "$('releaseIdleResourcesBtn')?.addEventListener('click',async()=>{await api.releaseIdleResources();await refreshRuntimeStatus();toast('Recursos liberados','Los módulos se abrirán de nuevo cuando los uses.','success');});",
+    "$('releaseIdleResourcesBtn')?.addEventListener('click',async()=>{await api.releaseIdleResources({keepMusic:hasMusicSession()});await refreshRuntimeStatus();toast('Recursos liberados',hasMusicSession()?'La música activa se conservó; lo demás se liberó.':'Los reproductores inactivos se cerraron.','success');});",
+    "botón de liberación sin cortar música",
 )
 runtime_renderer = r'''async function refreshRuntimeStatus(){if(!$('runtimeStats'))return;try{const runtime=await api.getRuntimeStatus();const total=Number(runtime.totalMemoryMb??runtime.memoryMb??0);$('runtimeStats').innerHTML=`<div class="runtime-stat runtime-stat-total"><strong>${total} MB</strong><span>RAM total de Lulu</span></div><div class="runtime-stat"><strong>${Number(runtime.mainMemoryMb||0)} MB</strong><span>Solo núcleo</span></div><div class="runtime-stat"><strong>${Number(runtime.processes||0)}</strong><span>Procesos protegidos</span></div><div class="runtime-stat"><strong>${Number(runtime.modules?.overlayClients||0)}</strong><span>Fuentes en pantalla</span></div>`;const breakdown=Array.isArray(runtime.breakdown)?runtime.breakdown:[];if($('runtimeBreakdown'))$('runtimeBreakdown').innerHTML=breakdown.length?`<div class="runtime-breakdown-title"><strong>Desglose real aproximado</strong><span>La suma incluye todos los procesos que Windows agrupa como Lulu Finity.</span></div><div class="runtime-breakdown-list">${breakdown.map((item)=>`<div><span>${escapeHtml(item.label||'Otro proceso')}</span><strong>${Number(item.memoryMb||0)} MB</strong></div>`).join('')}</div><p class="runtime-process-note">Electron separa interfaz, reproductor, gráficos y servicios para mantener el aislamiento. No son ocho copias de Lulu. Spotify Web puede usar varios de estos procesos mientras reproduce.</p>`:'';const modules=[['LIVE',runtime.modules?.live],['Lulu Local',runtime.modules?.localTts?.running],['YouTube',runtime.modules?.youtube],['Spotify',runtime.modules?.spotify],['Overlays',runtime.modules?.overlayServer],['Rankings',runtime.modules?.active?.includes('rankings')],['Automatizaciones',runtime.modules?.automationsLoaded],['Juegos',runtime.modules?.gamesLoaded],['Economía',runtime.modules?.active?.includes('economy')]];$('runtimeModules').innerHTML=modules.map(([label,on])=>`<span class="runtime-module ${on?'live':''}">${label} · ${on?'activo':'en espera'}</span>`).join('');}catch(error){$('runtimeStats').textContent=error.message||String(error);}}
 '''
@@ -929,6 +951,7 @@ entry = """# Cambios
 - Añade carga bajo demanda: al iniciar no abre YouTube/Spotify, TTS, rankings, overlays, juegos, economía ni automatizaciones; en Música solo permanece el proveedor elegido.
 - Libera el buscador temporal de YouTube después de resolver una canción y cierra el proveedor musical inactivo al cambiar de servicio.
 - Corrige Rendimiento para sumar todos los procesos de Lulu, igual que el grupo del Administrador de tareas, y muestra el consumo separado de la interfaz, Spotify/YouTube, gráficos y servicios de Electron.
+- Hace reales los perfiles: Ahorro libera el reproductor inactivo en 5 segundos, Equilibrado en 60 segundos y Respuesta inmediata lo conserva; ninguno interrumpe una canción o cola activa.
 
 """
 if "## 1.0.2" not in changelog:
