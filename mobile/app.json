@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Lulú Finity",
+    "slug": "lulu-finity-mobile",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.mikasita.lulufinity.mobile",
+      "versionCode": 2,
+      "permissions": ["POST_NOTIFICATIONS", "VIBRATE"]
+    },
+    "plugins": [["expo-notifications", {"color": "#FF5FC8"}], "expo-document-picker", "expo-splash-screen"],
+    "extra": {"relayUrl": "wss://lulu-finity-production.up.railway.app/v1/tiktok/live"},
+    "platforms": ["android"]
+  }
+}
