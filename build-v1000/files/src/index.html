@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="default-src 'self' file:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; media-src 'self' data: blob:;" http-equiv="Content-Security-Policy"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lulu Finity 1.0</title>
+<link href="styles.css" rel="stylesheet"/>
+</head>
+<body>
+<div class="app-shell">
+<header class="titlebar">
+<div class="brand-mini"><span class="heart">♥</span><strong>Lulu Finity</strong><span class="version" id="versionLabel">v1.0.0</span></div>
+<div class="window-controls">
+<button aria-label="Minimizar" id="minimizeBtn">—</button>
+<button aria-label="Maximizar" id="maximizeBtn">□</button>
+<button aria-label="Cerrar" class="close" id="closeBtn">×</button>
+</div>
+</header>
+<aside class="sidebar">
+<div class="logo-wrap"><div class="logo-mark">LF</div><div><strong>Lulu Finity</strong><span>Tu panel para el LIVE</span></div></div>
+<div class="feature-search"><input id="featureSearchInput" type="search" placeholder="Buscar una función…" autocomplete="off"/><div class="feature-search-results hidden" id="featureSearchResults"></div></div>
+<nav class="nav-list">
+<span class="nav-group-label">Principal</span><button class="nav-item active" data-page="dashboard"><span>⌂</span>Panel</button>
+<span class="nav-group-label">LIVE</span><button class="nav-item" data-page="account"><span>◎</span>Conexión y cuenta</button>
+<span class="nav-group-label">Voz y audio</span><button class="nav-item" data-page="voice"><span>◉</span>TTS y voces</button><button class="nav-item" data-page="songs"><span>▶</span>Música</button>
+<span class="nav-group-label">En pantalla</span><button class="nav-item" data-page="rankings"><span>▣</span>Pantalla y overlays</button><button class="nav-item" data-page="automations"><span>✦</span>Alertas y metas</button>
+<span class="nav-group-label">Interacciones</span><button class="nav-item" data-page="commands"><span>›_</span>Comandos</button><button class="nav-item" data-page="games"><span>♣</span>Juegos</button>
+<span class="nav-group-label">Comunidad</span><button class="nav-item" data-page="economy"><span>☾</span>Economía</button>
+<span class="nav-group-label">Sistema</span><button class="nav-item" data-page="about"><span>♡</span>Sobre Lulu</button><button class="nav-item" data-page="settings"><span>⚙</span>Ajustes y rendimiento</button>
+</nav>
+<div class="sidebar-bottom">
+<div class="connection-mini"><span class="status-light disconnected" id="sidebarStatusLight"></span><div><strong id="sidebarStatusText">Desconectado</strong><small id="sidebarUsername">Sin LIVE</small></div></div>
+<button class="sidebar-disconnect hidden" id="sidebarDisconnectBtn">Desconectar</button>
+</div>
+</aside>
+<main class="main-content">
+<section class="page active" id="page-dashboard"><div class="studio-dashboard" id="studioDashboard">
+  <div class="studio-main-column">
+    <article class="studio-hero">
+      <div class="studio-hero-copy">
+        <div class="studio-live-row"><span class="studio-live-badge" id="studioLiveBadge">OFF</span><strong id="studioConnectionText">Desconectado</strong></div>
+        <h1>Panel del LIVE</h1>
+        <div class="studio-user-row"><span id="studioUsername">Sin cuenta</span><span class="studio-viewers"><b id="studioViewerCount">0</b> espectadores</span></div>
+        <div class="studio-hero-actions"><button class="primary" id="studioConnectBtn">Conectar</button><button class="ghost" data-go-page="account">Cuenta</button></div>
+      </div>
+      <div class="studio-miku-stage" aria-hidden="true"><div class="studio-miku-halo"></div><img id="studioMikuImage" src="miku-dark-user.png" alt=""/></div>
+    </article>
+    <div class="studio-two-column">
+      <article class="panel studio-card studio-activity-card"><div class="studio-card-head"><h2>Actividad reciente</h2><button class="text-button" data-go-page="automations">Ver más</button></div><div class="studio-activity-list" id="studioActivityList"><div class="studio-empty">Sin actividad todavía</div></div></article>
+      <article class="panel studio-card studio-shortcuts-card"><div class="studio-card-head"><h2>Accesos</h2></div><div class="studio-shortcuts"><button data-go-page="voice"><span>◉</span>Voz TTS</button><button data-go-page="songs"><span>▶</span>Música</button><button data-go-page="automations"><span>✦</span>Alertas</button><button data-go-page="rankings"><span>▣</span>Overlays</button><button data-go-page="games"><span>♣</span>Juegos</button><button data-go-page="settings"><span>⚙</span>Ajustes</button></div></article>
+    </div>
+    <article class="panel studio-card studio-session-card"><div class="studio-card-head"><h2>Sesión</h2><span id="studioSessionState">Sin LIVE</span></div><div class="studio-session-stats"><div><span>Comentarios</span><strong id="studioCommentCount">0</strong></div><div><span>Likes</span><strong id="studioLikeCount">0</strong></div><div><span>Regalos</span><strong id="studioGiftCount">0</strong></div><div><span>Monedas</span><strong id="studioDiamondCount">0</strong></div><div><span>Cola TTS</span><strong id="studioVoiceQueue">0</strong></div></div><div class="studio-wave"></div></article>
+  </div>
+  <aside class="studio-right-column">
+    <article class="panel studio-card studio-alert-card"><div class="studio-card-head"><h2>Alertas</h2><span class="studio-state-dot"></span></div><div class="studio-alert-state"><span class="studio-check">✓</span><strong id="studioAlertTitle">Sin alertas pendientes</strong><small id="studioAlertDetail">Todo en orden</small></div></article>
+    <article class="panel studio-card studio-goal-card"><div class="studio-card-head"><h2>Meta</h2><button class="text-button" data-go-page="automations">Editar</button></div><div class="studio-goal-body"><div class="studio-goal-ring" id="studioGoalRing"><strong id="studioGoalPercent">0%</strong></div><div class="studio-goal-copy"><strong id="studioGoalTitle">Sin meta activa</strong><span id="studioGoalText">0 / 0</span><div class="studio-goal-track"><i id="studioGoalBar"></i></div></div></div></article>
+    <article class="panel studio-card studio-gift-card"><div class="studio-card-head"><h2>Último regalo</h2><button class="text-button" data-go-page="automations">Detalles</button></div><div class="studio-gift-main"><div class="studio-gift-icon">♡</div><div><strong id="studioGiftUser">Sin regalos todavía</strong><span id="studioGiftText">La sesión aparecerá aquí</span></div></div></article>
+    <article class="panel studio-card studio-ranking-card"><div class="studio-card-head"><h2>Top de la sesión</h2><button class="text-button" data-go-page="rankings">Ranking</button></div><div class="studio-ranking-list" id="studioRankingList"><div class="studio-empty">Sin datos todavía</div></div></article>
+  </aside>
+  <section class="panel studio-theme-strip"><div><h2>Tema</h2><span>Cambia el color sin salir del panel</span></div><button class="studio-theme-choice" data-studio-theme="studio-lavender"><img src="miku-dark-user.png" alt=""/><span>Lavanda</span></button><button class="studio-theme-choice" data-studio-theme="studio-pink"><img src="miku-soft-user.png" alt=""/><span>Rosa</span></button><button class="studio-theme-choice" data-studio-theme="studio-mint"><img src="miku-classic-user.jpg" alt=""/><span>Menta</span></button></section>
+</div>
+
+
+<div class="page-heading dashboard-heading">
+<div><h1>Panel del LIVE <span>♡</span></h1></div>
+<div class="connection-actions">
+<div class="account-chip"><div class="account-avatar">LF</div><div><strong id="accountUsername">Sin cuenta</strong><span><i id="accountLight"></i><b id="accountStatus">Desconectado</b></span></div></div>
+<button class="primary connect-top" id="connectBtn">◉ Conectar al LIVE</button>
+<button class="ghost hidden" id="disconnectBtn">Desconectar</button>
+</div>
+</div>
+<div class="status-banner disconnected" id="statusBanner">
+<div class="status-icon">◉</div>
+<div class="status-copy"><strong id="statusTitle">Lista para conectar</strong><p id="statusMessage">Escribe el usuario de TikTok.</p></div>
+<div class="username-field"><span>@</span><input autocomplete="off" id="usernameInput" placeholder="usuario" type="text"/><button class="secondary" id="bannerConnectBtn">Conectar</button></div>
+<span class="room-label" id="roomIdLabel"></span>
+</div>
+<div class="stats-grid" id="dashboardStatsPanel">
+<article class="stat-card"><div class="stat-icon pink">●</div><span>Comentarios</span><strong id="commentCount">0</strong><small>en esta sesión</small><i class="sparkline pink"></i></article>
+<article class="stat-card"><div class="stat-icon purple">●</div><span>Espectadores</span><strong id="viewerCount">0</strong><small>en vivo</small><i class="sparkline purple"></i></article>
+<article class="stat-card"><div class="stat-icon rose">●</div><span>Cola de voz</span><strong id="voiceQueueCount">0</strong><small>mensajes pendientes</small><i class="sparkline rose"></i></article>
+<article class="stat-card now-stat"><div class="stat-icon music">♪</div><span>Música actual</span><strong class="song-stat" id="currentSongStat">Ninguna</strong><small id="songQueueStat">0 en cola</small></article>
+</div>
+<div class="dashboard-grid-v8">
+<article class="panel comments-panel" id="dashboardCommentsPanel">
+<div class="panel-header"><div><h2>Comentarios recientes</h2></div><button class="icon-button" id="clearCommentsBtn" title="Limpiar comentarios">⌫</button></div>
+<div class="comments-list empty" id="commentsList"><div class="empty-state"><div>💬</div><strong>Esperando comentarios</strong><span>Los mensajes aparecerán aquí.</span></div></div>
+</article>
+<article class="panel music-panel dashboard-music" id="dashboardMusicPanel">
+<div class="panel-header"><div><h2>Música <span class="youtube-badge" id="dashboardMusicProviderBadge">▶ YouTube</span></h2></div><button class="ghost tiny" id="pauseSongBtn">Ver YouTube</button></div>
+<div class="now-playing-row">
+<div class="cover-placeholder" id="songDisc">♪</div>
+<div class="track-meta"><small>REPRODUCIENDO</small><strong id="currentSongTitle">Sin música</strong><span id="currentSongCommand">La cola está vacía.</span></div>
+</div>
+<div class="progress-wrap"><span id="currentTimeLabel">0:00</span><input disabled="" id="playbackProgress" max="100" min="0" type="range" value="0"/><span id="durationLabel">0:00</span></div>
+<div class="player-controls main-controls">
+<button id="shuffleSongBtn" title="Mezclar cola">⤨</button><button id="previousSongBtn" title="Reiniciar">|◀</button><button class="play-main" id="playPauseSongBtn" title="Pausar o continuar">▶</button><button id="skipSongBtn" title="Siguiente">▶|</button><button id="externalSongBtn" title="Abrir enlace actual">↗</button>
+</div>
+<div class="volume-row"><span>🔊</span><input id="youtubeVolumeInput" max="1" min="0" step="0.05" type="range" value="0.8"/><output id="youtubeVolumeOutput">80%</output></div>
+<label class="recommend-row"><span><strong>Continuar con recomendadas</strong><small id="dashboardRecommendedText">Cuando termine la cola, YouTube elegirá una canción relacionada.</small></span><span class="switch"><input id="continueRecommendedInput" type="checkbox"/><span></span></span></label>
+<div class="queue-heading"><strong>Cola <span id="dashboardQueueCount">(0)</span></strong><button class="text-button" id="clearSongQueueBtn">Limpiar</button></div>
+<div class="dashboard-queue" id="miniSongQueue">Cola vacía</div>
+<div class="song-request-inline"><input id="dashboardSongInput" placeholder="Buscar canción o pegar enlace…"/><button class="secondary" id="dashboardAddSongBtn">Agregar</button></div>
+</article>
+<article class="panel simulator-panel" id="dashboardSimulatorPanel">
+<div class="panel-header"><div><h2>Prueba local</h2></div></div>
+<input id="testNameInput" placeholder="Nombre" type="text" value="Usuario de prueba"/>
+<textarea id="testCommentInput" placeholder="Escribe un comentario o comando" rows="3"></textarea>
+<button class="secondary full" id="simulateBtn">Enviar prueba</button>
+</article>
+</div>
+</section>
+<section class="page" id="page-voice">
+<div class="page-heading simple"><div><h1>TTS y voces</h1><p>Voz local, reglas de lectura y permisos en un solo lugar.</p></div></div>
+<div aria-label="Secciones de Voz TTS" class="section-tabs tts-section-tabs" role="tablist">
+<button class="section-tab active" data-tts-tab="voice" type="button">General</button><button class="section-tab" data-tts-tab="local" type="button">Biblioteca local</button><button class="section-tab" data-tts-tab="users" type="button">Por usuario</button><button class="section-tab" data-tts-tab="filters" type="button">Lectura inteligente</button><button class="section-tab" data-tts-tab="dictionary" type="button">Diccionario</button><button class="section-tab" data-tts-tab="permissions" type="button">Permisos</button>
+</div>
+<div class="audio-activity-strip panel" id="voiceAudioActivity"><span>Audio TTS</span><div class="mini-equalizer" id="voiceActivityBars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><strong id="voiceActivityText">Silencio</strong></div>
+<div class="tts-section-pane active" data-tts-pane="voice">
+<div class="settings-grid">
+<article class="panel settings-card wide">
+<div class="setting-row top"><div><h3>Leer comentarios</h3><p>Envía comentarios a la cola de voz.</p></div><label class="switch"><input id="ttsEnabledInput" type="checkbox"/><span></span></label></div>
+<div class="setting-row"><div><h3>Incluir nombre</h3><p>Lee el nombre antes del comentario.</p></div><label class="switch"><input id="includeUsernameInput" type="checkbox"/><span></span></label></div>
+<div class="voice-picker-grid expanded"><div class="field-group"><label>Idioma</label><select id="voiceLanguageFilter"><option value="all">Todos los idiomas</option><option value="es">Español</option><option value="en">Inglés</option><option value="pt">Portugués</option><option value="ja">Japonés</option><option value="ko">Coreano</option><option value="fr">Francés</option><option value="de">Alemán</option><option value="it">Italiano</option><option value="ru">Ruso</option></select></div><div class="field-group"><label>Buscar voz</label><input id="voiceSearchInput" placeholder="Nombre, país o idioma"/></div><div class="field-group voice-main-field"><label>Voz</label><select id="voiceSelect"></select><small id="voiceVisibleCount"></small></div><button class="ghost voice-refresh" id="refreshVoicesBtn">↻ Recargar</button></div>
+<div class="voice-provider-status" id="voiceProviderStatus"><span class="status-light connecting"></span><span>Cargando voces…</span></div>
+<div class="sliders-grid"><div class="field-group"><div class="label-value"><label>Velocidad</label><output id="rateOutput">1.00×</output></div><input id="rateInput" max="2" min="0.5" step="0.05" type="range"/></div><div class="field-group"><div class="label-value"><label>Tono</label><output id="pitchOutput">1.00</output></div><input id="pitchInput" max="2" min="0.5" step="0.05" type="range"/></div><div class="field-group"><div class="label-value"><label>Volumen</label><output id="ttsVolumeOutput">90%</output></div><input id="ttsVolumeInput" max="1" min="0" step="0.05" type="range"/></div></div>
+<div class="voice-test-row"><input id="voiceTestInput" value="Hola, esta es una prueba de Lulu Finity."/><button class="secondary" id="voiceTestBtn">Probar voz</button><button class="ghost" id="stopVoiceBtn">Detener</button></div>
+</article>
+<article class="panel settings-card"><h3>Cola de voz</h3><div class="field-group"><div class="label-value"><label>Límite</label><output id="queueLimitOutput">30</output></div><input id="queueLimitInput" max="100" min="1" step="1" type="range"/></div><button class="danger-outline full" id="clearVoiceQueueBtn">Vaciar cola</button></article>
+<article class="panel settings-card"><h3>Mientras habla Lulu</h3><div class="setting-row top"><div><h3>Silenciar música</h3><p>Evita que la música tape la voz.</p></div><label class="switch"><input id="youtubeMuteDuringTtsInput" type="checkbox"/><span></span></label></div></article>
+</div>
+</div>
+<div class="tts-section-pane" data-tts-pane="local"><div class="local-voice-layout"><article class="panel settings-card wide"><div class="panel-header"><div><h3>Biblioteca Lulu Local</h3><p class="hint">Funciona sin Internet. El motor se libera cuando deja de usarse.</p></div><button class="primary" id="localVoiceImportBtn">Importar .lfvoice</button></div><div class="local-voice-status" id="localVoiceStatus">Buscando voces instaladas…</div><div class="local-voice-list" id="localVoiceList"></div></article><article class="panel settings-card"><h3>Paquetes de voz</h3><p>Un archivo <strong>.lfvoice</strong> contiene un modelo VITS/Piper, sus tokens y datos de pronunciación.</p><p class="hint">Las voces importadas se validan y se guardan sólo en tu equipo.</p></article></div></div>
+<div class="tts-section-pane" data-tts-pane="users">
+<div class="settings-grid">
+<article class="panel settings-card wide custom-voices-card">
+<div class="panel-header"><div><h3>Voces por usuario</h3></div><span class="count-pill" id="userVoiceRulesCount">0</span></div>
+<div class="custom-voice-add-row"><div class="username-field"><span>@</span><input id="customVoiceUserInput" placeholder="usuario"/></div><select id="customVoiceSelect"></select><button class="secondary" id="addCustomVoiceBtn">Guardar usuario</button></div>
+<div class="custom-voice-tuning-grid"><div class="field-group"><div class="label-value"><label>Velocidad</label><output id="customVoiceRateOutput">1.00×</output></div><input id="customVoiceRateInput" max="2" min="0.5" step="0.05" type="range" value="1"/></div><div class="field-group"><div class="label-value"><label>Tono</label><output id="customVoicePitchOutput">1.00</output></div><input id="customVoicePitchInput" max="2" min="0.5" step="0.05" type="range" value="1"/></div><div class="field-group"><div class="label-value"><label>Volumen</label><output id="customVoiceVolumeOutput">90%</output></div><input id="customVoiceVolumeInput" max="1" min="0" step="0.05" type="range" value="0.9"/></div></div>
+<div class="custom-voice-test-row"><input id="customVoiceTestInput" value="Hola, esta es mi voz personalizada."/><button class="ghost" id="testCustomVoiceBtn">Probar</button></div>
+<div class="custom-voice-rules" id="customVoiceRulesList"><span class="hint">No hay voces personalizadas.</span></div>
+</article>
+</div>
+</div>
+<div class="tts-section-pane" data-tts-pane="permissions">
+<div class="permissions-layout expanded-permissions integrated-permissions tts-permissions-section">
+<article class="panel permission-card"><h2>Quién puede ser leído por TTS</h2>
+<label class="permission-option"><input name="ttsPermissionMode" type="radio" value="selected"/><span><strong>Usuarios elegidos</strong><small>Solo la lista permitida.</small></span></label>
+<label class="permission-option"><input name="ttsPermissionMode" type="radio" value="members"/><span><strong>Miembros</strong><small>Desde el nivel indicado.</small></span></label>
+<div class="member-level-row"><label>Nivel mínimo</label><input id="minimumTtsMemberLevelInput" max="50" min="1" type="number" value="1"/></div>
+<label class="permission-option"><input name="ttsPermissionMode" type="radio" value="followers"/><span><strong>Seguidores</strong></span></label>
+<label class="permission-option"><input name="ttsPermissionMode" type="radio" value="all"/><span><strong>Todos</strong></span></label>
+</article>
+<article class="panel allowed-users-card"><div class="panel-header"><div><h2>Usuarios permitidos</h2></div><span class="count-pill" id="allowedTtsUsersCount">0</span></div><div class="allowed-add-row"><div class="username-field"><span>@</span><input id="allowedTtsUserInput" placeholder="usuario"/></div><button class="secondary" id="addAllowedTtsUserBtn">Añadir</button></div><div class="allowed-users-list" id="allowedTtsUsersList"></div></article>
+</div>
+</div>
+<div class="tts-section-pane" data-tts-pane="filters">
+<div class="settings-grid">
+<article class="panel settings-card wide"><div class="setting-row top"><div><h3>Limpieza inteligente Unicode</h3><p>Normaliza letras decoradas, repeticiones, Zalgo y caracteres invisibles.</p></div><label class="switch"><input id="smartTextEnabledInput" type="checkbox"/><span></span></label></div><div class="setting-row"><div><h3>Bloquear texto CJK</h3><p>Omite escritura china, japonesa o coreana.</p></div><label class="switch"><input id="blockCjkTextInput" type="checkbox"/><span></span></label></div><div class="setting-row"><div><h3>Bloquear alfabetos mezclados</h3><p>Reduce texto usado para confundir filtros.</p></div><label class="switch"><input id="blockMixedScriptsInput" type="checkbox"/><span></span></label></div><div class="setting-row"><div><h3>Quitar emojis de nombres</h3><p>La voz sólo lee el nombre limpio.</p></div><label class="switch"><input id="stripUsernameEmojiInput" type="checkbox"/><span></span></label></div><div class="setting-row"><div><h3>Bloquear enlaces</h3><p>Los enlaces de canciones siguen permitidos.</p></div><label class="switch"><input id="blockLinksInput" type="checkbox"/><span></span></label></div><div class="setting-row"><div><h3>Leer comandos desconocidos</h3><p>Lee mensajes que empiezan con “!”.</p></div><label class="switch"><input id="readCommandsInput" type="checkbox"/><span></span></label></div><div class="sliders-grid two"><div class="field-group"><div class="label-value"><label>Máximo de caracteres</label><output id="maxCharactersOutput">180</output></div><input id="maxCharactersInput" max="400" min="20" step="10" type="range"/></div><div class="field-group"><div class="label-value"><label>Espera por usuario</label><output id="cooldownOutput">4 s</output></div><input id="cooldownInput" max="30" min="0" step="1" type="range"/></div></div></article>
+<article class="panel settings-card"><h3>Palabras bloqueadas</h3><textarea id="blockedWordsInput" placeholder="Una por línea" rows="12"></textarea></article>
+<article class="panel settings-card"><h3>Usuarios ignorados</h3><textarea id="ignoredUsersInput" placeholder="Un usuario por línea" rows="12"></textarea></article>
+</div>
+</div>
+<div class="tts-section-pane" data-tts-pane="dictionary"><div class="settings-grid"><article class="panel settings-card wide"><h3>Diccionario de pronunciación</h3><p class="hint">Una regla por línea: <strong>original = pronunciación</strong>.</p><textarea id="pronunciationDictionaryInput" rows="14" placeholder="xd = equis de&#10;lulu = lu lu"></textarea><div class="voice-test-row"><input id="dictionaryTestInput" value="Lulu dice xd"/><button class="secondary" id="dictionaryTestBtn">Probar diccionario</button></div></article></div></div>
+</section>
+<section class="page" id="page-songs">
+<div class="page-heading simple actions-heading"><div><h1>Música</h1></div><div class="heading-actions"><button class="ghost" data-go-page="spotify">Abrir Spotify</button></div></div><div class="section-tabs category-section-tabs" data-category-tabs="songs" role="tablist"><button class="section-tab active" data-category-tab="player" type="button">Reproductor</button><button class="section-tab" data-category-tab="settings" type="button">Opciones</button><button class="section-tab" data-category-tab="permissions" type="button">Permisos</button></div><div class="audio-activity-strip panel" id="musicAudioActivity"><span>Audio de música</span><div class="mini-equalizer" id="musicActivityBars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><strong id="musicActivityText">Silencio</strong></div><div class="category-section-pane active" data-category-pane="player" data-category-pane-group="songs"><div class="songs-page-grid">
+<article class="panel music-panel full-player">
+<div class="panel-header"><div><h2>Reproductor</h2></div><button class="ghost" id="openYouTubeHomeBtn">Ver YouTube</button></div>
+<div class="now-playing-row large"><div class="cover-placeholder">♪</div><div class="track-meta"><small>REPRODUCIENDO</small><strong id="songsPageCurrentTitle">Sin música</strong><span id="songsPageRequester">—</span></div></div>
+<div class="progress-wrap"><span id="songsCurrentTime">0:00</span><div class="fake-progress"><i id="songsProgressBar"></i></div><span id="songsDuration">0:00</span></div>
+<div class="player-controls main-controls"><button id="songsRestartBtn">|◀</button><button class="play-main" id="songsPlayPauseBtn">▶</button><button id="songsSkipBtn">▶|</button><button id="songsShowYouTubeBtn">↗</button></div>
+<label class="recommend-row"><span><strong>Recomendaciones automáticas</strong><small>Continúa con música relacionada al terminar la cola.</small></span><span class="switch"><input id="songsContinueRecommendedInput" type="checkbox"/><span></span></span></label>
+</article>
+<article class="panel add-song-card"><h2>Pedir una canción</h2><div class="field-group"><label>Canción o enlace</label><input id="youtubeQueryInput" placeholder="Nombre, enlace o búsqueda de música"/></div><button class="primary full" id="addSongBtn">Agregar a la cola</button><p class="hint">Comando del chat: <strong id="songCommandExample">!cancion nombre</strong></p></article>
+<article class="panel songs-table-card"><div class="panel-header"><div><h2>Cola</h2></div><span class="count-pill" id="songCountPill">0 solicitudes</span></div><div class="songs-list empty" id="songsList"><div class="empty-state small"><div>♪</div><strong>Cola vacía</strong><span>Agrega una canción.</span></div></div></article>
+</div></div><div class="category-section-pane" data-category-pane="settings" data-category-pane-group="songs"><div class="youtube-settings-grid">
+<article class="panel settings-card song-settings"><div class="field-group"><label>Comando de música</label><input id="songPrefixInput" value="!cancion"/></div><div class="field-group"><div class="label-value"><label>Máximo en cola</label><output id="songQueueLimitOutput">10</output></div><input id="songQueueLimitInput" max="30" min="1" step="1" type="range"/></div><div class="field-group"><label>Texto adicional de búsqueda</label><input id="youtubeSearchSuffixInput" placeholder="audio oficial"/></div></article>
+<article class="panel settings-card youtube-rules-card">
+<div class="setting-row top"><div><h3>Anti anuncios de YouTube</h3><p>Bloquea anuncios desde la red con filtros tipo AdBlock/Brave y usa omisión automática como respaldo.</p></div><label class="switch"><input id="youtubeAdBlockEnabledInput" type="checkbox"/><span></span></label></div>
+
+
+<div class="setting-row"><div><h3>Evitar canciones duplicadas</h3><p>Compara la canción actual y toda la cola.</p></div><label class="switch"><input id="preventDuplicateSongsInput" type="checkbox"/><span></span></label></div>
+<div class="field-group"><div class="label-value"><label>Duración máxima</label><output id="maxSongDurationOutput">10 min</output></div><input id="maxSongDurationInput" max="60" min="0" step="1" type="range"/><small>0 permite cualquier duración.</small></div>
+</article>
+<article class="panel settings-card"><h3>Canciones bloqueadas</h3><p class="hint">Una palabra, título o enlace por línea.</p><textarea id="blockedSongsInput" placeholder="karaoke\nversión 10 horas" rows="8"></textarea></article>
+<article class="panel settings-card"><h3>Canales bloqueados</h3><p class="hint">Se comprueban cuando YouTube carga el video.</p><textarea id="blockedChannelsInput" placeholder="Nombre del canal" rows="8"></textarea></article>
+</div></div><div class="category-section-pane" data-category-pane="permissions" data-category-pane-group="songs"><div class="permissions-layout expanded-permissions integrated-permissions music-permissions-section">
+<article class="panel permission-card provider-card"><h2>Proveedor de música</h2>
+<label class="permission-option"><input name="musicProvider" type="radio" value="youtube"/><span><strong>YouTube</strong></span></label>
+<label class="permission-option"><input name="musicProvider" type="radio" value="spotify"/><span><strong>Spotify</strong></span></label>
+</article>
+<article class="panel permission-card"><h2>Quién puede pedir música</h2>
+<label class="permission-option"><input name="musicPermissionMode" type="radio" value="selected"/><span><strong>Usuarios elegidos por mí</strong><small>Solo las cuentas de la lista de música.</small></span></label>
+<label class="permission-option"><input name="musicPermissionMode" type="radio" value="members"/><span><strong>Miembros desde cierto nivel</strong><small>Usa el nivel que TikTok envía en el comentario.</small></span></label>
+<div class="member-level-row"><label>Nivel mínimo</label><input id="minimumMemberLevelInput" max="50" min="1" type="number" value="1"/></div>
+<label class="permission-option"><input name="musicPermissionMode" type="radio" value="followers"/><span><strong>Solo seguidores</strong><small>Incluye miembros identificados por TikTok.</small></span></label>
+<label class="permission-option"><input name="musicPermissionMode" type="radio" value="all"/><span><strong>Todos</strong><small>Cualquier comentario puede pedir música.</small></span></label>
+</article>
+<article class="panel allowed-users-card"><div class="panel-header"><div><h2>Usuarios permitidos para música</h2></div><span class="count-pill" id="allowedUsersCount">0</span></div><div class="allowed-add-row"><div class="username-field"><span>@</span><input id="allowedUserInput" placeholder="usuario"/></div><button class="secondary" id="addAllowedUserBtn">Añadir</button></div><div class="allowed-users-list" id="allowedUsersList"></div></article>
+</div></div>
+
+
+
+</section>
+<section class="page" id="page-account">
+<div class="page-heading simple"><div><h1>Cuenta</h1><p>Enlaza TikTok para poder mandar mensajes desde tu cuenta.</p></div></div><div class="section-tabs category-section-tabs" data-category-tabs="account" role="tablist"><button class="section-tab active" data-category-tab="tiktok" type="button">TikTok</button><button class="section-tab" data-category-tab="privacy" type="button">Privacidad</button></div><div class="category-section-pane active" data-category-pane="tiktok" data-category-pane-group="account"><div class="settings-grid"><article class="panel settings-card wide tiktok-account-card">
+<div class="panel-header"><div><h3>Cuenta de TikTok</h3></div><span class="chat-session-pill" id="tiktokChatStatusBadge">SIN SESIÓN</span></div>
+<div class="setting-row top"><div><h3>Enlazar cuenta</h3><p id="tiktokChatStatusText">Abre TikTok e inicia sesión.</p></div></div>
+<div class="tiktok-chat-actions"><button class="secondary" id="openTikTokChatBtn">Abrir TikTok e iniciar sesión</button><button class="ghost" id="checkTikTokChatBtn">Comprobar sesión</button><button class="danger-outline" id="resetTikTokChatBtn">Cerrar / restablecer sesión</button></div>
+</article></div></div><div class="category-section-pane" data-category-pane="privacy" data-category-pane-group="account"><div class="settings-grid"><article class="panel settings-card wide account-privacy-card">
+<h3>Privacidad</h3>
+<p>Tu sesión y tus ajustes se guardan en esta computadora y no se envían a servidores de Lulu Finity.</p>
+<small class="hint">La ventana de TikTok sí se conecta directamente a TikTok por Internet para iniciar sesión y enviar mensajes.</small>
+</article></div></div>
+
+</section>
+<section class="page" id="page-commands">
+<div class="page-heading simple actions-heading"><div><h1>Comandos</h1><p>Crea acciones personalizadas para tu chat.</p></div><button class="primary" id="newCommandBtn">+ Nuevo comando</button></div><div class="section-tabs category-section-tabs" data-category-tabs="commands" role="tablist"><button class="section-tab active" data-category-tab="list" type="button">Comandos</button><button class="section-tab" data-category-tab="stickers" type="button">Stickers</button><button class="section-tab" data-category-tab="auto" type="button">Mensajes automáticos</button></div><div class="audio-activity-strip panel" id="commandAudioActivity"><span>Audio de comandos</span><div class="mini-equalizer" id="commandActivityBars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><strong id="commandActivityText">Silencio</strong></div><div class="category-section-pane active" data-category-pane="list" data-category-pane-group="commands"><article class="panel stream-overlay-card hidden" id="commandOverlaySetupCard"><div class="panel-header"><div><h2>Superposición del stream</h2><p class="hint">TikTok LIVE Studio exige HTTPS. Lulu crea un enlace seguro temporal; mantén la aplicación abierta durante el LIVE.</p></div><span class="overlay-status" id="overlayConnectionStatus">Sin fuente conectada</span></div><div class="overlay-link-grid"><div class="field-group"><label>Pantalla</label><select id="overlayScreenInput"><option value="1">Superposición 1</option><option value="2">Superposición 2</option><option value="3">Superposición 3</option><option value="4">Superposición 4</option></select></div><div class="field-group overlay-url-field"><label>Enlace HTTPS para TikTok LIVE Studio</label><input id="overlayUrlOutput" readonly="" value="Preparando enlace HTTPS..."/><small id="overlayHttpsStatus">Conectando el enlace seguro…</small></div><button class="primary" id="copyOverlayUrlBtn">Copiar HTTPS</button></div><div class="overlay-local-row"><input id="overlayLocalUrlOutput" readonly="" value="Preparando enlace local..."/><button class="ghost" id="copyOverlayLocalUrlBtn">Copiar local para OBS</button></div><div class="overlay-actions"><button class="secondary" id="testOverlayBtn">Probar imagen/GIF</button><button class="ghost" id="clearOverlayBtn">Limpiar pantalla</button><button class="ghost" id="refreshOverlayBtn">Actualizar estado</button><span>Fuente recomendada: 1920 × 1080, fondo transparente. El HTTPS puede cambiar al reiniciar Lulu.</span></div></article><article class="panel commands-page-card"><div class="commands-table-head"><span>Comando</span><span>Acción</span><span>Permiso</span><span>Costo</span><span>Estado</span><span></span></div><div class="commands-list" id="commandsList"></div></article><article class="panel command-help"><h3>Acciones disponibles</h3><div class="help-grid"><div><strong>Respuesta de voz</strong><span>Lulu lee un texto personalizado.</span></div><div><strong>Leer mensaje</strong><span>Lee lo escrito después del comando.</span></div><div><strong>Pedir canción</strong><span>Agrega una búsqueda a la cola.</span></div><div><strong>Saltar canción</strong><span>Pasa a la siguiente pista.</span></div><div><strong>Reproducir sonido</strong><span>Activa un audio elegido desde la PC.</span></div><div><strong>Mostrar imagen o GIF</strong><span>La envía a la fuente de navegador del stream.</span></div><div><strong>Consultar saldo</strong><span>Lee las Lunitas disponibles del usuario.</span></div><div><strong>Revocar canción</strong><span>Quita su última solicitud pendiente y devuelve el costo.</span></div></div></article></div><div class="category-section-pane" data-category-pane="stickers" data-category-pane-group="commands"><article class="panel event-media-card command-event-card"><div class="panel-header"><div><h2>Acciones por stickers de Fan y actividad</h2><p class="hint">Los stickers son los que los espectadores envían desde las pestañas Fan y Super Fan de TikTok.</p></div></div>
+<div class="event-rule-builder"><div class="field-group"><label>Evento</label><select id="eventRuleTypeInput"><option value="fanSticker">Sticker de Fan</option><option value="gift">Regalo</option><option value="follow">Nuevo seguidor</option><option value="subscribe">Suscripción</option><option value="share">Compartido</option><option value="member">Entrada al LIVE</option><option value="like">Likes</option></select></div><div class="field-group"><label>Nombre a detectar</label><input id="eventRuleMatchInput" placeholder="Ejemplo: sticker de fan"/><small>Déjalo vacío para cualquier evento del tipo elegido.</small></div><button class="primary" id="addEventMediaRuleBtn">Agregar regla</button><div class="event-sound-builder"><div class="media-picker-row"><button class="secondary" id="pickEventSoundBtn">Elegir sonido</button><span id="eventSoundName">Ningún sonido elegido</span></div><div class="field-group event-volume-field"><div class="label-value"><label>Volumen de prueba</label><output id="eventSoundVolumeOutput">90%</output></div><input id="eventSoundVolumeInput" max="1" min="0" step="0.05" type="range" value="0.9"/></div><button class="ghost" id="testEventSoundBtn">Probar sonido</button></div></div>
+<div class="detected-fan-stickers" id="detectedFanStickers"><span class="hint">Los stickers detectados durante el LIVE aparecerán aquí con su ID.</span></div>
+<div class="event-rules-list" id="eventMediaRulesList"></div>
+</article></div><div class="category-section-pane" data-category-pane="auto" data-category-pane-group="commands"><article class="panel settings-card wide tiktok-auto-chat-card">
+<div class="panel-header"><div><h3>Mensajes automáticos en el LIVE</h3><p class="hint">Personaliza qué debe decir Lulu y en qué momento debe enviarlo.</p></div></div>
+<div class="setting-row top"><div><h3>Activar mensajes automáticos</h3><p>La sesión de TikTok se administra desde la categoría Cuenta.</p></div><label class="switch"><input id="tiktokAutoChatEnabledInput" type="checkbox"/><span></span></label></div>
+<div class="field-group"><div class="label-value"><label>Espera mínima entre mensajes</label><output id="tiktokAutoChatCooldownOutput">8 s</output></div><input id="tiktokAutoChatCooldownInput" max="120" min="5" step="1" type="range"/></div>
+<div class="auto-chat-rules">
+<label class="auto-chat-rule"><span class="auto-chat-rule-title"><input id="tiktokAutoChatSongQueuedEnabledInput" type="checkbox"/> Cuando una canción entra a la cola</span><textarea id="tiktokAutoChatSongQueuedTextInput" maxlength="180" rows="2"></textarea></label>
+<label class="auto-chat-rule"><span class="auto-chat-rule-title"><input id="tiktokAutoChatSongStartedEnabledInput" type="checkbox"/> Cuando una canción empieza a sonar</span><textarea id="tiktokAutoChatSongStartedTextInput" maxlength="180" rows="2"></textarea></label>
+<label class="auto-chat-rule"><span class="auto-chat-rule-title"><input id="tiktokAutoChatSongEndedEnabledInput" type="checkbox"/> Cuando termina una canción</span><textarea id="tiktokAutoChatSongEndedTextInput" maxlength="180" rows="2"></textarea></label>
+<label class="auto-chat-rule"><span class="auto-chat-rule-title"><input id="tiktokAutoChatSongSkippedEnabledInput" type="checkbox"/> Cuando se salta una canción</span><textarea id="tiktokAutoChatSongSkippedTextInput" maxlength="180" rows="2"></textarea></label>
+<label class="auto-chat-rule"><span class="auto-chat-rule-title"><input id="tiktokAutoChatLiveConnectedEnabledInput" type="checkbox"/> Cuando Lulu se conecta al LIVE</span><textarea id="tiktokAutoChatLiveConnectedTextInput" maxlength="180" rows="2"></textarea></label>
+</div>
+<p class="hint">Variables: <strong>{cancion}</strong>, <strong>{usuario}</strong>, <strong>{posicion}</strong>, <strong>{cola}</strong>, <strong>{proveedor}</strong>, <strong>{comando}</strong> y <strong>{live}</strong>.</p>
+<div class="tiktok-chat-test"><input id="tiktokAutoChatTestInput" maxlength="180" placeholder="Mensaje de prueba"/><button class="primary" id="testTikTokChatBtn">Enviar prueba</button></div>
+</article></div>
+
+
+
+
+
+</section>
+<section class="page" id="page-rankings">
+<div class="page-heading simple"><div><h1>Overlays</h1><p>Configura Overlays para tu Directo.</p></div><div class="heading-actions"><button class="ghost" id="refreshRankingPreviewBtn">Actualizar vista previa</button><button class="danger-outline" id="resetRankingBtn">Reiniciar datos</button></div></div><div class="section-tabs category-section-tabs" data-category-tabs="rankings" role="tablist"><button class="section-tab active" data-category-tab="ranking" type="button">Ranking</button><button class="section-tab" data-category-tab="widgets" type="button">Otros overlays</button></div><div class="category-section-pane active" data-category-pane="ranking" data-category-pane-group="rankings"><div class="rankings-layout">
+<article class="panel ranking-editor-card">
+<div class="panel-header"><div><h2>Configurar overlay</h2><p class="hint">Cada pantalla tiene su propio enlace y puede mostrar un ranking diferente.</p></div><span class="overlay-status" id="rankingConnectionStatus">Sin fuente conectada</span></div>
+<div class="ranking-form-grid">
+<div class="field-group"><label>Pantalla de overlay</label><select id="rankingSlotInput"><option value="1">Overlay 1</option><option value="2">Overlay 2</option><option value="3">Overlay 3</option><option value="4">Overlay 4</option></select></div>
+<div class="field-group"><label>Contenido</label><select id="rankingTypeInput"><option value="coins">Monedas de regalos / Top Gifters</option><option value="likes">Tap taps / Likes</option><option value="economy">Monedas de Lulu</option><option value="gifts">Cantidad de regalos</option><option value="comments">Comentarios</option><option value="shares">Compartidos</option><option value="follows">Nuevos seguidores</option><option value="members">Entradas al LIVE</option><option value="subscribes">Suscripciones</option><option value="fanStickers">Stickers de Fan</option></select></div>
+<div class="field-group ranking-title-field"><label>Título</label><input id="rankingTitleInput" maxlength="60" placeholder="TOP GIFTERS"/></div>
+<div class="field-group"><label>Personas visibles</label><select id="rankingLimitInput"><option value="3">Top 3</option><option value="5">Top 5</option><option value="7">Top 7</option><option value="10">Top 10</option></select></div>
+<div class="field-group"><label>Estilo</label><select id="rankingStyleInput"><option value="tiktok">TikTok</option><option value="glass">Cristal</option><option value="neon">Neón</option><option value="minimal">Minimalista</option></select></div>
+<div class="field-group"><label>Fuente</label><select id="rankingFontInput"><option value="Segoe UI">Segoe UI</option><option value="Arial">Arial</option><option value="Impact">Impact</option><option value="Trebuchet MS">Trebuchet</option><option value="Georgia">Georgia</option><option value="Courier New">Pixel / Monoespaciada</option><option value="Comic Sans MS">Comic</option></select></div>
+</div>
+<div class="ranking-color-grid"><label><span>Texto</span><input id="rankingTextColorInput" type="color" value="#ffffff"/></label><label><span>Acento rosa</span><input id="rankingAccentColorInput" type="color" value="#ff2d8f"/></label><label><span>Acento azul</span><input id="rankingSecondaryColorInput" type="color" value="#25f4ee"/></label><label><span>Fondo</span><input id="rankingBackgroundColorInput" type="color" value="#101018"/></label></div>
+<div class="field-group ranking-opacity-field"><label>Opacidad del fondo <output id="rankingBackgroundOpacityOutput">82%</output></label><input id="rankingBackgroundOpacityInput" max="100" min="0" type="range" value="82"/></div>
+<div class="ranking-toggle-grid"><label class="setting-row compact"><span><strong>Texto RGB</strong><small>Arcoíris animado.</small></span><span class="switch"><input id="rankingRgbInput" type="checkbox"/><span></span></span></label><label class="setting-row compact"><span><strong>Avatares</strong><small>Foto del usuario.</small></span><span class="switch"><input checked="" id="rankingShowAvatarInput" type="checkbox"/><span></span></span></label><label class="setting-row compact"><span><strong>Posiciones</strong><small>Número y corona.</small></span><span class="switch"><input checked="" id="rankingShowRankInput" type="checkbox"/><span></span></span></label><label class="setting-row compact"><span><strong>Cantidad</strong><small>Valor acumulado.</small></span><span class="switch"><input checked="" id="rankingShowValueInput" type="checkbox"/><span></span></span></label><label class="setting-row compact"><span><strong>Nombres en mayúsculas</strong><small>Más estilo de torneo.</small></span><span class="switch"><input id="rankingUppercaseInput" type="checkbox"/><span></span></span></label></div>
+</article>
+<article class="panel ranking-preview-card"><div class="panel-header"><div><h2>Vista previa</h2><p class="hint">Los usuarios de muestra solo aparecen aquí cuando todavía no hay datos reales.</p></div></div><div class="ranking-preview-shell"><iframe id="rankingPreviewFrame" title="Vista previa del overlay"></iframe></div></article>
+<article class="panel ranking-link-card"><div class="panel-header"><div><h2>Enlace para el stream</h2><p class="hint">Usa HTTPS en TikTok LIVE Studio. Para OBS también puedes usar el enlace local.</p></div></div><div class="ranking-link-row"><input id="rankingUrlOutput" readonly="" value="Preparando enlace HTTPS..."/><button class="primary" id="copyRankingUrlBtn">Copiar HTTPS</button></div><div class="ranking-link-row ranking-local-row"><input id="rankingLocalUrlOutput" readonly="" value="Preparando enlace local..."/><button class="ghost" id="copyRankingLocalUrlBtn">Copiar local para OBS</button></div><small id="rankingHttpsStatus">Conectando el enlace seguro…</small><small>Resolución recomendada: 600 × 700. El overlay se actualiza automáticamente durante el LIVE.</small></article>
+</div></div><div class="category-section-pane" data-category-pane="widgets" data-category-pane-group="rankings"><div class="stream-widgets-heading"><div><h2>Otros overlays</h2><p class="hint">La lista de reproducción muestra la canción actual y las siguientes solicitudes. La tarjeta de monedas enseña el último saldo que cambió.</p></div></div><div class="stream-widgets-grid">
+<article class="panel stream-widget-card"><div class="panel-header"><div><h2>Lista de reproducción</h2><p class="hint">Canción actual y hasta cinco canciones en cola.</p></div><button class="ghost tiny" id="refreshPlaylistWidgetBtn">Actualizar</button></div><div class="stream-widget-preview playlist-preview"><iframe id="playlistWidgetPreviewFrame" title="Vista previa de lista de reproducción"></iframe></div><div class="ranking-link-row"><input id="playlistWidgetUrlOutput" readonly="" value="Preparando enlace HTTPS..."/><button class="primary" id="copyPlaylistWidgetUrlBtn">Copiar HTTPS</button></div><div class="ranking-link-row ranking-local-row"><input id="playlistWidgetLocalUrlOutput" readonly="" value="Preparando enlace local..."/><button class="ghost" id="copyPlaylistWidgetLocalUrlBtn">Copiar local para OBS</button></div><small class="overlay-status" id="playlistWidgetStatus">Sin fuente conectada</small><small>Resolución recomendada: 600 × 600.</small></article>
+<article class="panel stream-widget-card"><div class="panel-header"><div><h2>Tarjeta de monedas</h2><p class="hint">Foto pequeña, nombre y saldo del último usuario que recibió, gastó o modificó monedas.</p></div><button class="ghost tiny" id="refreshWalletWidgetBtn">Actualizar</button></div><div class="stream-widget-preview wallet-preview"><iframe id="walletWidgetPreviewFrame" title="Vista previa de tarjeta de monedas"></iframe></div><div class="ranking-link-row"><input id="walletWidgetUrlOutput" readonly="" value="Preparando enlace HTTPS..."/><button class="primary" id="copyWalletWidgetUrlBtn">Copiar HTTPS</button></div><div class="ranking-link-row ranking-local-row"><input id="walletWidgetLocalUrlOutput" readonly="" value="Preparando enlace local..."/><button class="ghost" id="copyWalletWidgetLocalUrlBtn">Copiar local para OBS</button></div><small class="overlay-status" id="walletWidgetStatus">Sin fuente conectada</small><small>Resolución recomendada: 520 × 150.</small></article>
+</div></div>
+
+
+
+</section>
+<section class="page" id="page-automations">
+<div class="page-heading simple"><div><h1>Automatizaciones</h1><p>Haz que Lulu reaccione al LIVE con sonidos, TTS, mensajes, alertas, metas y conexiones externas.</p></div><div class="heading-actions"><button class="primary" id="addAutomationRuleBtn">+ Automatización</button></div></div>
+<div class="section-tabs category-section-tabs" data-category-tabs="automations" role="tablist"><button class="section-tab active" data-category-tab="rules" type="button">Reglas</button><button class="section-tab" data-category-tab="goals" type="button">Metas</button><button class="section-tab" data-category-tab="screens" type="button">Pantallas</button><button class="section-tab" data-category-tab="activity" type="button">Actividad</button></div>
+<div class="category-section-pane active" data-category-pane="rules" data-category-pane-group="automations"><div class="automation-intro-grid"><article class="panel automation-help-card"><span class="automation-kicker">ACCIONES & EVENTOS</span><h2>Una regla puede hacer varias cosas</h2><p>Filtra por regalo, palabra, usuario, cantidad o racha y combina TTS, chat, sonido, alerta o webhook.</p><div class="template-chip-row"><code>{user}</code><code>{gift}</code><code>{count}</code><code>{diamonds}</code><code>{comment}</code></div></article><article class="panel automation-mini-stats"><div><small>Regalos de la sesión</small><strong id="giftSessionTotal">0</strong></div><div><small>Monedas recibidas</small><strong id="giftSessionDiamonds">0</strong></div><div><small>Top regalo</small><strong id="giftSessionTop">Esperando</strong></div></article></div><div id="automationRulesList" class="automation-rules-list"></div></div>
+<div class="category-section-pane" data-category-pane="goals" data-category-pane-group="automations"><div class="automation-section-head"><div><h2>Metas del LIVE</h2><p>Likes, monedas, regalos, follows, compartidos, subs, entradas o comentarios.</p></div><button class="primary" id="addLiveGoalBtn">+ Meta</button></div><div id="liveGoalsList" class="live-goals-list"></div></div>
+<div class="category-section-pane" data-category-pane="screens" data-category-pane-group="automations"><div class="automation-widget-grid">
+<article class="panel stream-widget-card"><div class="panel-header"><div><h2>Alertas</h2><p class="hint">Animación para sonidos, regalos y reglas.</p></div><button class="ghost tiny" id="refreshAlertWidgetBtn">Actualizar</button></div><div class="stream-widget-preview automation-widget-preview"><iframe id="alertWidgetPreviewFrame" title="Vista previa de alertas"></iframe></div><div class="ranking-link-row"><input id="alertWidgetUrlOutput" readonly/><button class="primary" id="copyAlertWidgetUrlBtn">Copiar HTTPS</button></div><div class="ranking-link-row ranking-local-row"><input id="alertWidgetLocalUrlOutput" readonly/><button class="ghost" id="copyAlertWidgetLocalUrlBtn">Copiar local</button></div><small class="overlay-status" id="alertWidgetStatus">Preparando fuente</small></article>
+<article class="panel stream-widget-card"><div class="panel-header"><div><h2>Meta activa</h2><p class="hint">Barra de progreso de la meta seleccionada.</p></div><button class="ghost tiny" id="refreshGoalWidgetBtn">Actualizar</button></div><div class="stream-widget-preview automation-widget-preview"><iframe id="goalWidgetPreviewFrame" title="Vista previa de meta"></iframe></div><div class="ranking-link-row"><input id="goalWidgetUrlOutput" readonly/><button class="primary" id="copyGoalWidgetUrlBtn">Copiar HTTPS</button></div><div class="ranking-link-row ranking-local-row"><input id="goalWidgetLocalUrlOutput" readonly/><button class="ghost" id="copyGoalWidgetLocalUrlBtn">Copiar local</button></div><small class="overlay-status" id="goalWidgetStatus">Preparando fuente</small></article>
+<article class="panel stream-widget-card"><div class="panel-header"><div><h2>Top regalos y racha</h2><p class="hint">Top regalo, mejor racha y último regalo.</p></div><button class="ghost tiny" id="refreshGiftWidgetBtn">Actualizar</button></div><div class="stream-widget-preview automation-widget-preview"><iframe id="giftWidgetPreviewFrame" title="Vista previa de regalos"></iframe></div><div class="ranking-link-row"><input id="giftWidgetUrlOutput" readonly/><button class="primary" id="copyGiftWidgetUrlBtn">Copiar HTTPS</button></div><div class="ranking-link-row ranking-local-row"><input id="giftWidgetLocalUrlOutput" readonly/><button class="ghost" id="copyGiftWidgetLocalUrlBtn">Copiar local</button></div><div class="widget-actions-row"><small class="overlay-status" id="giftWidgetStatus">Preparando fuente</small><button class="ghost tiny" id="resetGiftStatsBtn">Reiniciar sesión</button></div></article>
+</div></div>
+<div class="category-section-pane" data-category-pane="activity" data-category-pane-group="automations"><article class="panel automation-activity-card"><div class="panel-header"><div><h2>Actividad</h2><p class="hint">Eventos y acciones ejecutadas durante esta sesión.</p></div></div><div id="automationActivityList" class="automation-activity-list"></div></article></div>
+</section>
+<section class="page" id="page-games">
+<div class="page-heading simple"><div><h1>Juegos del LIVE</h1><p>Los espectadores juegan con comandos usando únicamente las monedas virtuales de Lulu.</p></div><div class="heading-actions"><span class="count-pill"><b id="liveGamePlayCount">0</b> partidas</span><span class="count-pill"><b id="liveGameWinCount">0</b> victorias</span></div></div>
+<div class="section-tabs category-section-tabs" data-category-tabs="games" role="tablist"><button class="section-tab active" data-category-tab="games" type="button">Juegos</button><button class="section-tab" data-category-tab="screen" type="button">Pantalla del stream</button><button class="section-tab" data-category-tab="results" type="button">Actividad</button></div>
+<div class="category-section-pane active" data-category-pane="games" data-category-pane-group="games">
+<div class="games-layout"><article class="panel games-config-card"><div class="setting-row top"><div><h3>Activar Juegos del LIVE</h3><p>Las apuestas usan Lunitas. No hay dinero real ni premios fuera de Lulu.</p></div><label class="switch"><input id="liveGamesEnabledInput" type="checkbox"/><span></span></label></div>
+<div class="games-bet-grid"><div class="field-group"><label>Apuesta mínima</label><input id="liveGamesMinBetInput" min="1" max="1000000000" type="number" value="10"/></div><div class="field-group"><label>Apuesta predeterminada</label><input id="liveGamesDefaultBetInput" min="1" max="1000000000" type="number" value="50"/></div><div class="field-group"><label>Apuesta máxima</label><input id="liveGamesMaxBetInput" min="1" max="1000000000" type="number" value="1000"/></div><div class="field-group"><label>Cooldown por usuario</label><input id="liveGamesCooldownInput" min="0" max="300" type="number" value="8"/><small>Segundos entre partidas nuevas.</small></div></div>
+<div class="game-output-options"><label class="setting-row compact"><span><strong>Leer resultados con TTS</strong><small>Lulu anuncia el resultado en voz alta.</small></span><span class="switch"><input id="liveGamesSpeakResultsInput" type="checkbox"/><span></span></span></label><label class="setting-row compact"><span><strong>Responder en el chat de TikTok</strong><small>Requiere la cuenta enlazada en Cuenta.</small></span><span class="switch"><input id="liveGamesChatResultsInput" type="checkbox"/><span></span></span></label></div></article>
+<div class="live-games-list" id="liveGamesList"></div></div></div>
+<div class="category-section-pane" data-category-pane="screen" data-category-pane-group="games"><div class="games-overlay-layout"><article class="panel stream-widget-card"><div class="panel-header"><div><h2>Pantalla de juego</h2><p class="hint">Muestra jugador, apuesta y resultado en TikTok LIVE Studio u OBS.</p></div><button class="ghost tiny" id="refreshGameWidgetBtn">Actualizar</button></div><div class="stream-widget-preview game-widget-preview"><iframe id="gameWidgetPreviewFrame" title="Vista previa de Juegos del LIVE"></iframe></div><div class="ranking-link-row"><input id="gameWidgetUrlOutput" readonly value="Preparando enlace HTTPS..."/><button class="primary" id="copyGameWidgetUrlBtn">Copiar HTTPS</button></div><div class="ranking-link-row ranking-local-row"><input id="gameWidgetLocalUrlOutput" readonly value="Preparando enlace local..."/><button class="ghost" id="copyGameWidgetLocalUrlBtn">Copiar local para OBS</button></div><small class="overlay-status" id="gameWidgetStatus">Sin fuente conectada</small><small>Resolución recomendada: 700 × 280.</small></article><article class="panel games-help-card"><h2>Cómo juegan</h2><div class="game-help-lines"><p><strong>🃏 Blackjack:</strong> <code>!blackjack 100</code>, luego <code>!pedir</code> o <code>!plantar</code>.</p><p><strong>🎟️ Rasca:</strong> <code>!rasca 50</code>.</p><p><strong>🎡 Ruleta:</strong> <code>!ruleta rojo 100</code>, negro, par, impar o un número.</p><p><strong>🎲 Dados:</strong> <code>!dados 50</code>.</p><p><strong>✂️ PPT:</strong> <code>!ppt piedra 50</code>.</p><p><strong>🎰 Slots:</strong> <code>!slots 50</code>.</p></div></article></div></div>
+<div class="category-section-pane" data-category-pane="results" data-category-pane-group="games"><article class="panel games-results-card"><div class="panel-header"><div><h2>Resultados recientes</h2><p class="hint">Actividad de esta sesión. Los cobros y premios también aparecen en Economía.</p></div></div><div id="liveGameResultsList" class="live-game-results"></div></article></div>
+</section>
+<section class="page" id="page-economy">
+<div class="page-heading simple"><div><h1>Economía</h1><p>Personaliza tu economía.</p></div><button class="ghost" id="refreshEconomyBtn">↻ Actualizar</button></div><div class="section-tabs category-section-tabs" data-category-tabs="economy" role="tablist"><button class="section-tab active" data-category-tab="general" type="button">General</button><button class="section-tab" data-category-tab="rewards" type="button">Recompensas</button><button class="section-tab" data-category-tab="balances" type="button">Saldos</button></div><div class="category-section-pane active" data-category-pane="general" data-category-pane-group="economy"><div class="economy-grid"><article class="panel economy-card economy-config-card">
+<div class="setting-row top"><div><h3>Activar economía</h3><p>Los costos y recompensas solo funcionan cuando está activada.</p></div><label class="switch"><input id="economyEnabledInput" type="checkbox"/><span></span></label></div>
+<div class="form-grid"><div class="field-group"><label>Nombre de la moneda</label><input id="currencyNameInput" maxlength="24" value="Lunitas"/></div><div class="field-group"><label>Símbolo</label><input id="currencySymbolInput" maxlength="4" value="🌙"/></div></div>
+<div class="field-group"><label>Saldo inicial para usuarios nuevos</label><input id="economyStartingBalanceInput" max="1000000000" min="0" step="1" type="number" value="0"/><small>Solo se aplica la primera vez que aparece una cuenta.</small></div>
+</article><article class="panel economy-card economy-admin-card">
+<h2>Administrar saldo</h2>
+<div class="field-group"><label>Usuario</label><div class="username-field"><span>@</span><input id="economyUserInput" placeholder="usuario"/></div></div>
+<button class="ghost full" id="economyUseLiveUserBtn">Usar mi usuario del LIVE</button>
+<div class="economy-current-balance"><span>Saldo consultado</span><strong id="economyUserBalance">—</strong></div>
+<div class="field-group"><label>Cantidad</label><input id="economyAmountInput" max="1000000000" min="0" step="1" type="number" value="10"/></div>
+<div class="economy-admin-actions"><button class="secondary" id="economyAddBtn">Añadir</button><button class="danger-outline" id="economyRemoveBtn">Quitar</button><button class="ghost" id="economySetBtn">Establecer</button></div>
+</article></div></div><div class="category-section-pane" data-category-pane="rewards" data-category-pane-group="economy"><div class="economy-grid"><article class="panel economy-card economy-rewards-card">
+<div class="panel-header"><div><h2>Cómo se obtienen monedas</h2><p class="hint">Define cuánto se entrega y cada cuántas acciones.</p></div></div>
+<div class="economy-rewards-list" id="economyRewardsList"></div>
+</article></div></div><div class="category-section-pane" data-category-pane="balances" data-category-pane-group="economy"><div class="economy-grid"><article class="panel economy-card economy-balances-card"><div class="panel-header"><h2>Mayores saldos</h2><span class="count-pill" id="economyAccountCount">0</span></div><div class="economy-balances-list" id="economyBalancesList"></div></article><article class="panel economy-card economy-ledger-card"><div class="panel-header"><h2>Movimientos recientes</h2></div><div class="economy-ledger-list" id="economyLedgerList"></div></article></div></div>
+
+</section>
+<section class="page" id="page-settings">
+<div class="page-heading simple"><div><h1>Ajustes y rendimiento</h1><p>Servidor, apariencia, recursos y actualizaciones.</p></div></div><div class="section-tabs category-section-tabs" data-category-tabs="settings" role="tablist"><button class="section-tab active" data-category-tab="server" type="button">Servidor</button><button class="section-tab" data-category-tab="appearance" type="button">Apariencia</button><button class="section-tab" data-category-tab="panel" type="button">Panel</button><button class="section-tab" data-category-tab="performance" type="button">Rendimiento</button><button class="section-tab" data-category-tab="updates" type="button">Actualizaciones</button><button class="section-tab" data-category-tab="session" type="button">Sesión</button></div><div class="category-section-pane active" data-category-pane="server" data-category-pane-group="settings"><div class="settings-grid"><article class="panel settings-card wide tiktok-free-card">
+<div class="panel-header"><div><h3>Servidor seguro de Lulu Finity</h3></div><span class="free-plan-pill">CONFIGURADO</span></div>
+<div class="relay-usage-card">
+<div class="relay-usage-heading"><strong>Uso diario global</strong><span id="relayUsagePercent">0%</span></div>
+<div class="relay-usage-track"><span id="relayUsageBar"></span></div>
+<div class="relay-usage-meta"><span id="relayUsageCount">0 de 7500 usos</span><span id="relayUsageConnections">0 conexiones aproximadas</span></div>
+</div>
+<div class="relay-usage-card relay-user-usage-card">
+<div class="relay-usage-heading"><strong>Tu uso diario</strong><span id="relayUserUsagePercent">0%</span></div>
+<p id="relayUserUsageText">Te quedan 600 conexiones.</p>
+<div class="relay-usage-track"><span id="relayUserUsageBar"></span></div>
+<div class="relay-usage-meta"><span id="relayUserUsageCount">0 de 600 conexiones</span></div>
+</div>
+<small id="relayUsageStatus">Calculando el uso del servidor…</small>
+<p class="relay-privacy-note">Lulu Finity no sube tus ajustes ni tu sesión de TikTok. El servidor solo administra claves API y contadores de conexión para repartir el funcionamiento de forma equitativa.</p>
+</article></div></div><div class="category-section-pane" data-category-pane="appearance" data-category-pane-group="settings"><div class="settings-grid"><article class="panel settings-card appearance-card">
+<h3>Apariencia</h3>
+<div class="field-group"><label>Tema</label><select id="themeModeInput"><option value="pink">Rosa original</option><option value="blush">Rosa claro</option><option value="purple">Morado</option><option value="red">Rojo</option><option value="blue">Azul</option><option value="dark">Oscuro</option><optgroup label="Lulu Studio"><option value="studio-lavender">Studio Lavanda</option><option value="studio-pink">Studio Rosa</option><option value="studio-mint">Studio Menta</option></optgroup><optgroup label="Temas de Miku"><option value="miku-classic">Miku Menta</option><option value="miku-soft">Miku Rosa</option><option value="miku-dark">Miku Lavanda</option></optgroup></select><small>Studio cambia la distribución del Inicio; las demás secciones conservan sus funciones.</small></div>
+<div class="field-group"><div class="label-value"><label>Brillo</label><output id="glowIntensityOutput">70%</output></div><input id="glowIntensityInput" max="100" min="0" step="5" type="range"/></div>
+<div class="field-group"><div class="label-value"><label>Transparencia de paneles</label><output id="panelOpacityOutput">78%</output></div><input id="panelOpacityInput" max="100" min="20" step="1" type="range"/></div>
+<div class="field-group"><div class="label-value"><label>Redondeo</label><output id="cornerRadiusOutput">15 px</output></div><input id="cornerRadiusInput" max="24" min="6" step="1" type="range"/></div>
+</article></div></div><div class="category-section-pane" data-category-pane="panel" data-category-pane-group="settings"><div class="settings-grid"><article class="panel settings-card dashboard-visibility-card">
+<h3>Panel principal</h3>
+<p class="hint">Oculta solamente lo que no necesitas durante el LIVE.</p>
+<label class="visibility-option"><input data-dashboard-panel="stats" type="checkbox"/> Ocultar estadísticas</label>
+<label class="visibility-option"><input data-dashboard-panel="comments" type="checkbox"/> Ocultar comentarios recientes</label>
+<label class="visibility-option"><input data-dashboard-panel="music" type="checkbox"/> Ocultar reproductor de música</label>
+<label class="visibility-option"><input data-dashboard-panel="simulator" type="checkbox"/> Ocultar prueba local</label>
+</article></div></div><div class="category-section-pane" data-category-pane="updates" data-category-pane-group="settings"><div class="settings-grid"><article class="panel settings-card wide update-card"><div class="update-heading"><div><h3>Actualizaciones</h3><p id="updateStatusText">Se comprobarán al iniciar.</p></div><span class="update-version" id="updateVersionBadge">v1.0.0</span></div><div class="update-progress hidden" id="updateProgress"><span id="updateProgressBar"></span></div><div class="update-actions"><div class="switch-row"><label class="switch"><input id="checkUpdatesOnStartupInput" type="checkbox"/><span></span></label><span>Buscar versiones nuevas al iniciar</span></div><div><button class="ghost" id="openRepositoryBtn">Repositorio</button><button class="ghost" id="rollbackVersionBtn">Regresar a 0.27</button><button class="secondary" id="checkUpdatesBtn">Buscar actualización</button><button class="primary hidden" id="installUpdateBtn">Instalar y reiniciar</button><p class="hint rollback-hint">¿Encontraste un bug molesto? Puedes regresar a la versión 0.27 hasta que la creadora lo solucione (:</p></div></div></article></div></div><div class="category-section-pane" data-category-pane="session" data-category-pane-group="settings"><div class="settings-grid"><article class="panel settings-card"><h3>Sesión actual</h3><button class="ghost full" id="exportSettingsBtn">Copiar resumen de ajustes</button><p class="hint">No incluye contraseñas ni datos de TikTok.</p></article></div></div>
+<div class="category-section-pane" data-category-pane="performance" data-category-pane-group="settings"><div class="performance-layout"><article class="panel settings-card"><h3>Perfil de recursos</h3><label class="permission-option"><input name="performanceProfile" type="radio" value="saving"/><span><strong>Ahorro</strong><small>Libera módulos con más rapidez.</small></span></label><label class="permission-option"><input name="performanceProfile" type="radio" value="balanced"/><span><strong>Equilibrado</strong><small>Recomendado.</small></span></label><label class="permission-option"><input name="performanceProfile" type="radio" value="instant"/><span><strong>Respuesta inmediata</strong><small>Mantiene más funciones listas.</small></span></label><button class="secondary full" id="releaseIdleResourcesBtn">Liberar recursos inactivos ahora</button></article><article class="panel settings-card wide"><div class="panel-header"><div><h3>Estado de la aplicación</h3><p class="hint">Se actualiza sólo mientras ves esta sección.</p></div><button class="ghost" id="refreshRuntimeBtn">Actualizar</button></div><div class="runtime-stats" id="runtimeStats"><span>Abre esta sección para consultar el uso.</span></div><div class="runtime-modules" id="runtimeModules"></div></article></div></div>
+</section>
+</main>
+<div class="toast-stack" id="toastStack"></div>
+</div>
+<div class="modal-backdrop hidden" id="commandModal">
+<form class="modal-card" id="commandForm">
+<div class="modal-heading"><div><h2 id="commandModalTitle">Nuevo comando</h2><p>Configura qué debe hacer Lulu.</p></div><button class="icon-button" id="closeCommandModalBtn" type="button">×</button></div>
+<input id="commandIdInput" type="hidden"/>
+<div class="form-grid"><div class="field-group"><label>Comando</label><input id="commandTriggerInput" placeholder="!saludo" required=""/></div><div class="field-group"><label>Acción</label><select id="commandActionInput"><option value="response">Respuesta de voz</option><option value="tts">Leer el mensaje</option><option value="song">Pedir canción</option><option value="skip">Saltar canción</option><option value="sound">Reproducir sonido</option><option value="image">Mostrar imagen</option><option value="balance">Consultar saldo</option><option value="revoke">Revocar canción</option></select></div></div>
+<div class="field-group" id="commandResponseField"><label>Texto de respuesta</label><textarea id="commandResponseInput" placeholder="Hola {usuario}" rows="3"></textarea><small>Variables: {usuario}, {mensaje}</small></div>
+<div class="command-media-field hidden" id="commandMediaField"><div class="media-picker-row"><button class="secondary" id="pickCommandMediaBtn" type="button">Elegir archivo</button><span id="commandMediaName">Ningún archivo elegido</span></div><div class="form-grid"><div class="field-group" id="commandMediaVolumeField"><div class="label-value"><label>Volumen</label><output id="commandMediaVolumeOutput">90%</output></div><input id="commandMediaVolumeInput" max="1" min="0" step="0.05" type="range" value="0.9"/></div><div class="field-group hidden" id="commandImageDurationField"><label>Duración de la imagen/GIF</label><input id="commandImageDurationInput" max="60" min="1" type="number" value="6"/><small>Segundos en el stream.</small></div><div class="field-group hidden" id="commandOverlayScreenField"><label>Superposición</label><select id="commandOverlayScreenInput"><option value="1">Superposición 1</option><option value="2">Superposición 2</option><option value="3">Superposición 3</option><option value="4">Superposición 4</option></select><small>Debe coincidir con el enlace agregado al programa de stream.</small></div></div></div>
+<div class="command-audio-test hidden" id="commandAudioTestField"><input id="commandAudioTestInput" value="Este es un audio de prueba para el comando."/><button class="ghost" id="testCommandAudioBtn" type="button">Probar audio</button><small>Las pruebas respetan el volumen actual y la cola exclusiva.</small></div>
+<div class="field-group" id="commandCostField"><label>Costo del comando</label><div class="cost-input-row"><input id="commandCostInput" max="1000000000" min="0" step="1" type="number" value="0"/><span id="commandCostCurrency">Lunitas</span></div><small>0 significa gratis. El saldo se devuelve automáticamente si la acción falla.</small></div>
+<div class="form-grid"><div class="field-group"><label>Quién puede usarlo</label><select id="commandPermissionInput"><option value="all">Todos</option><option value="followers">Seguidores</option><option value="members">Miembros</option><option value="selected">Usuarios permitidos</option></select></div><label class="setting-row compact"><span><strong>Activo</strong></span><span class="switch"><input checked="" id="commandEnabledInput" type="checkbox"/><span></span></span></label></div>
+<div class="modal-actions"><button class="ghost" id="cancelCommandBtn" type="button">Cancelar</button><button class="primary" type="submit">Guardar comando</button></div>
+</form>
+</div>
+<script src="text-processor.js"></script><script src="renderer.js"></script>
+</body>
+</html>
