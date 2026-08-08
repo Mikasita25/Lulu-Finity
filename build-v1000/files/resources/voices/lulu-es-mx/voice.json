@@ -1,0 +1,15 @@
+{
+  "format": "lulu-local-v1",
+  "type": "vits",
+  "id": "lulu-es-mx",
+  "name": "Lulu México",
+  "author": "Piper / sherpa-onnx",
+  "language": "es-MX",
+  "description": "Voz local predeterminada de Lulu Finity. Funciona sin Internet.",
+  "sid": 0,
+  "engine": {
+    "model": "es_MX-ald-medium.onnx",
+    "tokens": "tokens.txt",
+    "dataDir": "espeak-ng-data"
+  }
+}
