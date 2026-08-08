@@ -38,7 +38,7 @@ jobs:
           node --check app/src/live-games.js
           node --check app/src/automation-engine.js
           python build-v0342/test-preload-sandbox.py app
-          python build-v0341/test-network-startup.py app
+          python build-v0342/test-network-startup.py app
           node build-v0320/test-live-games.js app/src/live-games.js
           node build-v0330/test-automation-engine.js app/src/automation-engine.js
       - name: Validar dependencias y relay
@@ -96,7 +96,7 @@ jobs:
           node --check app/src/preload.js
           node --check app/src/renderer.js
           python build-v0342/test-preload-sandbox.py app
-          python build-v0341/test-network-startup.py app
+          python build-v0342/test-network-startup.py app
           node build-v0320/test-live-games.js app/src/live-games.js
           node build-v0330/test-automation-engine.js app/src/automation-engine.js
           Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló relay" }; Pop-Location
