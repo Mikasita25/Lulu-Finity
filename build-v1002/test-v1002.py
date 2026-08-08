@@ -133,6 +133,14 @@ assert "ipcMain.handle('spotify:set-volume', async (_event, volume) => setSpotif
 assert "getAutomationEngine().evaluateAutomations" in main
 assert "getLiveGameManagerClass()" in main and "getLocalVoiceManagerClass()" in main
 assert "youtubeResolverIdleTimer=setTimeout" in main and ",15000)" in main
+for eager_import in (
+    "const { FALLBACK_ONLINE_VOICES, prepareOnlineVoices } = require('./online-voice-catalog');",
+    "const { TIKTOK_VOICES, isTikTokVoiceId } = require('./tiktok-voice-catalog');",
+    "const { requestTikTokSpeech } = require('./tiktok-tts-client');",
+):
+    assert eager_import not in main, eager_import
+for lazy_getter in ("getOnlineVoiceCatalog()", "getTikTokVoiceCatalog()", "getTikTokTtsClient()"):
+    assert lazy_getter in main, lazy_getter
 for module_label in ("Rankings", "Automatizaciones", "Juegos", "Economía"):
     assert f"['{module_label}'" in renderer, module_label
 
