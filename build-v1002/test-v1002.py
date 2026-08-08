@@ -70,6 +70,7 @@ for token in ("TIKTOK_TTS_ENDPOINTS", "requestTikTokSpeech", "text_speaker", "se
 
 for token in ("listTikTokVoices", "synthesizeTikTokVoice", "listOnlineVoices", "synthesizeOnlineVoice"):
     assert token in preload, token
+assert "releaseIdleResources: (details = {})" in preload
 for token in ("TikTok · ${category}", "tiktok:${voice.id}", "Microsoft online", "online:${voice.shortName}", "loadOnlineVoices", "Voz de TikTok no disponible", "Voz Microsoft no disponible", "privacyResetTikTokBtn"):
     assert token in renderer, token
 for token in ("RAM total de Lulu", "Solo núcleo", "Desglose real aproximado", "No son ocho copias de Lulu"):
@@ -132,9 +133,15 @@ assert "localTts:localVoiceManager?" in main
 assert "Math.round(workingSetKb/1024)" in main
 assert "memoryMb:usage.totalMemoryMb" in main
 assert "process.getProcessMemoryInfo()" not in main
+for token in ("details?.keepMusic", "destroyWindowSafely(spotifyWindow)", "keptMusic:Boolean(details?.keepMusic)"):
+    assert token in main, token
 assert "if (!activeRuntimeModules.has('rankings') && rankingClientCount() === 0) return;" in main
 assert "!state.loadedPages.has('automations')" in renderer
 assert "if(!hasActiveAudioActivity())return" in renderer
+for token in ("function hasMusicSession()", "profile==='saving'?5000", "profile==='balanced'?60000", "keepMusic:hasMusicSession()"):
+    assert token in renderer, token
+for label in ("Cierra reproductores inactivos después de 5 segundos", "Espera 60 segundos", "Conserva el reproductor listo"):
+    assert label in html, label
 assert "if (youtubeWindow && !youtubeWindow.isDestroyed()) void ensureYoutubeNetworkAdBlocker();" in main
 youtube_adblock_setter = re.search(r"function setYoutubeNetworkAdBlockEnabled\(enabled\) \{(.*?)\n\}", main, re.S)
 assert youtube_adblock_setter
