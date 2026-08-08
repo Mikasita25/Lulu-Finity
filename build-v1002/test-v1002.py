@@ -90,6 +90,12 @@ for security_copy in (
     "Permisos bloqueados",
     "Desvincular y borrar sesión",
     "Railway no recibe tu sesión",
+    "La única finalidad del servidor de Lulú es la API WebSocket del LIVE",
+    "El inicio de sesión y la sesión de tu cuenta de TikTok no pasan por este servidor",
+    "LO QUE SÍ USA EL WEBSOCKET",
+    "LO QUE NUNCA SE ENVÍA AL SERVIDOR DE LULÚ",
+    "A DÓNDE SE CONECTA CADA FUNCIÓN",
+    "El relay reenvía los eventos a tu aplicación en tiempo real",
     "voces de Microsoft",
 ):
     assert security_copy in html, security_copy
