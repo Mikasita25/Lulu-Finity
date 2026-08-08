@@ -39,8 +39,12 @@ jobs:
           node --check app/src/preload.js
           node --check app/src/renderer.js
           node --check app/src/online-voice-catalog.js
+          node --check app/src/clone-runtime-manager.js
+          node --check app/src/local-voice-manager.js
+          node --check app/src/local-tts-worker.js
+          python -m py_compile build-v1001/engine/lulu-clone-engine.py
           python build-v1001/test-v1001.py app
-          node --test app/src/online-voice-catalog.test.js app/src/text-processor.test.js
+          node --test app/src/clone-runtime-manager.test.js app/src/online-voice-catalog.test.js app/src/text-processor.test.js
           python build-v0342/test-preload-sandbox.py app
           node build-v0320/test-live-games.js app/src/live-games.js
           node build-v0330/test-automation-engine.js app/src/automation-engine.js
@@ -52,8 +56,7 @@ jobs:
           cd railway-relay
           npm test
 
-  release:
-    if: github.event_name != 'pull_request'
+  clone-engine:
     needs: validate
     runs-on: windows-latest
     steps:
@@ -61,6 +64,51 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Reconstruir la aplicación para la prueba de voz
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente 1.0.0 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1001/apply-v1001.py app
+          Set-Location app
+          npm ci --no-audit --no-fund
+      - name: Construir motor local opcional
+        shell: pwsh
+        run: ./build-v1001/engine/build-engine.ps1 -OutputZip "Lulu-Finity-Clone-Engine-1.0.1-win-x64.zip"
+      - name: Generar una frase nueva y clonar la voz
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          node build-v1001/engine/generate-base-audio.js app base-voice.wav
+          $runtime = Join-Path $env:RUNNER_TEMP "lulu-clone-smoke"
+          Expand-Archive "Lulu-Finity-Clone-Engine-1.0.1-win-x64.zip" -DestinationPath $runtime -Force
+          & "$runtime/python/python.exe" "$runtime/lulu-clone-engine.py" --config "$runtime/checkpoints_v2/converter/config.json" --checkpoint "$runtime/checkpoints_v2/converter/checkpoint.pth" --reference "app/resources/voices/lulu-official/reference.wav" --input "base-voice.wav" --output "official-voice-test.wav"
+          python -c "import wave; f=wave.open('official-voice-test.wav','rb'); assert f.getnchannels()==1 and f.getframerate()==22050 and f.getnframes()/f.getframerate()>1; print(f.getnframes()/f.getframerate())"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Clone-Engine-v1.0.1
+          path: Lulu-Finity-Clone-Engine-1.0.1-win-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: [validate, clone-engine]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: Lulu-Finity-Clone-Engine-v1.0.1
+          path: .
       - name: Reconstruir fuente 1.0.1
         shell: pwsh
         run: |
@@ -70,10 +118,21 @@ jobs:
           Expand-Archive base.zip -DestinationPath app -Force
           python build-v1001/apply-v1001.py app
           python build-v1001/test-v1001.py app
-          node --test app/src/online-voice-catalog.test.js app/src/text-processor.test.js
+          node --test app/src/clone-runtime-manager.test.js app/src/online-voice-catalog.test.js app/src/text-processor.test.js
           foreach ($file in @("app/resources/voices/lulu-es-mx/es_MX-ald-medium.onnx", "app/resources/voices/lulu-es-mx/tokens.txt", "app/resources/voices/lulu-es-mx/voice.json")) {
             if (!(Test-Path $file)) { throw "Falta $file" }
           }
+      - name: Firmar metadatos del motor opcional
+        shell: pwsh
+        run: |
+          $engine = "Lulu-Finity-Clone-Engine-1.0.1-win-x64.zip"
+          if (!(Test-Path $engine)) { throw "Falta el motor de clonación" }
+          $manifestPath = "app/resources/voices/lulu-official/voice.json"
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $manifest.engine.runtime.sha256 = (Get-FileHash $engine -Algorithm SHA256).Hash.ToLower()
+          $manifest.engine.runtime.bytes = (Get-Item $engine).Length
+          $manifest | ConvertTo-Json -Depth 8 | Set-Content $manifestPath -Encoding UTF8
+          if ($manifest.engine.runtime.sha256 -eq ("0" * 64) -or $manifest.engine.runtime.bytes -lt 1000000) { throw "Metadatos inválidos del motor" }
       - name: Crear fuente reproducible
         shell: pwsh
         run: |
@@ -109,16 +168,20 @@ jobs:
           $zip = "app/dist/Lulu-Finity-1.0.1-x64.zip"
           $latest = "app/dist/latest.yml"
           $blockmap = "app/dist/Lulu-Finity-Setup-1.0.1.exe.blockmap"
-          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.1.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          $cloneEngine = "Lulu-Finity-Clone-Engine-1.0.1-win-x64.zip"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.1.zip",$cloneEngine)) { if (!(Test-Path $file)) { throw "No se generó $file" } }
           if (!(Test-Path "app/dist/win-unpacked/resources/lulu-voices/lulu-es-mx/es_MX-ald-medium.onnx")) { throw "La voz local no entró al paquete" }
+          foreach ($file in @("app/dist/win-unpacked/resources/lulu-voices/lulu-official/voice.json", "app/dist/win-unpacked/resources/lulu-voices/lulu-official/reference.wav")) { if (!(Test-Path $file)) { throw "La Voz Oficial no entró al paquete: $file" } }
+          $voiceManifest = Get-Content "app/dist/win-unpacked/resources/lulu-voices/lulu-official/voice.json" -Raw
+          if ($voiceManifest.Contains('"sha256": "0000000000000000000000000000000000000000000000000000000000000000"')) { throw "La firma del motor no fue inyectada" }
           Expand-Archive $zip -DestinationPath verify -Force
           $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
           if (!$asar) { throw "Falta app.asar" }
           $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
-          foreach ($token in @("v1.0.1","Gratis online","online-voice-catalog-v1.json","prepareOnlineVoices","Cargando catálogo gratuito completo")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          foreach ($token in @("v1.0.1","Gratis online","online-voice-catalog-v1.json","prepareOnlineVoices","Cargando catálogo gratuito completo","tts:install-local-voice","Voz Oficial instalada")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
           if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
           $tag = "v1.0.1"
-          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.1.zip")
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.1.zip",$cloneEngine)
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 1.0.1" --notes-file "app/CHANGELOG.md" }
           else { gh release create $tag $files --target main --title "Lulu Finity 1.0.1" --notes-file "app/CHANGELOG.md" }
@@ -131,5 +194,6 @@ jobs:
             app/dist/latest.yml
             app/dist/Lulu-Finity-Setup-1.0.1.exe.blockmap
             Lulu-Finity-Source-1.0.1.zip
+            Lulu-Finity-Clone-Engine-1.0.1-win-x64.zip
           if-no-files-found: error
           retention-days: 30

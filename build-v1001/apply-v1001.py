@@ -45,6 +45,133 @@ for source in sorted((HERE / "files").rglob("*")):
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
 
+local_manager_path = ROOT / "src/local-voice-manager.js"
+local_manager = local_manager_path.read_text(encoding="utf-8")
+local_manager = replace_once(
+    local_manager,
+    "const AdmZip = require('adm-zip');\n",
+    "const AdmZip = require('adm-zip');\nconst { CloneRuntimeManager } = require('./clone-runtime-manager');\n",
+    "administrador del motor de clonación",
+)
+local_manager = replace_once(
+    local_manager,
+    "const ALLOWED_EXTENSIONS = new Set(['', '.json', '.onnx', '.txt', '.bin', '.fst', '.far', '.dat', '.md']);",
+    "const ALLOWED_EXTENSIONS = new Set(['', '.json', '.onnx', '.txt', '.bin', '.fst', '.far', '.dat', '.md', '.wav']);",
+    "muestra WAV permitida",
+)
+old_manifest = """  if (manifest.format !== 'lulu-local-v1' || manifest.type !== 'vits') throw new Error('La voz no usa el formato Lulu Local V1 (VITS/Piper).');
+  for (const key of ['model', 'tokens']) {
+    const file = safeInside(root, engine[key]);
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Falta ${key} en el paquete de voz.`);
+  }
+  const dataDir = safeInside(root, engine.dataDir || 'espeak-ng-data');
+  if (!fs.existsSync(dataDir) || !fs.statSync(dataDir).isDirectory()) throw new Error('Falta espeak-ng-data en el paquete de voz.');
+  return {
+    id,
+    name: String(manifest.name || id).slice(0, 80),
+    author: String(manifest.author || 'Voz local').slice(0, 80),
+    language: String(manifest.language || 'es-MX').slice(0, 20),
+    description: String(manifest.description || '').slice(0, 240),
+    type: 'vits',
+    format: 'lulu-local-v1',
+    sid: Math.max(0, Number(manifest.sid) || 0),
+    engine,
+    root,
+    bundled,
+    removable: !bundled
+  };
+"""
+new_manifest = """  const type = String(manifest.type || '');
+  const format = String(manifest.format || '');
+  if (type === 'vits' && format === 'lulu-local-v1') {
+    for (const key of ['model', 'tokens']) {
+      const file = safeInside(root, engine[key]);
+      if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Falta ${key} en el paquete de voz.`);
+    }
+    const dataDir = safeInside(root, engine.dataDir || 'espeak-ng-data');
+    if (!fs.existsSync(dataDir) || !fs.statSync(dataDir).isDirectory()) throw new Error('Falta espeak-ng-data en el paquete de voz.');
+  } else if (type === 'openvoice-v2' && format === 'lulu-local-v2') {
+    const reference = safeInside(root, engine.reference);
+    if (!fs.existsSync(reference) || !fs.statSync(reference).isFile()) throw new Error('Falta la muestra autorizada de la voz clonada.');
+    if (!engine.baseVoiceId || !engine.runtime) throw new Error('La voz clonada no define su motor local.');
+  } else {
+    throw new Error('La voz no usa un formato compatible con Lulu Local.');
+  }
+  return {
+    id,
+    name: String(manifest.name || id).slice(0, 80),
+    author: String(manifest.author || 'Voz local').slice(0, 80),
+    language: String(manifest.language || 'es-MX').slice(0, 20),
+    description: String(manifest.description || '').slice(0, 240),
+    type,
+    format,
+    sid: Math.max(0, Number(manifest.sid) || 0),
+    engine,
+    root,
+    bundled,
+    removable: !bundled
+  };
+"""
+local_manager = replace_once(local_manager, old_manifest, new_manifest, "formato de voz clonada")
+local_manager = replace_once(
+    local_manager,
+    "    this.workerPath = workerPath;\n    this.worker = null;",
+    "    this.workerPath = workerPath;\n    this.cloneRuntime = new CloneRuntimeManager({ app });\n    this.worker = null;",
+    "estado del motor opcional",
+)
+local_manager = replace_once(
+    local_manager,
+    "    return voices.map(({ root, engine, ...voice }) => voice);",
+    """    return voices.map((voice) => {
+      const runtime = voice.type === 'openvoice-v2'
+        ? this.cloneRuntime.status(voice)
+        : { installed: true, installable: false, installing: false, downloadBytes: 0 };
+      const { root: _root, engine: _engine, ...publicVoice } = voice;
+      return { ...publicVoice, ...runtime };
+    });""",
+    "estado público de voces locales",
+)
+old_synthesize_start = """  async synthesize(request = {}) {
+    const text = String(request.text || '').trim().slice(0, 500);
+    if (!text) throw new Error('No hay texto para leer.');
+    const voice = await this.resolve(request.voiceId || 'lulu-es-mx');
+    const requestId = randomUUID();
+"""
+new_synthesize_start = """  async install(id, onProgress) {
+    const voice = await this.resolve(id);
+    if (voice.type !== 'openvoice-v2') return { ok: true, installed: true, installable: false };
+    await this.release();
+    return this.cloneRuntime.install(voice, onProgress);
+  }
+
+  async synthesize(request = {}) {
+    const text = String(request.text || '').trim().slice(0, 500);
+    if (!text) throw new Error('No hay texto para leer.');
+    const voice = await this.resolve(request.voiceId || 'lulu-es-mx');
+    let baseVoice = null;
+    let runtime = null;
+    if (voice.type === 'openvoice-v2') {
+      runtime = this.cloneRuntime.runtimeFor(voice);
+      baseVoice = await this.resolve(voice.engine.baseVoiceId || 'lulu-es-mx');
+      if (baseVoice.type !== 'vits') throw new Error('La voz base de la clonación no está disponible.');
+    }
+    const requestId = randomUUID();
+"""
+local_manager = replace_once(local_manager, old_synthesize_start, new_synthesize_start, "instalación y síntesis clonada")
+local_manager = replace_once(
+    local_manager,
+    "      }, 90_000);",
+    "      }, voice.type === 'openvoice-v2' ? 240_000 : 90_000);",
+    "tiempo máximo de clonación",
+)
+local_manager = replace_once(
+    local_manager,
+    "        sid: request.sid,\n        voice\n",
+    "        sid: request.sid,\n        voice,\n        baseVoice,\n        runtime\n",
+    "datos del proceso de clonación",
+)
+local_manager_path.write_text(local_manager, encoding="utf-8", newline="\n")
+
 main_path = ROOT / "src/main.js"
 main = main_path.read_text(encoding="utf-8")
 main = replace_once(
@@ -132,6 +259,12 @@ main = replace_once(
     "ipcMain.handle('tts:list-online-voices', async (_event, options) => listOnlineVoices(options));",
     "IPC del catálogo",
 )
+main = replace_once(
+    main,
+    "ipcMain.handle('tts:import-local-voice', () => getLocalVoiceManager().importVoice(mainWindow));\n",
+    "ipcMain.handle('tts:import-local-voice', () => getLocalVoiceManager().importVoice(mainWindow));\nipcMain.handle('tts:install-local-voice', (event,id) => getLocalVoiceManager().install(id, (progress) => { if (!event.sender.isDestroyed()) event.sender.send('tts:local-install-progress', { id, ...progress }); }));\n",
+    "IPC para descargar el motor oficial",
+)
 main_path.write_text(main, encoding="utf-8", newline="\n")
 
 preload_path = ROOT / "src/preload.js"
@@ -141,6 +274,12 @@ preload = replace_once(
     "listOnlineVoices: () => ipcRenderer.invoke('tts:list-online-voices'),",
     "listOnlineVoices: (options = {}) => ipcRenderer.invoke('tts:list-online-voices', options),",
     "API del catálogo",
+)
+preload = replace_once(
+    preload,
+    "importLocalVoice: () => ipcRenderer.invoke('tts:import-local-voice'),\n",
+    "importLocalVoice: () => ipcRenderer.invoke('tts:import-local-voice'),\n  installLocalVoice: (id) => ipcRenderer.invoke('tts:install-local-voice', id),\n",
+    "API de instalación de voz oficial",
 )
 preload_path.write_text(preload, encoding="utf-8", newline="\n")
 
@@ -248,6 +387,30 @@ renderer = replace_once(
     "if (showToast) toast('Voces actualizadas', `${state.voices.length} de Windows y ${state.onlineVoices.length} gratuitas online.`, 'success');",
     "resumen de voces actualizado",
 )
+renderer = replace_once(
+    renderer,
+    "const localMatches=state.localVoices.filter((voice)=>(languageMatches(voice.language,filter)||`local:${voice.id}`===selected)&&(!search||normalizeText(`${voice.name} ${voice.language} ${voice.author}`).includes(search)||`local:${voice.id}`===selected));",
+    "const localMatches=state.localVoices.filter((voice)=>(voice.installed!==false||`local:${voice.id}`===selected)&&(languageMatches(voice.language,filter)||`local:${voice.id}`===selected)&&(!search||normalizeText(`${voice.name} ${voice.language} ${voice.author}`).includes(search)||`local:${voice.id}`===selected));",
+    "ocultar voces locales todavía no instaladas",
+)
+renderer = replace_once(
+    renderer,
+    "  $('localVoiceStatus').textContent=state.localVoices.length?`${state.localVoices.length} voz${state.localVoices.length===1?'':'es'} instalada${state.localVoices.length===1?'':'s'}.`:'No se encontró una voz local completa. Importa un paquete .lfvoice.';",
+    "  const installed=state.localVoices.filter((voice)=>voice.installed!==false).length;const optional=state.localVoices.length-installed;\n  $('localVoiceStatus').textContent=state.localVoices.length?`${installed} voz${installed===1?'':'es'} instalada${installed===1?'':'s'}${optional?` · ${optional} disponible para descargar`:''}.`:'No se encontró una voz local completa. Importa un paquete .lfvoice.';",
+    "estado de voces instaladas y opcionales",
+)
+renderer = replace_once(
+    renderer,
+    "  list.innerHTML=state.localVoices.length?state.localVoices.map((voice)=>`<div class=\"local-voice-card ${voice.id===selected&&state.settings.voiceMode==='local'?'active':''}\"><div class=\"local-voice-copy\"><strong>${escapeHtml(voice.name)}</strong><small>${escapeHtml(voice.language)} · ${escapeHtml(voice.author||'Voz local')}${voice.bundled?' · incluida':' · importada'}</small></div><div class=\"local-voice-actions\"><button class=\"secondary select-local-voice\" data-id=\"${escapeHtml(voice.id)}\">Usar</button><button class=\"ghost test-local-voice\" data-id=\"${escapeHtml(voice.id)}\">Probar</button>${voice.removable?`<button class=\"danger-outline remove-local-voice\" data-id=\"${escapeHtml(voice.id)}\">Eliminar</button>`:''}</div></div>`).join(''):'<div class=\"local-voice-card\"><div class=\"local-voice-copy\"><strong>Biblioteca vacía</strong><small>Importa una voz .lfvoice para comenzar.</small></div></div>';",
+    "  list.innerHTML=state.localVoices.length?state.localVoices.map((voice)=>`<div class=\"local-voice-card ${voice.id===selected&&state.settings.voiceMode==='local'?'active':''}\"><div class=\"local-voice-copy\"><strong>${escapeHtml(voice.name)}</strong><small>${escapeHtml(voice.language)} · ${escapeHtml(voice.author||'Voz local')}${voice.installable?(voice.installed?' · clonación instalada':' · descarga opcional'):(voice.bundled?' · incluida':' · importada')}</small>${voice.description?`<span>${escapeHtml(voice.description)}</span>`:''}</div><div class=\"local-voice-actions\">${voice.installable&&!voice.installed?`<button class=\"primary install-local-voice\" data-id=\"${escapeHtml(voice.id)}\">Descargar voz</button>`:`<button class=\"secondary select-local-voice\" data-id=\"${escapeHtml(voice.id)}\">Usar</button><button class=\"ghost test-local-voice\" data-id=\"${escapeHtml(voice.id)}\">Probar</button>`}${voice.removable?`<button class=\"danger-outline remove-local-voice\" data-id=\"${escapeHtml(voice.id)}\">Eliminar</button>`:''}</div></div>`).join(''):'<div class=\"local-voice-card\"><div class=\"local-voice-copy\"><strong>Biblioteca vacía</strong><small>Importa una voz .lfvoice para comenzar.</small></div></div>';",
+    "tarjeta de la Voz Oficial",
+)
+renderer = replace_once(
+    renderer,
+    "  qsa('.test-local-voice').forEach((button)=>button.addEventListener('click',()=>speakText($('voiceTestInput')?.value.trim()||'Hola, esta es una prueba de Lulu Local.',false,null,{mode:'local',localVoiceId:button.dataset.id},{lockKey:`test-local:${button.dataset.id}`,label:'Prueba Lulu Local'})));\n",
+    "  qsa('.test-local-voice').forEach((button)=>button.addEventListener('click',()=>speakText($('voiceTestInput')?.value.trim()||'Hola, esta es una prueba de Lulu Local.',false,null,{mode:'local',localVoiceId:button.dataset.id},{lockKey:`test-local:${button.dataset.id}`,label:'Prueba Lulu Local'})));\n  qsa('.install-local-voice').forEach((button)=>button.addEventListener('click',async()=>{button.disabled=true;button.textContent='Descargando…';$('localVoiceStatus').textContent='Descargando y verificando el motor local. Puede tardar varios minutos…';try{await api.installLocalVoice(button.dataset.id);await loadLocalVoices();state.settings.voiceMode='local';state.settings.localVoiceId=button.dataset.id;renderVoiceOptions();renderLocalVoices();scheduleSave();toast('Voz Oficial instalada','Ya funciona sin Internet.','success');}catch(error){button.disabled=false;button.textContent='Reintentar descarga';toast('No se pudo instalar la voz',error.message||String(error),'error');await loadLocalVoices();}}));\n",
+    "botón para instalar la Voz Oficial",
+)
 renderer_path.write_text(renderer, encoding="utf-8", newline="\n")
 
 html_path = ROOT / "src/index.html"
@@ -265,7 +428,19 @@ html = replace_once(
     '<div class="voice-provider-status" id="voiceProviderStatus"><span class="status-light connecting"></span><span>Cargando catálogo gratuito completo…</span></div>',
     "estado inicial de voces",
 )
+html = replace_once(
+    html,
+    '<div class="tts-section-pane" data-tts-pane="local"><div class="local-voice-layout"><article class="panel settings-card wide"><div class="panel-header"><div><h3>Biblioteca Lulu Local</h3><p class="hint">Funciona sin Internet. El motor se libera cuando deja de usarse.</p></div><button class="primary" id="localVoiceImportBtn">Importar .lfvoice</button></div><div class="local-voice-status" id="localVoiceStatus">Buscando voces instaladas…</div><div class="local-voice-list" id="localVoiceList"></div></article><article class="panel settings-card"><h3>Paquetes de voz</h3><p>Un archivo <strong>.lfvoice</strong> contiene un modelo VITS/Piper, sus tokens y datos de pronunciación.</p><p class="hint">Las voces importadas se validan y se guardan sólo en tu equipo.</p></article></div></div>',
+    '<div class="tts-section-pane" data-tts-pane="local"><div class="local-voice-layout"><article class="panel settings-card wide"><div class="panel-header"><div><h3>Biblioteca Lulu Local</h3><p class="hint">Funciona sin Internet. El motor se libera cuando deja de usarse.</p></div><button class="primary" id="localVoiceImportBtn">Importar .lfvoice</button></div><div class="local-voice-status" id="localVoiceStatus">Buscando voces instaladas…</div><div class="local-voice-list" id="localVoiceList"></div></article><article class="panel settings-card"><h3>Paquetes de voz</h3><p>La <strong>Voz Oficial De Lulu Finity</strong> usa clonación local y descarga su motor sólo al instalarla.</p><p>Un archivo <strong>.lfvoice</strong> contiene un modelo VITS/Piper, sus tokens y datos de pronunciación.</p><p class="hint">Las voces importadas se validan y se guardan sólo en tu equipo.</p></article></div></div>',
+    "explicación de la Voz Oficial",
+)
 html_path.write_text(html, encoding="utf-8", newline="\n")
+
+styles_path = ROOT / "src/styles.css"
+styles = styles_path.read_text(encoding="utf-8")
+if ".local-voice-copy > span" not in styles:
+    styles += "\n.local-voice-copy > span{display:block;margin-top:5px;max-width:680px;color:var(--muted);font-size:.78rem;line-height:1.45}\n"
+styles_path.write_text(styles, encoding="utf-8", newline="\n")
 
 changelog_path = ROOT / "CHANGELOG.md"
 changelog = changelog_path.read_text(encoding="utf-8") if changelog_path.exists() else "# Cambios\n\n"
@@ -277,6 +452,8 @@ entry = """## 1.0.1
 - Guarda el último catálogo válido y amplía la lista de respaldo para funcionar ante fallos temporales.
 - Omite voces CJK del catálogo, de acuerdo con el filtro de lectura inteligente de Lulu Finity.
 - Conserva Lulu Local y todas las voces instaladas de Windows.
+- Añade la **Voz Oficial De Lulu Finity**, creada con una muestra autorizada y un motor de clonación local que se descarga sólo cuando se instala.
+- Mantiene el instalador ligero: el motor OpenVoice V2 se verifica por SHA-256 y se obtiene desde la Release oficial.
 
 """
 if "## 1.0.1" not in changelog:
@@ -289,5 +466,17 @@ readme_path = ROOT / "README.md"
 if readme_path.exists():
     readme = readme_path.read_text(encoding="utf-8").replace("1.0.0", "1.0.1")
     readme_path.write_text(readme, encoding="utf-8", newline="\n")
+
+notice_path = ROOT / "NOTICE.md"
+notice = notice_path.read_text(encoding="utf-8") if notice_path.exists() else "# Avisos de terceros\n"
+openvoice_notice = """
+
+## OpenVoice V2
+
+La descarga opcional de la Voz Oficial usa OpenVoice V2 de MyShell/MIT, distribuido bajo licencia MIT. El motor y su licencia completa se entregan en un archivo separado de la Release.
+"""
+if "## OpenVoice V2" not in notice:
+    notice += openvoice_notice
+notice_path.write_text(notice, encoding="utf-8", newline="\n")
 
 print("Lulu Finity 1.0.1: catálogo gratuito completo y carga de voces corregidos")

@@ -1,0 +1,23 @@
+{
+  "format": "lulu-local-v2",
+  "type": "openvoice-v2",
+  "id": "lulu-official",
+  "name": "Voz Oficial De Lulu Finity",
+  "author": "Lulu Finity",
+  "language": "es-MX",
+  "description": "Voz oficial clonada con autorización de su propietaria. Funciona localmente después de descargar el motor opcional.",
+  "engine": {
+    "baseVoiceId": "lulu-es-mx",
+    "reference": "reference.wav",
+    "runtime": {
+      "version": "openvoice-v2-2024-04",
+      "url": "https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.0.1/Lulu-Finity-Clone-Engine-1.0.1-win-x64.zip",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "bytes": 0,
+      "executable": "python/python.exe",
+      "script": "lulu-clone-engine.py",
+      "config": "checkpoints_v2/converter/config.json",
+      "checkpoint": "checkpoints_v2/converter/checkpoint.pth"
+    }
+  }
+}
