@@ -1,0 +1,157 @@
+name: Lulu Finity 0.34.2
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v0342/**"
+      - ".github/workflows/v0342.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v0342/**"
+      - ".github/workflows/v0342.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Descargar fuente 0.34.1
+        run: |
+          curl --fail --location --silent --show-error https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.34.1/Lulu-Finity-Source-0.34.1.zip -o base.zip
+          echo "50aab2872fcfabdc9a6b7f0d94364278cb45419a717a9f0f2b2a145d3810d69a  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+      - name: Aplicar hotfix 0.34.2
+        run: python build-v0342/apply-v0342.py app
+      - name: Validar preload sandbox y sintaxis
+        run: |
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/live-games.js
+          node --check app/src/automation-engine.js
+          python build-v0342/test-preload-sandbox.py app
+          python build-v0341/test-network-startup.py app
+          node build-v0320/test-live-games.js app/src/live-games.js
+          node build-v0330/test-automation-engine.js app/src/automation-engine.js
+      - name: Validar dependencias y relay
+        run: |
+          cd app
+          npm install --ignore-scripts --no-audit --no-fund
+          npm ls @ghostery/adblocker-electron edge-tts-universal --depth=0
+          cd railway-relay
+          npm test
+      - name: Regresiones de interfaz
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          h=Path('app/src/index.html').read_text(encoding='utf-8')
+          r=Path('app/src/renderer.js').read_text(encoding='utf-8')
+          s=Path('app/src/styles.css').read_text(encoding='utf-8')
+          m=Path('app/src/main.js').read_text(encoding='utf-8')
+          p=Path('app/src/preload.js').read_text(encoding='utf-8')
+          pkg=json.loads(Path('app/package.json').read_text(encoding='utf-8'))
+          assert pkg['version']=='0.34.2'
+          for token in ('Voz TTS','Música','Automatizaciones','Juegos del LIVE','Economía'):
+              assert token in h, token
+          for theme in ('studio-lavender','studio-pink','studio-mint'):
+              assert theme in h and theme in r and theme in s
+          for asset in ('miku-dark-user.png','miku-soft-user.png','miku-classic-user.jpg'):
+              assert (Path('app/src')/asset).stat().st_size > 100_000
+          assert 'persist:lulu-youtube' in m
+          assert "session.fromPartition(YOUTUBE_PARTITION)" in m
+          assert 'session.defaultSession.webRequest' not in m
+          assert "require('./automation-engine')" not in p
+          assert "ipcMain.handle('automations:evaluate'" in m
+          assert "ipcRenderer.invoke('automations:evaluate'" in p
+          assert '<span class="version" id="versionLabel">v0.34.2</span>' in h
+          PY
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir 0.34.2
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri "https://github.com/Mikasita25/Lulu-Finity/releases/download/v0.34.1/Lulu-Finity-Source-0.34.1.zip" -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne "50aab2872fcfabdc9a6b7f0d94364278cb45419a717a9f0f2b2a145d3810d69a") { throw "Fuente 0.34.1 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v0342/apply-v0342.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          python build-v0342/test-preload-sandbox.py app
+          python build-v0341/test-network-startup.py app
+          node build-v0320/test-live-games.js app/src/live-games.js
+          node build-v0330/test-automation-engine.js app/src/automation-engine.js
+          Push-Location app/railway-relay; npm test; if ($LASTEXITCODE -ne 0) { throw "Falló relay" }; Pop-Location
+          New-Item -ItemType Directory source-v0342 -Force | Out-Null
+          foreach ($file in @("package.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v0342/$file" -Force } }
+          foreach ($folder in @("src","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v0342/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v0342/*" -DestinationPath "Lulu-Finity-Source-0.34.2.zip" -Force
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:win -- --publish never
+      - name: Verificar y publicar 0.34.2
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-0.34.2.exe"
+          $zip = "app/dist/Lulu-Finity-0.34.2-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-0.34.2.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.34.2.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @("studio-lavender","studioDashboard","miku-dark-user.png","v0.34.2","currentOverlayTunnelInfo","automations:evaluate","goals:apply-event","gifts:update-stats","Juegos del LIVE","Automatizaciones")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
+          $tag = "v0.34.2"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-0.34.2.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 0.34.2" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 0.34.2" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v0.34.2
+          path: |
+            app/dist/Lulu-Finity-Setup-0.34.2.exe
+            app/dist/Lulu-Finity-0.34.2-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-0.34.2.exe.blockmap
+            Lulu-Finity-Source-0.34.2.zip
+          if-no-files-found: error
+          retention-days: 30
