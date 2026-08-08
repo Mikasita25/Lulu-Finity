@@ -60,6 +60,9 @@ for token in (
     "scheduleYoutubeResolverRelease",
     "setYoutubeVolume",
     "setSpotifyVolume",
+    "runtimeProcessUsage",
+    "totalMemoryMb",
+    "workingSetSize",
 ):
     assert token in main, token
 for token in ("TIKTOK_TTS_ENDPOINTS", "requestTikTokSpeech", "text_speaker", "sessionid="):
@@ -69,6 +72,11 @@ for token in ("listTikTokVoices", "synthesizeTikTokVoice", "listOnlineVoices", "
     assert token in preload, token
 for token in ("TikTok · ${category}", "tiktok:${voice.id}", "Microsoft online", "online:${voice.shortName}", "loadOnlineVoices", "Voz de TikTok no disponible", "Voz Microsoft no disponible", "privacyResetTikTokBtn"):
     assert token in renderer, token
+for token in ("RAM total de Lulu", "Solo núcleo", "Desglose real aproximado", "No son ocho copias de Lulu"):
+    assert token in renderer, token
+assert 'id="runtimeBreakdown"' in html
+for token in (".runtime-breakdown-list", ".runtime-process-note", ".runtime-stat-total"):
+    assert token in styles, token
 for voice_id in ("es_mx_002", "en_us_002", "en_us_stitch", "en_us_stormtrooper", "en_us_c3po"):
     assert voice_id in catalog, voice_id
 
@@ -121,6 +129,9 @@ for forbidden in ("loadLocalVoices(", "loadSystemVoices(", "publishAutomationWid
 
 assert "economy: null" in main
 assert "localTts:localVoiceManager?" in main
+assert "Math.round(workingSetKb/1024)" in main
+assert "memoryMb:usage.totalMemoryMb" in main
+assert "process.getProcessMemoryInfo()" not in main
 assert "if (!activeRuntimeModules.has('rankings') && rankingClientCount() === 0) return;" in main
 assert "!state.loadedPages.has('automations')" in renderer
 assert "if(!hasActiveAudioActivity())return" in renderer
