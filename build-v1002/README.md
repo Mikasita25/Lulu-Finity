@@ -12,6 +12,7 @@ Hotfix de TTS, seguridad de cuenta e interfaz para la fuente reproducible 1.0.1.
 - Carga cada módulo y catálogo bajo demanda: el arranque no importa voces ni crea reproductores, TTS, overlays, rankings, economía, juegos o automatizaciones.
 - En modo de uso musical solo conserva el proveedor elegido; el buscador temporal de YouTube se libera al terminar.
 - Expone en Rendimiento qué módulos se han activado sin despertarlos para consultar su estado.
+- Mide la RAM total de todos los procesos agrupados por Windows y la desglosa por núcleo, interfaz, proveedor musical, gráficos y servicios auxiliares; ya no presenta la memoria del proceso principal como si fuera la app completa.
 
 ```bash
 python build-v1002/apply-v1002.py app
