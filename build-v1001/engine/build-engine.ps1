@@ -36,6 +36,10 @@ $ApiPath = Join-Path $SitePackages "openvoice/api.py"
 $Api = Get-Content $ApiPath -Raw
 $Api = $Api.Replace("from openvoice.text import text_to_sequence`n", "")
 $Api = $Api.Replace("from openvoice.text import text_to_sequence`r`n", "")
+$WatermarkPattern = "        super\(\).__init__\(\*args, \*\*kwargs\)\r?\n\r?\n        if kwargs\.get\('enable_watermark', True\):"
+$WatermarkReplacement = "        enable_watermark = kwargs.pop('enable_watermark', True)`n        super().__init__(*args, **kwargs)`n`n        if enable_watermark:"
+$Api = $Api -replace $WatermarkPattern, $WatermarkReplacement
+if (!$Api.Contains("enable_watermark = kwargs.pop")) { throw "No se pudo aplicar el parche de marca de agua de OpenVoice." }
 [IO.File]::WriteAllText($ApiPath, $Api, [Text.UTF8Encoding]::new($false))
 
 $ConverterRoot = Join-Path $Runtime "checkpoints_v2/converter"
