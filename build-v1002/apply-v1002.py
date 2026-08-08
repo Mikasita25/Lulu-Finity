@@ -409,6 +409,64 @@ main = replace_once(
     "  youtubeResolverWindow=null;\n  const settings={...DEFAULT_SETTINGS,...(await readJson(getDataPaths().settings,DEFAULT_SETTINGS))};\n  releaseInactiveMusicProvider(settings.musicProvider);\n  return {ok:true};",
     "liberar proveedor musical inactivo",
 )
+runtime_status_old = """ipcMain.handle('runtime:status', async () => ({
+  activePage:activeRendererPage,
+  memoryMb:Math.round((await process.getProcessMemoryInfo()).private/1024),
+  processes:app.getAppMetrics().length,
+  modules:{
+    live:Boolean(liveConnection), localTts:localVoiceManager?{loaded:true,...localVoiceManager.status()}:{loaded:false,running:false,pid:null,pending:0,lastUsedAt:0},
+    youtube:Boolean(youtubeWindow&&!youtubeWindow.isDestroyed()), spotify:Boolean(spotifyWindow&&!spotifyWindow.isDestroyed()),
+    overlayServer:Boolean(overlayServer), overlayClients:overlayClientCount()+rankingClientCount()+streamWidgetClientCount(),
+    gamesLoaded:Boolean(liveGameManager), automationsLoaded:Boolean(automationEngine), active:[...activeRuntimeModules]
+  }
+}));"""
+runtime_status_new = r'''function runtimeWindowPid(win){
+  if(!win||win.isDestroyed())return 0;
+  try{return Number(win.webContents?.getOSProcessId?.()||win.webContents?.mainFrame?.processId||0);}catch{return 0;}
+}
+
+function runtimeProcessUsage(){
+  const roleByPid=new Map([[Number(process.pid),'Núcleo']]);
+  for(const [label,win] of [['Interfaz',mainWindow],['Spotify',spotifyWindow],['YouTube',youtubeWindow],['Buscador de YouTube',youtubeResolverWindow],['Cuenta TikTok',tiktokChatWindow]]){
+    const pid=runtimeWindowPid(win);if(pid)roleByPid.set(pid,label);
+  }
+  const fallbackRole=(type)=>({Browser:'Núcleo',GPU:'Gráficos',Utility:'Servicios de Electron',Tab:'Renderizadores auxiliares','Zygote':'Servicios de Electron','Sandbox helper':'Servicios de Electron'}[String(type)]||'Otros procesos');
+  const metrics=app.getAppMetrics();
+  const totals=new Map();
+  let workingSetKb=0;let privateKb=0;
+  for(const metric of metrics){
+    const memory=metric?.memory||{};
+    const working=Math.max(0,Number(memory.workingSetSize)||0);
+    const privateBytes=Math.max(0,Number(memory.privateBytes)||0);
+    const role=roleByPid.get(Number(metric?.pid))||fallbackRole(metric?.type);
+    workingSetKb+=working;privateKb+=privateBytes;
+    totals.set(role,(totals.get(role)||0)+working);
+  }
+  const breakdown=[...totals.entries()].map(([label,kb])=>({label,memoryMb:Math.round(kb/1024)})).filter((item)=>item.memoryMb>0).sort((a,b)=>b.memoryMb-a.memoryMb);
+  return{
+    totalMemoryMb:Math.round(workingSetKb/1024),
+    privateMemoryMb:Math.round(privateKb/1024),
+    mainMemoryMb:breakdown.find((item)=>item.label==='Núcleo')?.memoryMb||0,
+    processes:metrics.length,
+    breakdown
+  };
+}
+
+ipcMain.handle('runtime:status', async () => {
+  const usage=runtimeProcessUsage();
+  return{
+    activePage:activeRendererPage,
+    memoryMb:usage.totalMemoryMb,
+    ...usage,
+    modules:{
+      live:Boolean(liveConnection), localTts:localVoiceManager?{loaded:true,...localVoiceManager.status()}:{loaded:false,running:false,pid:null,pending:0,lastUsedAt:0},
+      youtube:Boolean(youtubeWindow&&!youtubeWindow.isDestroyed()), spotify:Boolean(spotifyWindow&&!spotifyWindow.isDestroyed()),
+      overlayServer:Boolean(overlayServer), overlayClients:overlayClientCount()+rankingClientCount()+streamWidgetClientCount(),
+      gamesLoaded:Boolean(liveGameManager), automationsLoaded:Boolean(automationEngine), active:[...activeRuntimeModules]
+    }
+  };
+});'''
+main = replace_once(main, runtime_status_old, runtime_status_new, "memoria total de todos los procesos")
 main = replace_once(main, "ipcMain.handle('automations:evaluate', async (_event, details = {}) => automationEngine.evaluateAutomations(details.rules, details.event, details.context));", "ipcMain.handle('automations:evaluate', async (_event, details = {}) => getAutomationEngine().evaluateAutomations(details.rules, details.event, details.context));", "evaluador automático diferido")
 main = replace_once(main, "ipcMain.handle('goals:apply-event', async (_event, details = {}) => automationEngine.applyGoalEvent(details.goals, details.event));", "ipcMain.handle('goals:apply-event', async (_event, details = {}) => getAutomationEngine().applyGoalEvent(details.goals, details.event));", "metas diferidas")
 main = replace_once(main, "ipcMain.handle('goals:reset', async (_event, details = {}) => automationEngine.resetGoal(details.goals, details.goalId));", "ipcMain.handle('goals:reset', async (_event, details = {}) => getAutomationEngine().resetGoal(details.goals, details.goalId));", "reinicio de metas diferido")
@@ -432,6 +490,12 @@ html_path = ROOT / "src/index.html"
 html = html_path.read_text(encoding="utf-8")
 html = replace_once(html, 'id="versionLabel">v1.0.1', 'id="versionLabel">v1.0.2', "versión de la barra")
 html = replace_once(html, 'id="updateVersionBadge">v1.0.1', 'id="updateVersionBadge">v1.0.2', "versión de actualizaciones")
+html = replace_once(
+    html,
+    '<div class="runtime-modules" id="runtimeModules"></div></article>',
+    '<div class="runtime-modules" id="runtimeModules"></div><div class="runtime-breakdown" id="runtimeBreakdown"></div></article>',
+    "desglose de procesos en Rendimiento",
+)
 html = replace_once(
     html,
     '<div class="page-heading simple"><div><h1>TTS y voces</h1><p>Voz local, reglas de lectura y permisos en un solo lugar.</p></div></div>',
@@ -813,6 +877,9 @@ renderer = replace_once(
     "  $('songQueueStat').textContent = `${activeMusicProvider() === 'spotify' ? state.spotifyQueue.length : state.songQueue.length} en cola`;\n  renderStudioDashboard();\n  scheduleAudioActivityIndicators();\n}",
     "indicadores guiados por cambios",
 )
+runtime_renderer = r'''async function refreshRuntimeStatus(){if(!$('runtimeStats'))return;try{const runtime=await api.getRuntimeStatus();const total=Number(runtime.totalMemoryMb??runtime.memoryMb??0);$('runtimeStats').innerHTML=`<div class="runtime-stat runtime-stat-total"><strong>${total} MB</strong><span>RAM total de Lulu</span></div><div class="runtime-stat"><strong>${Number(runtime.mainMemoryMb||0)} MB</strong><span>Solo núcleo</span></div><div class="runtime-stat"><strong>${Number(runtime.processes||0)}</strong><span>Procesos protegidos</span></div><div class="runtime-stat"><strong>${Number(runtime.modules?.overlayClients||0)}</strong><span>Fuentes en pantalla</span></div>`;const breakdown=Array.isArray(runtime.breakdown)?runtime.breakdown:[];if($('runtimeBreakdown'))$('runtimeBreakdown').innerHTML=breakdown.length?`<div class="runtime-breakdown-title"><strong>Desglose real aproximado</strong><span>La suma incluye todos los procesos que Windows agrupa como Lulu Finity.</span></div><div class="runtime-breakdown-list">${breakdown.map((item)=>`<div><span>${escapeHtml(item.label||'Otro proceso')}</span><strong>${Number(item.memoryMb||0)} MB</strong></div>`).join('')}</div><p class="runtime-process-note">Electron separa interfaz, reproductor, gráficos y servicios para mantener el aislamiento. No son ocho copias de Lulu. Spotify Web puede usar varios de estos procesos mientras reproduce.</p>`:'';const modules=[['LIVE',runtime.modules?.live],['Lulu Local',runtime.modules?.localTts?.running],['YouTube',runtime.modules?.youtube],['Spotify',runtime.modules?.spotify],['Overlays',runtime.modules?.overlayServer],['Rankings',runtime.modules?.active?.includes('rankings')],['Automatizaciones',runtime.modules?.automationsLoaded],['Juegos',runtime.modules?.gamesLoaded],['Economía',runtime.modules?.active?.includes('economy')]];$('runtimeModules').innerHTML=modules.map(([label,on])=>`<span class="runtime-module ${on?'live':''}">${label} · ${on?'activo':'en espera'}</span>`).join('');}catch(error){$('runtimeStats').textContent=error.message||String(error);}}
+'''
+renderer = replace_between(renderer, "async function refreshRuntimeStatus()", "function scheduleRuntimeMonitor", runtime_renderer, "panel de memoria total y desglose")
 renderer_path.write_text(renderer, encoding="utf-8")
 
 styles_path = ROOT / "src/styles.css"
@@ -831,8 +898,9 @@ html,body{min-width:0;min-height:0}
 .modal-backdrop{overflow-y:auto;padding:20px;overscroll-behavior:contain}
 .modal-card{max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;margin:auto;overscroll-behavior:contain}
 .feature-search-results{max-height:min(340px,calc(100dvh - 140px))}
+.runtime-stat-total{border-color:rgba(81,231,146,.32);background:linear-gradient(135deg,rgba(42,122,83,.2),rgba(255,255,255,.03))}.runtime-breakdown{margin-top:14px}.runtime-breakdown-title{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:8px}.runtime-breakdown-title strong,.runtime-breakdown-title span{display:block}.runtime-breakdown-title strong{font-size:12px}.runtime-breakdown-title span{color:var(--muted);font-size:9px;text-align:right}.runtime-breakdown-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.runtime-breakdown-list>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.025);font-size:10px}.runtime-breakdown-list span{color:var(--muted)}.runtime-breakdown-list strong{color:#fff}.runtime-process-note{margin:10px 0 0;padding:10px 12px;border-left:3px solid var(--purple);border-radius:0 8px 8px 0;background:rgba(169,124,255,.07);color:var(--muted);font-size:10px;line-height:1.5}
 .secure-account-card{overflow:hidden}.official-domain-banner{display:flex;align-items:center;gap:12px;margin:14px 0;padding:14px 16px;border:1px solid rgba(81,231,146,.3);border-radius:12px;background:linear-gradient(100deg,rgba(42,122,83,.2),rgba(255,255,255,.025))}.domain-lock{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:rgba(81,231,146,.14)}.official-domain-banner div{min-width:0;flex:1}.official-domain-banner strong,.official-domain-banner small{display:block}.official-domain-banner strong{color:#9df2bd;word-break:break-all}.official-domain-banner strong.untrusted{color:#ff9bb0}.official-domain-banner small{margin-top:4px;color:var(--muted);font-size:10px}.verified-pill{padding:5px 8px;border-radius:999px;background:rgba(81,231,146,.13);color:#8aefb2;font-size:9px;font-weight:800;letter-spacing:.5px}.tiktok-trust-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.trust-item{display:flex;gap:10px;padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.025)}.trust-item>span{width:24px;height:24px;flex:none;display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,#ff82b8,#a97cff);font-size:11px;font-weight:800}.trust-item strong,.trust-item small{display:block}.trust-item strong{font-size:12px}.trust-item small{margin-top:5px;color:var(--muted);font-size:10px;line-height:1.45}.account-independence-note{margin:14px 0 0;padding:11px 13px;border-left:3px solid var(--purple);border-radius:0 9px 9px 0;background:rgba(169,124,255,.08);color:#ddd0e5;font-size:11px;line-height:1.55}.account-privacy-card{gap:0}.privacy-intro{display:flex;align-items:center;gap:13px;margin-bottom:15px}.privacy-intro h3,.privacy-intro p{margin:0}.privacy-intro p{margin-top:5px;color:var(--muted);font-size:11px;line-height:1.55}.privacy-shield{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:13px;background:linear-gradient(135deg,rgba(255,130,184,.18),rgba(169,124,255,.18));font-size:19px}.privacy-section-label{display:block;margin-bottom:7px;color:#d8b4ff;font-size:9px;font-weight:900;letter-spacing:.9px}.privacy-server-explainer,.privacy-direct-connections,.privacy-local-session{margin-top:12px;padding:16px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.025)}.privacy-server-explainer{border-color:rgba(81,231,146,.23);background:linear-gradient(120deg,rgba(42,122,83,.13),rgba(255,255,255,.025))}.account-privacy-card h4{margin:0;color:#fff;font-size:14px}.account-privacy-card section>p{margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.65}.account-privacy-card section>p strong{color:#e8dff0}.websocket-flow{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:14px;padding:11px;border-radius:10px;background:rgba(7,10,17,.28);font-size:10px}.websocket-flow span{padding:7px 9px;border:1px solid rgba(81,231,146,.2);border-radius:8px;color:#a5f4c1;font-weight:800}.websocket-flow i{color:var(--muted);font-style:normal}.privacy-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.privacy-detail-card{padding:16px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.025)}.privacy-detail-card.safe{border-color:rgba(81,231,146,.17)}.privacy-detail-card.blocked{border-color:rgba(255,109,140,.17)}.privacy-detail-card ul{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:10px;line-height:1.65}.privacy-detail-card li+li{margin-top:5px}.privacy-detail-card p{margin:10px 0 0;color:#cfc4d5;font-size:10px;line-height:1.6}.privacy-detail-card code{padding:1px 4px;border-radius:4px;background:rgba(255,255,255,.07);color:#ffc4dc}.privacy-connection-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:11px}.privacy-connection-list>div{padding:12px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(0,0,0,.1)}.privacy-connection-list strong,.privacy-connection-list span{display:block}.privacy-connection-list strong{font-size:11px;color:#ffb3d3}.privacy-connection-list span{margin-top:5px;color:var(--muted);font-size:10px;line-height:1.5}.privacy-delete-box{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px;padding:14px;border:1px solid rgba(255,109,140,.2);border-radius:11px;background:rgba(255,82,116,.045)}.privacy-delete-box strong,.privacy-delete-box span{display:block}.privacy-delete-box span{margin-top:5px;color:var(--muted);font-size:10px;line-height:1.45}.privacy-delete-box button{flex:none}
-@media(max-width:980px){.tiktok-trust-grid,.privacy-detail-grid,.privacy-connection-list{grid-template-columns:1fr}.official-domain-banner{align-items:flex-start;flex-wrap:wrap}.verified-pill{margin-left:46px}.privacy-delete-box{align-items:stretch;flex-direction:column}.websocket-flow{align-items:stretch;flex-direction:column;text-align:center}}
+@media(max-width:980px){.tiktok-trust-grid,.privacy-detail-grid,.privacy-connection-list,.runtime-breakdown-list{grid-template-columns:1fr}.official-domain-banner{align-items:flex-start;flex-wrap:wrap}.verified-pill{margin-left:46px}.privacy-delete-box{align-items:stretch;flex-direction:column}.websocket-flow{align-items:stretch;flex-direction:column;text-align:center}.runtime-breakdown-title{align-items:flex-start;flex-direction:column}.runtime-breakdown-title span{text-align:left}}
 @media(max-height:720px){.main-content{padding-top:16px;padding-bottom:24px}.sidebar{padding-top:12px;padding-bottom:10px}.logo-wrap{padding-bottom:9px}.feature-search{margin-bottom:8px}.nav-list{gap:8px}.sidebar-bottom{margin-top:5px}}
 """
 styles_path.write_text(styles, encoding="utf-8")
@@ -860,6 +928,7 @@ entry = """# Cambios
 - Permite desplazarse verticalmente por todas las funciones cuando la ventana no está maximizada.
 - Añade carga bajo demanda: al iniciar no abre YouTube/Spotify, TTS, rankings, overlays, juegos, economía ni automatizaciones; en Música solo permanece el proveedor elegido.
 - Libera el buscador temporal de YouTube después de resolver una canción y cierra el proveedor musical inactivo al cambiar de servicio.
+- Corrige Rendimiento para sumar todos los procesos de Lulu, igual que el grupo del Administrador de tareas, y muestra el consumo separado de la interfaz, Spotify/YouTube, gráficos y servicios de Electron.
 
 """
 if "## 1.0.2" not in changelog:
