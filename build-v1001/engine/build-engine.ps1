@@ -5,6 +5,8 @@ param(
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
 $OpenVoiceCommit = "74a1d147b17a8c3092dd5430504bd83ef6c7eb23"
+$OpenVoiceModelCommit = "fd981100305a0e4291f93a9ad169c6d9f7bed54a"
+$OpenVoiceCheckpointSha256 = "9652c27e92b6b2a91632590ac9962ef7ae2b712e5c5b7f4c34ec55ee2b37ab9e"
 $PythonVersion = "3.9.13"
 $Work = Join-Path $env:RUNNER_TEMP "lulu-clone-engine"
 $Runtime = Join-Path $Work "runtime"
@@ -36,23 +38,26 @@ $Api = $Api.Replace("from openvoice.text import text_to_sequence`n", "")
 $Api = $Api.Replace("from openvoice.text import text_to_sequence`r`n", "")
 [IO.File]::WriteAllText($ApiPath, $Api, [Text.UTF8Encoding]::new($false))
 
-$CheckpointArchive = Join-Path $Work "openvoice-v2.zip"
-Invoke-WebRequest "https://myshell-public-repo-host.s3.amazonaws.com/openvoice/checkpoints_v2_0417.zip" -OutFile $CheckpointArchive
-$CheckpointRoot = Join-Path $Work "checkpoint-source"
-Expand-Archive $CheckpointArchive -DestinationPath $CheckpointRoot -Force
-$Checkpoint = Get-ChildItem $CheckpointRoot -Recurse -Filter "checkpoint.pth" | Where-Object { $_.Directory.Name -eq "converter" } | Select-Object -First 1
-$Config = Get-ChildItem $CheckpointRoot -Recurse -Filter "config.json" | Where-Object { $_.Directory.Name -eq "converter" } | Select-Object -First 1
-if (!$Checkpoint -or !$Config) { throw "El paquete oficial de OpenVoice V2 no contiene el conversor esperado." }
 $ConverterRoot = Join-Path $Runtime "checkpoints_v2/converter"
 New-Item -ItemType Directory $ConverterRoot -Force | Out-Null
-Copy-Item $Checkpoint.FullName (Join-Path $ConverterRoot "checkpoint.pth") -Force
-Copy-Item $Config.FullName (Join-Path $ConverterRoot "config.json") -Force
+$Checkpoint = Join-Path $ConverterRoot "checkpoint.pth"
+$Config = Join-Path $ConverterRoot "config.json"
+$ModelBase = "https://huggingface.co/myshell-ai/OpenVoiceV2/resolve/$OpenVoiceModelCommit/converter"
+Invoke-WebRequest "$ModelBase/checkpoint.pth?download=true" -OutFile $Checkpoint
+Invoke-WebRequest "$ModelBase/config.json?download=true" -OutFile $Config
+if ((Get-FileHash $Checkpoint -Algorithm SHA256).Hash.ToLower() -ne $OpenVoiceCheckpointSha256) {
+  throw "El checkpoint oficial de OpenVoice V2 no coincide con su SHA-256 publicado."
+}
+$ConfigJson = Get-Content $Config -Raw | ConvertFrom-Json
+if ($ConfigJson._version_ -ne "v2" -or $ConfigJson.data.sampling_rate -ne 22050) {
+  throw "La configuración oficial de OpenVoice V2 no contiene el conversor esperado."
+}
 
 Copy-Item "build-v1001/engine/lulu-clone-engine.py" (Join-Path $Runtime "lulu-clone-engine.py") -Force
 Invoke-WebRequest "https://raw.githubusercontent.com/myshell-ai/OpenVoice/$OpenVoiceCommit/LICENSE" -OutFile (Join-Path $Runtime "OPENVOICE-LICENSE.txt")
 @"
 Lulu Finity Clone Engine 1.0.1
-OpenVoice V2 source and checkpoints: MyShell/MIT, pinned at $OpenVoiceCommit.
+OpenVoice V2 source and checkpoints: MyShell/MIT, pinned at source $OpenVoiceCommit and model $OpenVoiceModelCommit.
 Python: Python Software Foundation License.
 PyTorch: BSD-style license.
 The bundled reference voice is distributed with the speaker owner's explicit authorization.
