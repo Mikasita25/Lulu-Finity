@@ -19,8 +19,8 @@ notice = (ROOT / "NOTICE.md").read_text(encoding="utf-8")
 assert package["version"] == "1.0.2"
 assert lock["version"] == "1.0.2"
 assert lock["packages"][""]["version"] == "1.0.2"
-assert "edge-tts-universal" not in package.get("dependencies", {})
-assert "node_modules/edge-tts-universal" not in lock.get("packages", {})
+assert package.get("dependencies", {}).get("edge-tts-universal") == "1.4.0"
+assert "node_modules/edge-tts-universal" in lock.get("packages", {})
 assert 'id="versionLabel">v1.0.2' in html
 assert 'id="updateVersionBadge">v1.0.2' in html
 
@@ -40,16 +40,29 @@ for token in (
     "synthesizeTikTokVoice",
     "normalizeVoiceSettings",
     "removeRetiredVoiceEngine",
+    "getEdgeTtsModule",
+    "listOnlineVoices",
+    "synthesizeOnlineVoice",
     "tts:list-tiktok-voices",
     "tts:synthesize-tiktok",
+    "tts:list-online-voices",
+    "tts:synthesize-online",
+    "hardenTikTokSession",
+    "setPermissionRequestHandler",
+    "setPermissionCheckHandler",
+    "will-download",
+    "will-navigate",
+    "page-title-updated",
+    "tikTokOriginSummary",
+    "getTikTokSessionSummary",
 ):
     assert token in main, token
 for token in ("TIKTOK_TTS_ENDPOINTS", "requestTikTokSpeech", "text_speaker", "sessionid="):
     assert token in client, token
 
-for token in ("listTikTokVoices", "synthesizeTikTokVoice"):
+for token in ("listTikTokVoices", "synthesizeTikTokVoice", "listOnlineVoices", "synthesizeOnlineVoice"):
     assert token in preload, token
-for token in ("TikTok · ${category}", "tiktok:${voice.id}", "loadTikTokVoices", "Voz de TikTok no disponible"):
+for token in ("TikTok · ${category}", "tiktok:${voice.id}", "Microsoft online", "online:${voice.shortName}", "loadOnlineVoices", "Voz de TikTok no disponible", "Voz Microsoft no disponible", "privacyResetTikTokBtn"):
     assert token in renderer, token
 for voice_id in ("es_mx_002", "en_us_002", "en_us_stitch", "en_us_stormtrooper", "en_us_c3po"):
     assert voice_id in catalog, voice_id
@@ -58,25 +71,37 @@ for retired in (
     ROOT / "resources/voices/lulu-official",
     ROOT / "src/clone-runtime-manager.js",
     ROOT / "src/clone-runtime-manager.test.js",
-    ROOT / "src/online-voice-catalog.js",
-    ROOT / "src/online-voice-catalog.test.js",
 ):
     assert not retired.exists(), retired
 assert (ROOT / "resources/voices/lulu-es-mx/voice.json").exists()
+assert (ROOT / "src/online-voice-catalog.js").exists()
+assert (ROOT / "src/online-voice-catalog.test.js").exists()
 assert (ROOT / "src/tiktok-voice-catalog.test.js").exists()
 assert (ROOT / "src/tiktok-tts-client.test.js").exists()
 
 combined = "\n".join((main, preload, renderer, html, notice, json.dumps(package)))
-for retired_token in ("Voz Oficial De Lulu Finity", "OpenVoice", "edge-tts-universal"):
+for retired_token in ("Voz Oficial De Lulu Finity", "OpenVoice"):
     assert retired_token not in combined, retired_token
+
+for security_copy in (
+    "DOMINIO OFICIAL",
+    "Tu contraseña solo va a TikTok",
+    "Sesión solo en esta PC",
+    "Permisos bloqueados",
+    "Desvincular y borrar sesión",
+    "Railway no recibe tu sesión",
+    "voces de Microsoft",
+):
+    assert security_copy in html, security_copy
 
 assert styles.count("Lulu Finity 1.0.2 — ventanas ajustables y desplazamiento vertical") == 1
 changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 assert "## 1.0.2" in changelog
 assert "más de 70 voces auténticas de TikTok" in changelog
+assert "Conserva las voces online de Microsoft/Edge" in changelog
 
 ids = re.findall(r'\bid="([^"]+)"', html)
 duplicates = sorted({item for item in ids if ids.count(item) > 1})
 assert not duplicates, f"IDs duplicados: {duplicates}"
 
-print(f"Lulu Finity {package['version']}: motor retirado, TikTok TTS y scroll validados con {len(ids)} IDs")
+print(f"Lulu Finity {package['version']}: Microsoft, TikTok seguro, motor retirado y scroll validados con {len(ids)} IDs")

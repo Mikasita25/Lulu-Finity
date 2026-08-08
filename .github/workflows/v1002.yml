@@ -33,13 +33,13 @@ jobs:
           echo "$BASE_SHA256  base.zip" | sha256sum --check
           unzip -q base.zip -d app
           python build-v1002/apply-v1002.py app
-      - name: Validar voces TikTok, retiro del motor e interfaz adaptable
+      - name: Validar voces Microsoft/TikTok, seguridad y pantalla adaptable
         run: |
           python build-v1002/test-v1002.py app
           node --check app/src/main.js
           node --check app/src/preload.js
           node --check app/src/renderer.js
-          node --test app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js
+          node --test app/src/online-voice-catalog.test.js app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js
           python build-v0342/test-preload-sandbox.py app
           node build-v0320/test-live-games.js app/src/live-games.js
           node build-v0330/test-automation-engine.js app/src/automation-engine.js
@@ -47,8 +47,7 @@ jobs:
         run: |
           cd app
           npm ci --ignore-scripts --no-audit --no-fund
-          npm ls adm-zip sherpa-onnx-node --depth=0
-          if npm ls edge-tts-universal --depth=0 >/dev/null 2>&1; then echo "Edge TTS no fue retirado"; exit 1; fi
+          npm ls adm-zip sherpa-onnx-node edge-tts-universal --depth=0
           cd railway-relay
           npm test
 
@@ -70,7 +69,7 @@ jobs:
           Expand-Archive base.zip -DestinationPath app -Force
           python build-v1002/apply-v1002.py app
           python build-v1002/test-v1002.py app
-          node --test app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js
+          node --test app/src/online-voice-catalog.test.js app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js
       - name: Crear fuente reproducible
         shell: pwsh
         run: |
@@ -108,13 +107,14 @@ jobs:
           $blockmap = "app/dist/Lulu-Finity-Setup-1.0.2.exe.blockmap"
           foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.2.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
           if (!(Test-Path "app/dist/win-unpacked/resources/lulu-voices/lulu-es-mx/voice.json")) { throw "Falta Lulu Local base" }
-          foreach ($retired in @("app/dist/win-unpacked/resources/lulu-voices/lulu-official", "app/src/clone-runtime-manager.js", "app/src/online-voice-catalog.js")) { if (Test-Path $retired) { throw "El componente retirado sigue presente: $retired" } }
+          foreach ($retired in @("app/dist/win-unpacked/resources/lulu-voices/lulu-official", "app/src/clone-runtime-manager.js")) { if (Test-Path $retired) { throw "El componente retirado sigue presente: $retired" } }
+          if (!(Test-Path "app/src/online-voice-catalog.js")) { throw "Falta el catálogo Microsoft" }
           Expand-Archive $zip -DestinationPath verify -Force
           $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
           if (!$asar) { throw "Falta app.asar" }
           $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
-          foreach ($token in @("v1.0.2","grid-template-rows:40px minmax(0,1fr)","overscroll-behavior-y:contain","tts:synthesize-tiktok","en_us_stitch","TikTok · Personajes")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
-          foreach ($retired in @("Voz Oficial De Lulu Finity","edge-tts-universal","clone-runtime-manager")) { if ($text.Contains($retired)) { throw "app.asar aún contiene $retired" } }
+          foreach ($token in @("v1.0.2","grid-template-rows:40px minmax(0,1fr)","overscroll-behavior-y:contain","tts:synthesize-tiktok","tts:synthesize-online","edge-tts-universal","en_us_stitch","TikTok · Personajes","Microsoft online","DOMINIO OFICIAL","setPermissionRequestHandler","Desvincular y borrar sesión")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          foreach ($retired in @("Voz Oficial De Lulu Finity","clone-runtime-manager")) { if ($text.Contains($retired)) { throw "app.asar aún contiene $retired" } }
           if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
           $tag = "v1.0.2"
           $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.2.zip")
