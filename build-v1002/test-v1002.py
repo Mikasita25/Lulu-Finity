@@ -63,6 +63,11 @@ for token in (
     "runtimeProcessUsage",
     "totalMemoryMb",
     "workingSetSize",
+    "BALANCED_KEEP_ACTIVE_KEYS",
+    "normalizeBalancedKeepActive",
+    "runtimeResourceSettings",
+    "protectedCategories",
+    "overlayInUse",
 ):
     assert token in main, token
 for token in ("TIKTOK_TTS_ENDPOINTS", "requestTikTokSpeech", "text_speaker", "sessionid="):
@@ -71,13 +76,23 @@ for token in ("TIKTOK_TTS_ENDPOINTS", "requestTikTokSpeech", "text_speaker", "se
 for token in ("listTikTokVoices", "synthesizeTikTokVoice", "listOnlineVoices", "synthesizeOnlineVoice"):
     assert token in preload, token
 assert "releaseIdleResources: (details = {})" in preload
-for token in ("TikTok · ${category}", "tiktok:${voice.id}", "Microsoft online", "online:${voice.shortName}", "loadOnlineVoices", "Voz de TikTok no disponible", "Voz Microsoft no disponible", "privacyResetTikTokBtn"):
+for token in ("TikTok · ${category}", "tiktok:${voice.id}", "Microsoft online", "online:${voice.shortName}", "loadOnlineVoices", "Voz de TikTok no disponible", "Voz Microsoft no disponible", "privacyResetTikTokBtn", "normalizedBalancedKeepActive", "renderBalancedKeepActiveControls", "setAllBalancedCategories"):
     assert token in renderer, token
 for token in ("RAM total de Lulu", "Solo núcleo", "Desglose real aproximado", "No son ocho copias de Lulu"):
     assert token in renderer, token
 assert 'id="runtimeBreakdown"' in html
 for token in (".runtime-breakdown-list", ".runtime-process-note", ".runtime-stat-total"):
     assert token in styles, token
+for token in (".balanced-keep-grid", ".balanced-keep-option", ".balanced-profile-badge", ".balanced-core-note"):
+    assert token in styles, token
+balanced_keys = ("live","account","voice","music","overlays","rankings","automations","commands","games","economy")
+assert html.count('data-balanced-keep=') == len(balanced_keys)
+for key in balanced_keys:
+    assert f'data-balanced-keep="{key}"' in html, key
+for label in ("LIVE y conexión", "Cuenta TikTok", "TTS y voces", "Música", "Pantalla y overlays", "Rankings", "Alertas y metas", "Comandos", "Juegos", "Economía"):
+    assert label in html, label
+for element_id in ("balancedKeepActiveCard", "balancedKeepStatus", "balancedKeepAllBtn", "balancedKeepNoneBtn", "balancedKeepGrid"):
+    assert f'id="{element_id}"' in html, element_id
 for voice_id in ("es_mx_002", "en_us_002", "en_us_stitch", "en_us_stormtrooper", "en_us_c3po"):
     assert voice_id in catalog, voice_id
 
@@ -133,12 +148,12 @@ assert "localTts:localVoiceManager?" in main
 assert "Math.round(workingSetKb/1024)" in main
 assert "memoryMb:usage.totalMemoryMb" in main
 assert "process.getProcessMemoryInfo()" not in main
-for token in ("details?.keepMusic", "destroyWindowSafely(spotifyWindow)", "keptMusic:Boolean(details?.keepMusic)"):
+for token in ("details?.keepMusic", "details?.force===true", "destroyWindowSafely(spotifyWindow)", "keptMusic:preserveMusic", "settings.balancedKeepActive?.[key]===true", "await stopOverlayServer()", "gameInUse"):
     assert token in main, token
 assert "if (!activeRuntimeModules.has('rankings') && rankingClientCount() === 0) return;" in main
 assert "!state.loadedPages.has('automations')" in renderer
 assert "if(!hasActiveAudioActivity())return" in renderer
-for token in ("function hasMusicSession()", "profile==='saving'?5000", "profile==='balanced'?60000", "keepMusic:hasMusicSession()"):
+for token in ("function hasMusicSession()", "profile==='saving'?5000", "profile==='balanced'?60000", "keepMusic:hasMusicSession()", "BALANCED_KEEP_ACTIVE_KEYS", "data-balanced-keep", "force:true"):
     assert token in renderer, token
 for label in ("Cierra reproductores inactivos después de 5 segundos", "Espera 60 segundos", "Conserva el reproductor listo"):
     assert label in html, label
@@ -161,6 +176,14 @@ for lazy_getter in ("getOnlineVoiceCatalog()", "getTikTokVoiceCatalog()", "getTi
     assert lazy_getter in main, lazy_getter
 for module_label in ("Rankings", "Automatizaciones", "Juegos", "Economía"):
     assert f"['{module_label}'" in renderer, module_label
+
+runtime_status = re.search(r"ipcMain\.handle\('runtime:status'.*?\n\}\);", main, re.S)
+runtime_release = re.search(r"ipcMain\.handle\('runtime:release-idle'.*?\n\}\);", main, re.S)
+assert runtime_status and runtime_release
+assert "readJson(" not in runtime_status.group(0), "Rendimiento no debe leer ajustes del disco en cada sondeo"
+assert "readJson(" not in runtime_release.group(0), "La liberación debe usar los ajustes ya cargados"
+assert "balancedKeepActive: { live:false, account:false, voice:false, music:false, overlays:false, rankings:false, automations:false, commands:false, games:false, economy:false }" in main
+assert "runtimeResourceSettings=normalizeVoiceSettings(DEFAULT_SETTINGS)" not in main
 
 changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 assert "## 1.0.2" in changelog
