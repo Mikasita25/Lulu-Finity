@@ -1,0 +1,131 @@
+name: Lulu Finity 1.0.2
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v1002/**"
+      - ".github/workflows/v1002.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v1002/**"
+      - ".github/workflows/v1002.yml"
+
+permissions:
+  contents: write
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.0.1/Lulu-Finity-Source-1.0.1.zip
+  BASE_SHA256: cc76b1af16af1d9dee13430142a65cc250552241a17d1c2953437f2f29e1774b
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir Lulu Finity 1.0.2
+        run: |
+          curl --fail --location --silent --show-error "$BASE_URL" -o base.zip
+          echo "$BASE_SHA256  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v1002/apply-v1002.py app
+      - name: Validar interfaz adaptable y regresiones
+        run: |
+          python build-v1002/test-v1002.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --test app/src/clone-runtime-manager.test.js app/src/online-voice-catalog.test.js app/src/text-processor.test.js
+          python build-v0342/test-preload-sandbox.py app
+          node build-v0320/test-live-games.js app/src/live-games.js
+          node build-v0330/test-automation-engine.js app/src/automation-engine.js
+      - name: Validar dependencias y relay
+        run: |
+          cd app
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ls edge-tts-universal adm-zip sherpa-onnx-node --depth=0
+          cd railway-relay
+          npm test
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir fuente 1.0.2
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente 1.0.1 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1002/apply-v1002.py app
+          python build-v1002/test-v1002.py app
+          node --test app/src/clone-runtime-manager.test.js app/src/online-voice-catalog.test.js app/src/text-processor.test.js
+      - name: Crear fuente reproducible
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory source-v1002 -Force | Out-Null
+          foreach ($file in @("package.json","package-lock.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v1002/$file" -Force } }
+          foreach ($folder in @("src","resources","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v1002/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v1002/*" -DestinationPath "Lulu-Finity-Source-1.0.2.zip" -Force
+      - name: Inyectar token oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build:win -- --publish never
+      - name: Verificar y publicar 1.0.2
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-1.0.2.exe"
+          $zip = "app/dist/Lulu-Finity-1.0.2-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-1.0.2.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.2.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          foreach ($file in @("app/dist/win-unpacked/resources/lulu-voices/lulu-es-mx/voice.json", "app/dist/win-unpacked/resources/lulu-voices/lulu-official/voice.json", "app/dist/win-unpacked/resources/lulu-voices/lulu-official/reference.wav")) { if (!(Test-Path $file)) { throw "Falta una voz local: $file" } }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @("v1.0.2","grid-template-rows:40px minmax(0,1fr)","overscroll-behavior-y:contain","Voz Oficial De Lulu Finity","Gratis online")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
+          $tag = "v1.0.2"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.2.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 1.0.2" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 1.0.2" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v1.0.2
+          path: |
+            app/dist/Lulu-Finity-Setup-1.0.2.exe
+            app/dist/Lulu-Finity-1.0.2-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-1.0.2.exe.blockmap
+            Lulu-Finity-Source-1.0.2.zip
+          if-no-files-found: error
+          retention-days: 30
