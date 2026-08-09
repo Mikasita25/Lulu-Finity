@@ -8,7 +8,10 @@ renderer = (root / 'src/renderer.js').read_text(encoding='utf-8')
 
 assert 'sandbox: true' in main, 'La ventana principal debe conservar sandbox: true.'
 assert "require('./automation-engine')" not in preload, 'Un preload sandboxed no puede cargar automation-engine con require local.'
-assert "const automationEngine = require('./automation-engine');" in main, 'El motor debe cargarse en el proceso principal.'
+assert (
+    "const automationEngine = require('./automation-engine');" in main
+    or "automationEngine=require('./automation-engine')" in main
+), 'El motor debe permanecer en el proceso principal, aunque se cargue bajo demanda.'
 
 for channel in ('automations:evaluate', 'goals:apply-event', 'goals:reset', 'gifts:update-stats'):
     assert f"ipcMain.handle('{channel}'" in main, f'Falta handler IPC {channel}.'
