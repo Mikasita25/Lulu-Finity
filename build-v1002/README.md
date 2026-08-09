@@ -15,6 +15,9 @@ Hotfix de TTS, seguridad de cuenta e interfaz para la fuente reproducible 1.0.1.
 - Mide la RAM total de todos los procesos agrupados por Windows y la desglosa por núcleo, interfaz, proveedor musical, gráficos y servicios auxiliares; ya no presenta la memoria del proceso principal como si fuera la app completa.
 - Aplica de verdad los perfiles de recursos: Ahorro libera el reproductor inactivo a los 5 segundos, Equilibrado a los 60 y Respuesta inmediata lo conserva; una canción o cola activa nunca se interrumpe.
 - En Equilibrado permite elegir, categoría por categoría, qué debe conservarse después de usarlo: LIVE, cuenta TikTok, TTS, música, overlays, rankings, alertas/metas, comandos, juegos y economía. La selección persiste, no precarga nada al arrancar y nunca corta una función que sigue en uso.
+- Prepara una sola voz por adelantado mientras se reproduce el comentario actual y elimina las pausas fijas entre trabajos de audio.
+- Mantiene el chat actual: por defecto omite comentarios normales que lleven 8 segundos esperando, permite ajustar el límite entre 3 y 30 segundos y nunca descarta comandos prioritarios por antigüedad.
+- Sustituye el comentario normal más antiguo cuando se llena la cola, acelera la lectura gradualmente hasta 25% y muestra la latencia actual y promedio.
 
 ```bash
 python build-v1002/apply-v1002.py app

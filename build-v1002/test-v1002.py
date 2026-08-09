@@ -68,6 +68,7 @@ for token in (
     "runtimeResourceSettings",
     "protectedCategories",
     "overlayInUse",
+    "maxCommentDelaySeconds: 8",
 ):
     assert token in main, token
 for token in ("TIKTOK_TTS_ENDPOINTS", "requestTikTokSpeech", "text_speaker", "sessionid="):
@@ -78,12 +79,30 @@ for token in ("listTikTokVoices", "synthesizeTikTokVoice", "listOnlineVoices", "
 assert "releaseIdleResources: (details = {})" in preload
 for token in ("TikTok · ${category}", "tiktok:${voice.id}", "Microsoft online", "online:${voice.shortName}", "loadOnlineVoices", "Voz de TikTok no disponible", "Voz Microsoft no disponible", "privacyResetTikTokBtn", "normalizedBalancedKeepActive", "renderBalancedKeepActiveControls", "setAllBalancedCategories"):
     assert token in renderer, token
+for token in (
+    "speechPlaybackStarted",
+    "speechPreparation",
+    "prepareNextSpeech()",
+    "synthesizeSpeechData",
+    "speechItemExpired",
+    "reemplazado por un comentario más reciente",
+    "cola ocupada por comandos prioritarios",
+    "Math.min(0.25",
+    "speechLatencySamples",
+    "queueMicrotask(processExclusiveAudioQueue)",
+    "queueMicrotask(speakNext)",
+):
+    assert token in renderer, token
+for retired_delay in ("setTimeout(processExclusiveAudioQueue, 60)", "setTimeout(speakNext, 70)"):
+    assert retired_delay not in renderer, retired_delay
 for token in ("RAM total de Lulu", "Solo núcleo", "Desglose real aproximado", "No son ocho copias de Lulu"):
     assert token in renderer, token
 assert 'id="runtimeBreakdown"' in html
 for token in (".runtime-breakdown-list", ".runtime-process-note", ".runtime-stat-total"):
     assert token in styles, token
 for token in (".balanced-keep-grid", ".balanced-keep-option", ".balanced-profile-badge", ".balanced-core-note"):
+    assert token in styles, token
+for token in (".tts-latency-card", ".tts-latency-grid"):
     assert token in styles, token
 balanced_keys = ("live","account","voice","music","overlays","rankings","automations","commands","games","economy")
 assert html.count('data-balanced-keep=') == len(balanced_keys)
@@ -93,6 +112,9 @@ for label in ("LIVE y conexión", "Cuenta TikTok", "TTS y voces", "Música", "Pa
     assert label in html, label
 for element_id in ("balancedKeepActiveCard", "balancedKeepStatus", "balancedKeepAllBtn", "balancedKeepNoneBtn", "balancedKeepGrid"):
     assert f'id="{element_id}"' in html, element_id
+for element_id in ("maxCommentDelayInput", "maxCommentDelayOutput", "ttsLatencyCurrent", "ttsLatencyAverage"):
+    assert f'id="{element_id}"' in html, element_id
+assert 'id="maxCommentDelayInput" max="30" min="3"' in html
 for voice_id in ("es_mx_002", "en_us_002", "en_us_stitch", "en_us_stormtrooper", "en_us_c3po"):
     assert voice_id in catalog, voice_id
 
@@ -184,6 +206,7 @@ assert "readJson(" not in runtime_status.group(0), "Rendimiento no debe leer aju
 assert "readJson(" not in runtime_release.group(0), "La liberación debe usar los ajustes ya cargados"
 assert "balancedKeepActive: { live:false, account:false, voice:false, music:false, overlays:false, rankings:false, automations:false, commands:false, games:false, economy:false }" in main
 assert "runtimeResourceSettings=normalizeVoiceSettings(DEFAULT_SETTINGS)" not in main
+assert "bindSetting('maxCommentDelayInput', 'maxCommentDelaySeconds', 'input', Number)" in renderer
 
 changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 assert "## 1.0.2" in changelog

@@ -113,7 +113,7 @@ jobs:
           $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
           if (!$asar) { throw "Falta app.asar" }
           $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
-          foreach ($token in @("v1.0.2","grid-template-rows:40px minmax(0,1fr)","overscroll-behavior-y:contain","tts:synthesize-tiktok","tts:synthesize-online","edge-tts-universal","en_us_stitch","TikTok · Personajes","Microsoft online","DOMINIO OFICIAL","setPermissionRequestHandler","Desvincular y borrar sesión")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          foreach ($token in @("v1.0.2","grid-template-rows:40px minmax(0,1fr)","overscroll-behavior-y:contain","tts:synthesize-tiktok","tts:synthesize-online","edge-tts-universal","en_us_stitch","TikTok · Personajes","Microsoft online","DOMINIO OFICIAL","setPermissionRequestHandler","Desvincular y borrar sesión","prepareNextSpeech","maxCommentDelaySeconds","Latencia actual")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
           foreach ($retired in @("Voz Oficial De Lulu Finity","clone-runtime-manager")) { if ($text.Contains($retired)) { throw "app.asar aún contiene $retired" } }
           if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
           $tag = "v1.0.2"

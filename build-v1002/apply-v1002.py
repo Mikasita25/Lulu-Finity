@@ -84,6 +84,12 @@ main = replace_once(
 main = replace_once(main, "  onlineVoice: 'es-MX-DaliaNeural',", "  onlineVoice: 'es-MX-DaliaNeural',\n  tiktokVoice: 'es_mx_002',", "código de voz TikTok")
 main = replace_once(
     main,
+    "  queueLimit: 30,",
+    "  queueLimit: 30,\n  maxCommentDelaySeconds: 8,",
+    "límite de antigüedad TTS",
+)
+main = replace_once(
+    main,
     "  performanceProfile: 'balanced',",
     "  performanceProfile: 'balanced',\n  balancedKeepActive: { live:false, account:false, voice:false, music:false, overlays:false, rankings:false, automations:false, commands:false, games:false, economy:false },",
     "preferencias de categorías en Equilibrado",
@@ -570,6 +576,12 @@ html = replace_once(
     '<div class="tts-section-pane" data-tts-pane="local"><div class="local-voice-layout"><article class="panel settings-card wide"><div class="panel-header"><div><h3>Biblioteca Lulu Local</h3><p class="hint">Voces Piper sencillas que funcionan sin Internet y sin descargar el motor retirado.</p></div><button class="primary" id="localVoiceImportBtn">Importar .lfvoice</button></div><div class="local-voice-status" id="localVoiceStatus">Buscando voces instaladas…</div><div class="local-voice-list" id="localVoiceList"></div></article><article class="panel settings-card"><h3>Paquetes de voz</h3><p>Un archivo <strong>.lfvoice</strong> contiene un modelo VITS/Piper, sus tokens y datos de pronunciación.</p><p class="hint">Las voces importadas se validan y se guardan sólo en tu equipo.</p></article></div></div>',
     "biblioteca sin OpenVoice",
 )
+html = replace_once(
+    html,
+    '<article class="panel settings-card"><h3>Cola de voz</h3><div class="field-group"><div class="label-value"><label>Límite</label><output id="queueLimitOutput">30</output></div><input id="queueLimitInput" max="100" min="1" step="1" type="range"/></div><button class="danger-outline full" id="clearVoiceQueueBtn">Vaciar cola</button></article>',
+    '<article class="panel settings-card tts-latency-card"><h3>Cola rápida</h3><div class="field-group"><div class="label-value"><label>Límite de mensajes</label><output id="queueLimitOutput">30</output></div><input id="queueLimitInput" max="100" min="1" step="1" type="range"/></div><div class="field-group"><div class="label-value"><label>Omitir después de</label><output id="maxCommentDelayOutput">8 s</output></div><input id="maxCommentDelayInput" max="30" min="3" step="1" type="range"/></div><div class="tts-latency-grid"><div><strong id="ttsLatencyCurrent">—</strong><span>Latencia actual</span></div><div><strong id="ttsLatencyAverage">—</strong><span>Promedio reciente</span></div></div><p class="hint">Lulu prepara solo el siguiente comentario. Si el chat se atrasa, omite mensajes viejos y conserva los comandos prioritarios.</p><button class="danger-outline full" id="clearVoiceQueueBtn">Vaciar cola</button></article>',
+    "controles de cola TTS rápida",
+)
 
 account_html = r'''<section class="page" id="page-account">
 <div class="page-heading simple"><div><h1>Cuenta</h1><p>Conecta TikTok desde su sitio oficial y conserva el control de tu sesión.</p></div></div>
@@ -626,6 +638,12 @@ renderer = replace_once(
     "  onlineVoices: [],\n  onlineVoicesFallback: false,",
     "  onlineVoices: [],\n  onlineVoicesFallback: false,\n  tiktokVoices: [],",
     "estado de voces TikTok",
+)
+renderer = replace_once(
+    renderer,
+    "  speechQueue: [],\n  speaking: false,",
+    "  speechQueue: [],\n  speaking: false,\n  speechPlaybackStarted: false,\n  speechPreparation: null,\n  speechPrepareGeneration: 0,\n  speechLatencyCurrentMs: 0,\n  speechLatencySamples: [],",
+    "estado de cola TTS anticipada",
 )
 
 account_status = r'''function renderTikTokChatStatus(status = state.tiktokChatStatus || {}) {
@@ -867,6 +885,242 @@ renderer = replace_once(
 )
 renderer = replace_once(
     renderer,
+    "    setTimeout(processExclusiveAudioQueue, 60);",
+    "    queueMicrotask(processExclusiveAudioQueue);",
+    "audio continuo sin pausa artificial",
+)
+
+fast_tts = r'''function enqueueSpeech(message, options = {}) {
+  const lockKey = String(options.lockKey || '');
+  const priority = Boolean(lockKey || options.priority === true);
+  const fail = (reason) => { if (lockKey && options.lockReserved === true) releaseAudioLock(lockKey); return { added: false, reason }; };
+  if (!state.settings.ttsEnabled) return fail('voz apagada');
+  if (!hasAudienceAccess(message, state.settings.ttsPermissionMode || 'all', 'tts')) return fail(permissionDeniedLabel(state.settings.ttsPermissionMode, 'tts'));
+  if (lockKey && options.lockReserved !== true && !reserveAudioLock(lockKey)) return { added: false, reason: 'comando en cooldown hasta que termine el audio' };
+
+  const item = { id:message.id, text:makeSpeechText(message), voice:voiceForMessage(message), audioLockKey:lockKey, priority, queuedAt:Date.now(), preparedPromise:null, speedMultiplier:1 };
+  const queueLimit = Math.max(1, Number(state.settings.queueLimit) || 30);
+  if (state.speechQueue.length >= queueLimit) {
+    const replaceIndex = state.speechQueue.findIndex((queued) => !queued.priority);
+    if (replaceIndex < 0) {
+      releaseAudioLock(lockKey);
+      return { added:false, reason:'cola ocupada por comandos prioritarios' };
+    }
+    const [replaced] = state.speechQueue.splice(replaceIndex, 1);
+    releaseAudioLock(replaced.audioLockKey);
+    updateCommentResult(replaced.id, 'skipped', 'reemplazado por un comentario más reciente');
+  }
+  state.speechQueue.push(item);
+  renderStats();
+  if (state.speechPlaybackStarted) prepareNextSpeech();
+  speakNext();
+  return { added:true };
+}
+'''
+renderer = replace_between(renderer, "function enqueueSpeech(message, options = {})", "function stopCurrentAudio()", fast_tts, "cola TTS reciente y prioritaria")
+
+speech_runtime = r'''function speechTuning(voiceConfig = null, speedMultiplier = 1) {
+  return {
+    rate: clamp((voiceConfig?.rate ?? state.settings.rate) * clamp(speedMultiplier, 1, 1.25), 0.5, 2),
+    pitch: clamp(voiceConfig?.pitch ?? state.settings.pitch, 0.5, 2),
+    volume: clamp(voiceConfig?.volume ?? state.settings.ttsVolume, 0, 1)
+  };
+}
+
+function speechItemExpired(item) {
+  if (!item || item.priority || !item.queuedAt) return false;
+  const maxAge = clamp(state.settings.maxCommentDelaySeconds || 8, 3, 30) * 1000;
+  return Date.now() - item.queuedAt > maxAge;
+}
+
+function adaptiveSpeechMultiplier() {
+  return 1 + Math.min(0.25, Math.max(0, state.speechQueue.length - 1) * 0.035);
+}
+
+function markSpeechStarted(item) {
+  if (state.speechPlaybackStarted) return;
+  state.speechPlaybackStarted = true;
+  if (item?.queuedAt) {
+    const latency = Math.max(0, Date.now() - item.queuedAt);
+    state.speechLatencyCurrentMs = latency;
+    state.speechLatencySamples.push(latency);
+    if (state.speechLatencySamples.length > 20) state.speechLatencySamples.shift();
+  }
+  renderStats();
+  prepareNextSpeech();
+}
+
+async function synthesizeSpeechData(text, voiceConfig, speedMultiplier = 1) {
+  const voiceMode = voiceConfig?.mode || state.settings.voiceMode;
+  if (voiceMode === 'system') return null;
+  const tuning = speechTuning(voiceConfig, speedMultiplier);
+  if (voiceMode === 'local') {
+    const result = await api.synthesizeLocalVoice({ text, voiceId:voiceConfig?.localVoiceId||state.settings.localVoiceId||'lulu-es-mx', speed:tuning.rate, idleMinutes:state.settings.localVoiceIdleMinutes||2 });
+    return { result, voiceMode, tuning };
+  }
+  const result = voiceMode === 'tiktok'
+    ? await api.synthesizeTikTokVoice({ text, voice:voiceConfig?.tiktokVoice||state.settings.tiktokVoice||'es_mx_002' })
+    : await api.synthesizeOnlineVoice({ text, voice:voiceConfig?.onlineVoice||state.settings.onlineVoice, rate:tuning.rate, pitch:tuning.pitch });
+  return { result, voiceMode, tuning };
+}
+
+function prepareNextSpeech() {
+  if (!state.speechPlaybackStarted || state.speechPreparation || !state.speechQueue.length) return;
+  const item = state.speechQueue[0];
+  const voiceMode = item.voice?.mode || state.settings.voiceMode;
+  if (voiceMode === 'system' || item.preparedPromise || speechItemExpired(item)) return;
+  item.speedMultiplier = adaptiveSpeechMultiplier();
+  const generation = state.speechPrepareGeneration;
+  const promise = synthesizeSpeechData(item.text, item.voice, item.speedMultiplier)
+    .then((prepared) => ({ ok:true, prepared }))
+    .catch((error) => ({ ok:false, error }))
+    .finally(() => { if (state.speechPreparation?.itemId === item.id && state.speechPrepareGeneration === generation) state.speechPreparation = null; });
+  item.preparedPromise = promise;
+  state.speechPreparation = { itemId:item.id, promise };
+}
+
+function startSystemSpeechNow(text, voiceConfig, token, finish, item = null, speedMultiplier = 1) {
+  if (!('speechSynthesis' in window) || token !== state.speechToken) { finish(false); return; }
+  const tuning = speechTuning(voiceConfig, speedMultiplier);
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voice = currentSystemVoice(voiceConfig?.mode === 'system' ? voiceConfig.voiceURI : '');
+  if (voice) utterance.voice = voice;
+  utterance.rate = tuning.rate; utterance.pitch = tuning.pitch; utterance.volume = tuning.volume;
+  utterance.onstart = () => { if (token === state.speechToken) markSpeechStarted(item); };
+  utterance.onend = () => finish(true);
+  utterance.onerror = () => finish(false);
+  try { window.speechSynthesis.speak(utterance); } catch { finish(false); }
+}
+
+function runSpeechNow(text, isQueue = false, queueId = null, voiceConfig = null, speechItem = null) {
+  if (!text) return Promise.resolve(false);
+  const token = ++state.speechToken;
+  const speedMultiplier = speechItem?.speedMultiplier || adaptiveSpeechMultiplier();
+  if (isQueue) state.speaking = true;
+  if (state.settings.youtubeMuteDuringTts) { api.muteYouTube(true).catch(() => {}); api.muteSpotify(true).catch(() => {}); }
+  renderStats();
+
+  return new Promise((resolve) => {
+    let finished = false;
+    const finish = (success, reason = '') => {
+      if (finished) return;
+      finished = true;
+      state.onlineAudio = null;
+      state.speechPlaybackStarted = false;
+      if (isQueue) state.speaking = false;
+      if (state.settings.youtubeMuteDuringTts) { api.muteYouTube(false).catch(() => {}); api.muteSpotify(false).catch(() => {}); }
+      if (queueId) updateCommentResult(queueId, success ? 'read' : 'skipped', success ? '' : (reason || 'audio detenido'));
+      renderStats();
+      if (isQueue) queueMicrotask(speakNext);
+      resolve(Boolean(success));
+    };
+
+    state.activeAudioCancel = () => {
+      try { window.speechSynthesis.cancel(); } catch {}
+      if (state.onlineAudio) { try { state.onlineAudio.pause(); state.onlineAudio.src = ''; } catch {} }
+      finish(false);
+    };
+
+    const voiceMode = voiceConfig?.mode || state.settings.voiceMode;
+    if (speechItemExpired(speechItem)) { finish(false, 'comentario vencido'); return; }
+    if (voiceMode === 'system') { startSystemSpeechNow(text, voiceConfig, token, finish, speechItem, speedMultiplier); return; }
+
+    (async () => {
+      try {
+        const preparedState = speechItem?.preparedPromise ? await speechItem.preparedPromise : { ok:true, prepared:await synthesizeSpeechData(text, voiceConfig, speedMultiplier) };
+        if (!preparedState?.ok) throw preparedState.error || new Error('No se pudo preparar la voz.');
+        if (finished || token !== state.speechToken) { finish(false); return; }
+        if (speechItemExpired(speechItem)) { finish(false, 'comentario vencido'); return; }
+        const { result, voiceMode:preparedMode, tuning } = preparedState.prepared;
+        const audio = new Audio(`data:${result.mimeType || (preparedMode === 'local' ? 'audio/wav' : 'audio/mpeg')};base64,${result.data}`);
+        audio.volume = tuning.volume;
+        if (preparedMode === 'tiktok') { audio.playbackRate = tuning.rate; audio.preservesPitch = false; }
+        state.onlineAudio = audio;
+        audio.onplaying = () => markSpeechStarted(speechItem);
+        audio.onended = () => finish(true);
+        audio.onerror = () => finish(false);
+        audio.onabort = () => finish(false);
+        await audio.play();
+        markSpeechStarted(speechItem);
+      } catch (error) {
+        if (finished || token !== state.speechToken) { finish(false); return; }
+        if (speechItemExpired(speechItem)) { finish(false, 'comentario vencido'); return; }
+        const title = voiceMode === 'local' ? 'Lulu Local no disponible' : voiceMode === 'tiktok' ? 'Voz de TikTok no disponible' : 'Voz Microsoft no disponible';
+        toast(title, 'Se usó una voz de Windows para este audio.', 'error');
+        startSystemSpeechNow(text, { ...voiceConfig, mode:'system' }, token, finish, speechItem, speedMultiplier);
+      }
+    })();
+  });
+}
+'''
+renderer = replace_between(renderer, "function speechTuning(voiceConfig = null)", "function speakText(", speech_runtime, "preparación anticipada TTS")
+
+speech_dispatch = r'''function speakText(text, isQueue = false, queueId = null, voiceConfig = null, options = {}) {
+  if (!text) return { accepted:false, reason:'texto vacío', promise:Promise.resolve(false) };
+  return enqueueExclusiveAudio(() => runSpeechNow(text, isQueue, queueId, voiceConfig, options.speechItem || null), { ...options, kind:'speech', label:options.label || 'Voz TTS' });
+}
+
+function speakNext() {
+  if (state.speaking || !state.speechQueue.length) return;
+  while (state.speechQueue.length && speechItemExpired(state.speechQueue[0])) {
+    const expired = state.speechQueue.shift();
+    releaseAudioLock(expired.audioLockKey);
+    updateCommentResult(expired.id, 'skipped', 'comentario vencido');
+  }
+  if (!state.speechQueue.length) { renderStats(); return; }
+  const item = state.speechQueue.shift();
+  item.speedMultiplier = item.speedMultiplier || adaptiveSpeechMultiplier();
+  state.speaking = true;
+  renderStats();
+  const queued = speakText(item.text, true, item.id, item.voice, { speechItem:item, lockKey:item.audioLockKey||'', lockReserved:Boolean(item.audioLockKey), label:item.priority?'Comando TTS':'Comentario TTS' });
+  if (!queued.accepted) {
+    releaseAudioLock(item.audioLockKey);
+    state.speaking = false;
+    updateCommentResult(item.id, 'skipped', queued.reason || 'cola de audio llena');
+    renderStats();
+    queueMicrotask(speakNext);
+  }
+}
+
+function clearSpeechQueue() {
+  for (const item of state.speechQueue) releaseAudioLock(item.audioLockKey);
+  state.speechQueue = [];
+  state.speaking = false;
+  state.speechPlaybackStarted = false;
+  state.speechPrepareGeneration += 1;
+  state.speechPreparation = null;
+  stopCurrentAudio();
+  if (state.settings.youtubeMuteDuringTts) { api.muteYouTube(false).catch(() => {}); api.muteSpotify(false).catch(() => {}); }
+  renderStats();
+}
+'''
+renderer = replace_between(renderer, "function speakText(", "function parseSongCommand", speech_dispatch, "despacho TTS sin esperas")
+renderer = replace_once(
+    renderer,
+    "  $('voiceQueueCount').textContent = String(state.speechQueue.length + (state.speaking ? 1 : 0));",
+    "  $('voiceQueueCount').textContent = String(state.speechQueue.length + (state.speaking ? 1 : 0));\n  if ($('ttsLatencyCurrent')) $('ttsLatencyCurrent').textContent = state.speechLatencyCurrentMs ? `${(state.speechLatencyCurrentMs/1000).toFixed(1)} s` : '—';\n  if ($('ttsLatencyAverage')) { const samples=state.speechLatencySamples; const average=samples.length?samples.reduce((sum,value)=>sum+value,0)/samples.length:0; $('ttsLatencyAverage').textContent=average?`${(average/1000).toFixed(1)} s`:'—'; }",
+    "latencia TTS visible",
+)
+renderer = replace_once(
+    renderer,
+    "  $('queueLimitOutput').textContent = String(state.settings.queueLimit);",
+    "  $('queueLimitOutput').textContent = String(state.settings.queueLimit);\n  if ($('maxCommentDelayOutput')) $('maxCommentDelayOutput').textContent = `${clamp(state.settings.maxCommentDelaySeconds||8,3,30)} s`;",
+    "salida del límite TTS",
+)
+renderer = replace_once(
+    renderer,
+    "  $('queueLimitInput').value = settings.queueLimit;",
+    "  $('queueLimitInput').value = settings.queueLimit;\n  if ($('maxCommentDelayInput')) $('maxCommentDelayInput').value = clamp(settings.maxCommentDelaySeconds||8,3,30);",
+    "valor del límite TTS",
+)
+renderer = replace_once(
+    renderer,
+    "  bindSetting('queueLimitInput', 'queueLimit', 'input', Number);",
+    "  bindSetting('queueLimitInput', 'queueLimit', 'input', Number);\n  bindSetting('maxCommentDelayInput', 'maxCommentDelaySeconds', 'input', Number);",
+    "ajuste del límite TTS",
+)
+renderer = replace_once(
+    renderer,
     "  setupAudioActivityIndicators();",
     "  let migratedTikTokVoices=false;\n  if(state.settings.localVoiceId==='lulu-official'){state.settings.voiceMode='online';state.settings.onlineVoice=state.settings.onlineVoice||'es-MX-DaliaNeural';migratedTikTokVoices=true;}\n  if(!state.settings.tiktokVoice)state.settings.tiktokVoice='es_mx_002';\n  if(!state.settings.onlineVoice)state.settings.onlineVoice='es-MX-DaliaNeural';\n  state.settings.userVoiceRules=(Array.isArray(state.settings.userVoiceRules)?state.settings.userVoiceRules:[]).map((rule)=>rule?.voice==='local:lulu-official'?{...rule,voice:`online:${state.settings.onlineVoice}`}:rule);\n  setupAudioActivityIndicators();",
     "migración a voces TikTok",
@@ -974,6 +1228,7 @@ html,body{min-width:0;min-height:0}
 .feature-search-results{max-height:min(340px,calc(100dvh - 140px))}
 .runtime-stat-total{border-color:rgba(81,231,146,.32);background:linear-gradient(135deg,rgba(42,122,83,.2),rgba(255,255,255,.03))}.runtime-breakdown{margin-top:14px}.runtime-breakdown-title{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:8px}.runtime-breakdown-title strong,.runtime-breakdown-title span{display:block}.runtime-breakdown-title strong{font-size:12px}.runtime-breakdown-title span{color:var(--muted);font-size:9px;text-align:right}.runtime-breakdown-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.runtime-breakdown-list>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.025);font-size:10px}.runtime-breakdown-list span{color:var(--muted)}.runtime-breakdown-list strong{color:#fff}.runtime-process-note{margin:10px 0 0;padding:10px 12px;border-left:3px solid var(--purple);border-radius:0 8px 8px 0;background:rgba(169,124,255,.07);color:var(--muted);font-size:10px;line-height:1.5}
 .balanced-keep-card{grid-column:1/-1}.balanced-profile-badge{padding:6px 9px;border:1px solid rgba(81,231,146,.22);border-radius:999px;background:rgba(81,231,146,.1);color:#9df2bd;font-size:9px;font-weight:900;white-space:nowrap}.balanced-keep-actions{display:flex;justify-content:flex-end;gap:8px;margin:12px 0 10px}.balanced-keep-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.balanced-keep-option{display:flex;gap:11px;align-items:flex-start;padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.025);cursor:pointer;transition:.18s ease}.balanced-keep-option:hover{border-color:rgba(255,130,184,.25);background:rgba(255,130,184,.045)}.balanced-keep-option input{margin-top:2px;accent-color:#ff82b8}.balanced-keep-option span,.balanced-keep-option strong,.balanced-keep-option small{display:block}.balanced-keep-option span{min-width:0}.balanced-keep-option strong{font-size:11px;color:#fff}.balanced-keep-option small{margin-top:4px;color:var(--muted);font-size:9px;line-height:1.5}.balanced-core-note{margin:12px 0 0;padding:10px 12px;border-left:3px solid var(--purple);border-radius:0 8px 8px 0;background:rgba(169,124,255,.07);color:var(--muted);font-size:10px;line-height:1.5}.balanced-keep-card.profile-disabled .balanced-keep-grid,.balanced-keep-card.profile-disabled .balanced-keep-actions{opacity:.5}.balanced-keep-card.profile-disabled .balanced-profile-badge{border-color:rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:var(--muted)}
+.tts-latency-card .field-group+.field-group{margin-top:12px}.tts-latency-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}.tts-latency-grid>div{padding:11px;border:1px solid rgba(81,231,146,.16);border-radius:10px;background:rgba(81,231,146,.055)}.tts-latency-grid strong,.tts-latency-grid span{display:block}.tts-latency-grid strong{color:#9df2bd;font-size:16px}.tts-latency-grid span{margin-top:3px;color:var(--muted);font-size:9px}.tts-latency-card .hint{line-height:1.5}
 .secure-account-card{overflow:hidden}.official-domain-banner{display:flex;align-items:center;gap:12px;margin:14px 0;padding:14px 16px;border:1px solid rgba(81,231,146,.3);border-radius:12px;background:linear-gradient(100deg,rgba(42,122,83,.2),rgba(255,255,255,.025))}.domain-lock{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:rgba(81,231,146,.14)}.official-domain-banner div{min-width:0;flex:1}.official-domain-banner strong,.official-domain-banner small{display:block}.official-domain-banner strong{color:#9df2bd;word-break:break-all}.official-domain-banner strong.untrusted{color:#ff9bb0}.official-domain-banner small{margin-top:4px;color:var(--muted);font-size:10px}.verified-pill{padding:5px 8px;border-radius:999px;background:rgba(81,231,146,.13);color:#8aefb2;font-size:9px;font-weight:800;letter-spacing:.5px}.tiktok-trust-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.trust-item{display:flex;gap:10px;padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.025)}.trust-item>span{width:24px;height:24px;flex:none;display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,#ff82b8,#a97cff);font-size:11px;font-weight:800}.trust-item strong,.trust-item small{display:block}.trust-item strong{font-size:12px}.trust-item small{margin-top:5px;color:var(--muted);font-size:10px;line-height:1.45}.account-independence-note{margin:14px 0 0;padding:11px 13px;border-left:3px solid var(--purple);border-radius:0 9px 9px 0;background:rgba(169,124,255,.08);color:#ddd0e5;font-size:11px;line-height:1.55}.account-privacy-card{gap:0}.privacy-intro{display:flex;align-items:center;gap:13px;margin-bottom:15px}.privacy-intro h3,.privacy-intro p{margin:0}.privacy-intro p{margin-top:5px;color:var(--muted);font-size:11px;line-height:1.55}.privacy-shield{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:13px;background:linear-gradient(135deg,rgba(255,130,184,.18),rgba(169,124,255,.18));font-size:19px}.privacy-section-label{display:block;margin-bottom:7px;color:#d8b4ff;font-size:9px;font-weight:900;letter-spacing:.9px}.privacy-server-explainer,.privacy-direct-connections,.privacy-local-session{margin-top:12px;padding:16px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.025)}.privacy-server-explainer{border-color:rgba(81,231,146,.23);background:linear-gradient(120deg,rgba(42,122,83,.13),rgba(255,255,255,.025))}.account-privacy-card h4{margin:0;color:#fff;font-size:14px}.account-privacy-card section>p{margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.65}.account-privacy-card section>p strong{color:#e8dff0}.websocket-flow{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:14px;padding:11px;border-radius:10px;background:rgba(7,10,17,.28);font-size:10px}.websocket-flow span{padding:7px 9px;border:1px solid rgba(81,231,146,.2);border-radius:8px;color:#a5f4c1;font-weight:800}.websocket-flow i{color:var(--muted);font-style:normal}.privacy-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.privacy-detail-card{padding:16px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.025)}.privacy-detail-card.safe{border-color:rgba(81,231,146,.17)}.privacy-detail-card.blocked{border-color:rgba(255,109,140,.17)}.privacy-detail-card ul{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:10px;line-height:1.65}.privacy-detail-card li+li{margin-top:5px}.privacy-detail-card p{margin:10px 0 0;color:#cfc4d5;font-size:10px;line-height:1.6}.privacy-detail-card code{padding:1px 4px;border-radius:4px;background:rgba(255,255,255,.07);color:#ffc4dc}.privacy-connection-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:11px}.privacy-connection-list>div{padding:12px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(0,0,0,.1)}.privacy-connection-list strong,.privacy-connection-list span{display:block}.privacy-connection-list strong{font-size:11px;color:#ffb3d3}.privacy-connection-list span{margin-top:5px;color:var(--muted);font-size:10px;line-height:1.5}.privacy-delete-box{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px;padding:14px;border:1px solid rgba(255,109,140,.2);border-radius:11px;background:rgba(255,82,116,.045)}.privacy-delete-box strong,.privacy-delete-box span{display:block}.privacy-delete-box span{margin-top:5px;color:var(--muted);font-size:10px;line-height:1.45}.privacy-delete-box button{flex:none}
 @media(max-width:980px){.tiktok-trust-grid,.privacy-detail-grid,.privacy-connection-list,.runtime-breakdown-list,.balanced-keep-grid{grid-template-columns:1fr}.official-domain-banner{align-items:flex-start;flex-wrap:wrap}.verified-pill{margin-left:46px}.privacy-delete-box{align-items:stretch;flex-direction:column}.websocket-flow{align-items:stretch;flex-direction:column;text-align:center}.runtime-breakdown-title{align-items:flex-start;flex-direction:column}.runtime-breakdown-title span{text-align:left}}
 @media(max-height:720px){.main-content{padding-top:16px;padding-bottom:24px}.sidebar{padding-top:12px;padding-bottom:10px}.logo-wrap{padding-bottom:9px}.feature-search{margin-bottom:8px}.nav-list{gap:8px}.sidebar-bottom{margin-top:5px}}
@@ -1006,6 +1261,9 @@ entry = """# Cambios
 - Corrige Rendimiento para sumar todos los procesos de Lulu, igual que el grupo del Administrador de tareas, y muestra el consumo separado de la interfaz, Spotify/YouTube, gráficos y servicios de Electron.
 - Hace reales los perfiles: Ahorro libera el reproductor inactivo en 5 segundos, Equilibrado en 60 segundos y Respuesta inmediata lo conserva; ninguno interrumpe una canción o cola activa.
 - Permite personalizar Equilibrado por categoría, conservando sólo los módulos elegidos después de usarlos y sin precargarlos al iniciar.
+- Reduce el retraso del bot preparando únicamente el siguiente comentario mientras suena el actual, sin pausas artificiales entre voces.
+- Omite comentarios normales que no empiecen dentro del límite configurable, conserva comandos prioritarios y acelera gradualmente hasta 25% cuando se acumula la cola.
+- Muestra la latencia real y su promedio desde que llega el comentario hasta que comienza la voz.
 
 """
 if "## 1.0.2" not in changelog:
