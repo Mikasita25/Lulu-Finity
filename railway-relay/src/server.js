@@ -16,10 +16,12 @@ const MAX_ATTEMPTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_CONNECTION_AT
 const UPSTREAM_OPEN_TIMEOUT_MS = Math.max(3000, Number(process.env.UPSTREAM_OPEN_TIMEOUT_MS || 18000));
 const DAILY_USAGE_LIMIT = Math.max(1, Number(process.env.DAILY_USAGE_LIMIT || 7500));
 const USAGE_PER_CONNECTION = Math.max(0.1, Number(process.env.USAGE_PER_CONNECTION || 2));
+const USER_DAILY_CONNECTION_LIMIT = Math.max(1, Number(process.env.USER_DAILY_CONNECTION_LIMIT || 600));
 const USAGE_STATE_FILE = String(process.env.USAGE_STATE_FILE || '').trim();
 const usageMeter = new DailyUsageMeter({
   limit: DAILY_USAGE_LIMIT,
   perConnection: USAGE_PER_CONNECTION,
+  userLimit: USER_DAILY_CONNECTION_LIMIT,
   stateFile: USAGE_STATE_FILE || undefined
 });
 const keyPool = new KeyPool(parseList(process.env.EULER_API_KEYS), {
@@ -232,14 +234,16 @@ const server = http.createServer((request, response) => {
   }
   if (request.method === 'GET' && url.pathname === '/usage') {
     response.writeHead(200, jsonHeaders());
-    response.end(JSON.stringify({ ok: true, ...usageMeter.snapshot() }));
+    const uniqueId = cleanUsername(url.searchParams.get('uniqueId'));
+    response.end(JSON.stringify({ ok: true, ...usageMeter.snapshot(), user: uniqueId ? usageMeter.userSnapshot(uniqueId) : null }));
     return;
   }
   response.writeHead(404, jsonHeaders());
   response.end(JSON.stringify({ ok: false, error: 'Not found' }));
 });
 
-const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024 });
+// El cliente oficial nunca envía mensajes de aplicación al relay.
+const wss = new WebSocketServer({ noServer: true, maxPayload: 1024, perMessageDeflate: false });
 
 server.on('upgrade', (request, socket, head) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
@@ -266,9 +270,16 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (client, request, uniqueId) => {
+  const before = usageMeter.userSnapshot(uniqueId);
+  if (before.remaining <= 0) {
+    const message = `Esta cuenta ya utilizó sus ${before.limit} conexiones diarias de Lulu Finity. Vuelve a intentarlo después del reinicio diario.`;
+    sendJson(client, { type:'lulu.relay.error', data:{ message, classification:'user-daily-limit', usage:before } });
+    try { client.close(4429, message.slice(0, 120)); } catch {}
+    return;
+  }
   activeClients += 1;
-  const usage = usageMeter.recordConnection();
-  console.info(`[usage] ${usage.used}/${usage.limit} usos diarios (${usage.percent}%).`);
+  const usage = usageMeter.recordConnection(1, uniqueId);
+  console.info(`[usage] ${usage.used}/${usage.limit} usos globales; usuario ${usage.user.used}/${usage.user.limit} conexiones.`);
   const session = new RelaySession(client, request, uniqueId);
   sessions.add(session);
   let alive = true;
@@ -279,6 +290,9 @@ wss.on('connection', (client, request, uniqueId) => {
     activeClients = Math.max(0, activeClients - 1);
   });
   client.on('error', () => {});
+  client.on('message', () => {
+    try { client.close(1008, 'Canal de solo recepción'); } catch {}
+  });
   session.start();
 
   const heartbeat = setInterval(() => {
