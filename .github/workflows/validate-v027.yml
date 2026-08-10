@@ -76,12 +76,13 @@ jobs:
 
       - name: Validar límite individual del relay
         run: |
-          grep -q 'server-v027-loader' railway-relay/src/public-server.js
+          set -euo pipefail
+          grep -q "require('./server')" railway-relay/src/public-server.js
+          if grep -q 'server-v027-loader' railway-relay/src/public-server.js; then
+            echo 'El relay volvió a ejecutar el cargador antiguo.' >&2
+            exit 1
+          fi
           grep -q 'userSnapshot' railway-relay/src/usage-meter.js
+          grep -q 'USER_DAILY_CONNECTION_LIMIT' railway-relay/src/server.js
+          grep -q 'recordConnection(1, uniqueId)' railway-relay/src/server.js
           grep -q '600' railway-relay/.env.example
-          node - <<'NODE'
-          const fs=require('fs'),zlib=require('zlib');
-          const e=fs.readFileSync('railway-relay/src/server-v027-part-00.txt','utf8').trim()+fs.readFileSync('railway-relay/src/server-v027-part-01.txt','utf8').trim();
-          const code=zlib.gunzipSync(Buffer.from(e,'base64')).toString('utf8');
-          if(!code.includes('USER_DAILY_CONNECTION_LIMIT') || !code.includes('recordConnection(1, uniqueId)')) process.exit(1);
-          NODE

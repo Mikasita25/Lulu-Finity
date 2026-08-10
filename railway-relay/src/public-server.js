@@ -6,4 +6,4 @@ process.env.CLIENT_TOKENS = '';
 process.env.CLIENT_TOKEN = '';
 
 console.warn('[startup] Relay en modo público para clientes Lulu Finity; autenticación por token desactivada.');
-require('./server-v027-loader');
+require('./server');
