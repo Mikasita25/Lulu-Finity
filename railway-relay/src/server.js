@@ -139,8 +139,7 @@ class RelaySession {
       'features.rawMessages': 'false',
       'features.normalizeUniqueId': 'true',
       'features.schemaVersion': 'v2',
-      'features.syntheticPresence': 'true',
-      'features.closeInactiveWebSocketAfter': '300'
+      'features.syntheticPresence': 'true'
     });
     const separator = UPSTREAM_WS_URL.includes('?') ? '&' : '?';
     const upstreamUrl = `${UPSTREAM_WS_URL}${separator}${params.toString()}`;
