@@ -47,6 +47,46 @@ html = replace_once(
 )
 html_path.write_text(html, encoding="utf-8")
 
+tiktok_catalog_path = ROOT / "src/tiktok-voice-catalog.js"
+tiktok_catalog = tiktok_catalog_path.read_text(encoding="utf-8")
+tiktok_catalog = replace_once(
+    tiktok_catalog,
+    """const RAW_TIKTOK_VOICES = [
+  ['es_mx_002', 'Warm / Español MX', 'es-MX', 'Español'],
+  ['es_002', 'Español España', 'es-ES', 'Español'],""",
+    """const RAW_TIKTOK_VOICES = [
+  ['es_mx_female_supermom', 'Super Mamá', 'es-MX', 'Español'],
+  ['es_mx_002', 'Álex', 'es-MX', 'Español'],
+  ['es_female_f6', 'Alejandra', 'es-ES', 'Español'],
+  ['es_male_m3', 'Julio', 'es-ES', 'Español'],
+  ['es_female_fp1', 'Mariana', 'es-ES', 'Español'],
+  ['es_002', 'Voz masculina de España', 'es-ES', 'Español'],""",
+    "seis voces TikTok en español",
+)
+tiktok_catalog_path.write_text(tiktok_catalog, encoding="utf-8")
+
+tiktok_catalog_test_path = ROOT / "src/tiktok-voice-catalog.test.js"
+tiktok_catalog_test = tiktok_catalog_test_path.read_text(encoding="utf-8")
+tiktok_catalog_test = replace_once(
+    tiktok_catalog_test,
+    """  assert.ok(TIKTOK_VOICES.length >= 70);
+  assert.equal(new Set(TIKTOK_VOICES.map((voice) => voice.id)).size, TIKTOK_VOICES.length);
+  assert.ok(TIKTOK_VOICES.some((voice) => voice.id === 'es_mx_002'));
+  assert.ok(TIKTOK_VOICES.some((voice) => voice.id === 'en_us_002'));""",
+    """  assert.ok(TIKTOK_VOICES.length >= 79);
+  assert.equal(new Set(TIKTOK_VOICES.map((voice) => voice.id)).size, TIKTOK_VOICES.length);
+  const spanishVoices = TIKTOK_VOICES.filter((voice) => voice.category === 'Español');
+  assert.deepEqual(
+    spanishVoices.map((voice) => voice.id).sort(),
+    ['es_002', 'es_female_f6', 'es_female_fp1', 'es_male_m3', 'es_mx_002', 'es_mx_female_supermom'].sort()
+  );
+  assert.equal(spanishVoices.filter((voice) => voice.locale === 'es-MX').length, 2);
+  assert.equal(spanishVoices.filter((voice) => voice.locale === 'es-ES').length, 4);
+  assert.ok(TIKTOK_VOICES.some((voice) => voice.id === 'en_us_002'));""",
+    "regresión del catálogo TikTok en español",
+)
+tiktok_catalog_test_path.write_text(tiktok_catalog_test, encoding="utf-8")
+
 renderer_path = ROOT / "src/renderer.js"
 renderer = renderer_path.read_text(encoding="utf-8")
 renderer = replace_once(
@@ -170,6 +210,21 @@ renderer = replace_once(
     "  api.onStreamWidgetStatus((payload)=>{if(!payload?.widget)return;state.streamWidgets[payload.widget]={...state.streamWidgets[payload.widget],...payload};refreshStreamWidgetInfo(payload.widget,false);});",
     "  api.onStreamWidgetStatus((payload)=>{if(!payload?.widget)return;state.streamWidgets[payload.widget]={...state.streamWidgets[payload.widget],...payload};const pageByWidget={playlist:'rankings',wallet:'rankings',game:'games',alert:'automations',goal:'automations',gift:'automations'};if(state.activePage===pageByWidget[payload.widget])refreshStreamWidgetInfo(payload.widget,false);});",
     "widgets solo visibles",
+)
+renderer = replace_once(
+    renderer,
+    """    state.tiktokVoices = Array.isArray(tiktok?.voices) ? tiktok.voices : [];
+    const total = state.onlineVoices.length + state.tiktokVoices.length;
+    status.className = `voice-provider-status ${total ? 'ready' : 'error'}`;
+    status.innerHTML = total
+      ? `<span class="status-light connected"></span><span>${state.onlineVoices.length} voces Microsoft online y ${state.tiktokVoices.length} voces TikTok. TikTok solo usa la sesión local cuando eliges una de sus voces.</span>`""",
+    """    state.tiktokVoices = Array.isArray(tiktok?.voices) ? tiktok.voices : [];
+    const tiktokSpanishCount = state.tiktokVoices.filter((voice) => /^es(?:-|_)/i.test(String(voice.locale || ''))).length;
+    const total = state.onlineVoices.length + state.tiktokVoices.length;
+    status.className = `voice-provider-status ${total ? 'ready' : 'error'}`;
+    status.innerHTML = total
+      ? `<span class="status-light connected"></span><span>${state.onlineVoices.length} voces Microsoft online y ${state.tiktokVoices.length} voces TikTok · ${tiktokSpanishCount} en español. TikTok solo usa la sesión local cuando eliges una de sus voces.</span>`""",
+    "contador visible de voces TikTok en español",
 )
 renderer_path.write_text(renderer, encoding="utf-8")
 
@@ -347,6 +402,7 @@ entry = """# Cambios
 - Suspende las vistas previas de overlays, alertas y juegos al salir de su categoría, sin cerrar fuentes OBS/TikTok LIVE Studio que sigan conectadas.
 - Evita que eventos del relay vuelvan a cargar vistas previas ocultas y que Automatizaciones despierte fuera de su categoría si no fue conservada en Rendimiento.
 - Agrupa las ventanas auxiliares de TikTok, YouTube y Spotify dentro de Lulu sin mostrarlas como aplicaciones independientes en la barra de tareas.
+- Amplía el catálogo de TikTok a seis voces en español: cuatro de España y dos de México, con nombres claros y un contador visible.
 - Añade una prueba real que recorre todas las categorías en el ejecutable de Windows y exige una sola pantalla visible en cada cambio.
 
 """

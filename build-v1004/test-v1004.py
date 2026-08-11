@@ -12,6 +12,8 @@ html = (ROOT / "src/index.html").read_text(encoding="utf-8")
 renderer = (ROOT / "src/renderer.js").read_text(encoding="utf-8")
 main = (ROOT / "src/main.js").read_text(encoding="utf-8")
 changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+tiktok_catalog = (ROOT / "src/tiktok-voice-catalog.js").read_text(encoding="utf-8")
+tiktok_catalog_test = (ROOT / "src/tiktok-voice-catalog.test.js").read_text(encoding="utf-8")
 
 
 class PageStructureParser(HTMLParser):
@@ -99,6 +101,8 @@ for token in (
     "categoryRunsInBackground('automations')",
     "state.activePage==='rankings'",
     "pageByWidget={playlist:'rankings'",
+    "const tiktokSpanishCount = state.tiktokVoices.filter",
+    "voces TikTok · ${tiktokSpanishCount} en español",
 ):
     assert token in renderer, token
 
@@ -135,4 +139,19 @@ for preserved in (
 ):
     assert preserved in main, preserved
 
-print(f"Lulu Finity 1.0.4: {len(parser.pages)} categorías estructurales y ciclo de una ventana validados")
+spanish_tiktok_voices = {
+    "es_mx_female_supermom": ("Super Mamá", "es-MX"),
+    "es_mx_002": ("Álex", "es-MX"),
+    "es_female_f6": ("Alejandra", "es-ES"),
+    "es_male_m3": ("Julio", "es-ES"),
+    "es_female_fp1": ("Mariana", "es-ES"),
+    "es_002": ("Voz masculina de España", "es-ES"),
+}
+for voice_id, (name, locale) in spanish_tiktok_voices.items():
+    assert f"['{voice_id}', '{name}', '{locale}', 'Español']" in tiktok_catalog, voice_id
+assert tiktok_catalog.count("'Español']") == 6
+assert "assert.deepEqual(" in tiktok_catalog_test
+assert "spanishVoices.filter((voice) => voice.locale === 'es-MX').length, 2" in tiktok_catalog_test
+assert "spanishVoices.filter((voice) => voice.locale === 'es-ES').length, 4" in tiktok_catalog_test
+
+print(f"Lulu Finity 1.0.4: {len(parser.pages)} categorías y {len(spanish_tiktok_voices)} voces TikTok en español validadas")

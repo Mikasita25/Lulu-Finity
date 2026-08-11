@@ -8,6 +8,8 @@ Hotfix de navegación sobre la fuente reproducible 1.0.3.
 - Conserva un LIVE, una canción, una partida y fuentes externas que sigan realmente en uso.
 - Evita que actualizaciones del relay vuelvan a cargar vistas ocultas.
 - Agrupa las ventanas auxiliares bajo Lulu Finity y las excluye de la barra de tareas.
+- Incluye seis voces de TikTok en español: Super Mamá y Álex (México), además de Alejandra, Julio, Mariana y una voz masculina de España.
+- Muestra dentro de la app cuántas voces de TikTok hablan español.
 - Recorre todas las categorías en el ejecutable de Windows antes de publicar.
 
 ```bash
