@@ -1,0 +1,190 @@
+name: Lulu Finity 1.0.5
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v1005/**"
+      - "railway-relay/**"
+      - ".github/workflows/v1005.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v1005/**"
+      - "railway-relay/**"
+      - ".github/workflows/v1005.yml"
+
+permissions:
+  contents: write
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.0.4/Lulu-Finity-Source-1.0.4.zip
+  BASE_SHA256: 1575ee93be464ddbe0b7f9eb63d4f6530fe4ed17042d8de0520b2d7f9dad6116
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir Lulu Finity 1.0.5
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error "$BASE_URL" -o base.zip
+          echo "$BASE_SHA256  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v1005/apply-v1005.py app
+      - name: Validar navegación, ciclo de vida y regresiones
+        run: |
+          set -euo pipefail
+          python build-v1005/test-v1005.py app
+          python build-v1005/test-v1004-regressions.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/relay-protocol.js
+          node build-v1005/test-main-startup.js app
+          node --test app/src/live-reconnect-policy.test.js app/src/online-voice-catalog.test.js app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js app/src/relay-protocol.test.js
+          python build-v0342/test-preload-sandbox.py app
+          node build-v0320/test-live-games.js app/src/live-games.js
+          node build-v0330/test-automation-engine.js app/src/automation-engine.js
+      - name: Validar dependencias y ambos relays
+        run: |
+          set -euo pipefail
+          cd app
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ls adm-zip sherpa-onnx-node edge-tts-universal ws --depth=0
+          npm audit --omit=dev --audit-level=high
+          node ../build-v1005/test-live-reconnect.js .
+          npm test
+          cd railway-relay
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high
+          npm run check
+          npm test
+          cd ../..
+          cd railway-relay
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high
+          npm run check
+          npm test
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir fuente 1.0.5
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente 1.0.4 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1005/apply-v1005.py app
+          python build-v1005/test-v1005.py app
+          python build-v1005/test-v1004-regressions.py app
+          node --test app/src/live-reconnect-policy.test.js app/src/online-voice-catalog.test.js app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js app/src/relay-protocol.test.js
+      - name: Crear fuente reproducible
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory source-v1005 -Force | Out-Null
+          foreach ($file in @("package.json","package-lock.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v1005/$file" -Force } }
+          foreach ($folder in @("src","resources","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v1005/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v1005/*" -DestinationPath "Lulu-Finity-Source-1.0.5.zip" -Force
+      - name: Inyectar token oficial del relay
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund
+          node ../build-v1005/test-live-reconnect.js .
+          npm test
+          npm run build:win -- --publish never
+      - name: Probar arranque real de Windows y renderer
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $profile = Join-Path $env:RUNNER_TEMP "lulu-startup-profile"
+          $marker = Join-Path $env:RUNNER_TEMP "lulu-renderer-ready.txt"
+          $navigationMarker = Join-Path $env:RUNNER_TEMP "lulu-navigation-ready.json"
+          New-Item -ItemType Directory -Path $profile -Force | Out-Null
+          Remove-Item $marker -Force -ErrorAction SilentlyContinue
+          Remove-Item $navigationMarker -Force -ErrorAction SilentlyContinue
+          $env:LULU_STARTUP_SMOKE_MARKER = $marker
+          $env:LULU_NAVIGATION_SMOKE_MARKER = $navigationMarker
+          $executable = Resolve-Path "app/dist/win-unpacked/Lulu Finity.exe"
+          $process = Start-Process -FilePath $executable -ArgumentList "--user-data-dir=$profile" -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 60; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+              if ($process.HasExited) { throw "Lulu Finity se cerró durante el arranque con código $($process.ExitCode)" }
+              if ((Test-Path $marker) -and (Test-Path $navigationMarker)) { $ready = $true; break }
+            }
+            if (!$ready) { throw "El renderer no confirmó un arranque completo en 30 segundos" }
+            if ((Get-Content $marker -Raw).Trim() -ne "ready") { throw "La marca de arranque del renderer es inválida" }
+            $navigation = Get-Content $navigationMarker -Raw | ConvertFrom-Json
+            if (!$navigation.ok) { throw "Una o más categorías no fueron visibles: $($navigation | ConvertTo-Json -Depth 8 -Compress)" }
+            if (@($navigation.results).Count -lt 12) { throw "La prueba recorrió menos categorías de las esperadas" }
+          }
+          finally {
+            Remove-Item Env:LULU_STARTUP_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Stop-Process -Name "Lulu Finity" -Force -ErrorAction SilentlyContinue
+          }
+      - name: Verificar y publicar 1.0.5
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-1.0.5.exe"
+          $zip = "app/dist/Lulu-Finity-1.0.5-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-1.0.5.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.5.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @("v1.0.5","relay-protocol","forbidden_remote_request","MAX_RELAY_FRAME_BYTES","parseRelayFrame","sanitizeRelayUsage","followRedirects","SI EL SERVIDOR FUERA ATACADO","El relay no tiene permisos para leer datos de la aplicación","prepareNextSpeech","Microsoft online","tts:synthesize-tiktok","PAGE_PREVIEW_FRAMES","main-content > .page","LULU_NAVIGATION_SMOKE_MARKER","visibleRuntimeModule","live-reconnect-policy","automatic-reconnect-scheduled","Lulu recuperó la conexión al LIVE automáticamente","backgroundThrottling")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          foreach ($retired in @("Voz Oficial De Lulu Finity","clone-runtime-manager","message?.method","message?.payload")) { if ($text.Contains($retired)) { throw "app.asar aún contiene $retired" } }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
+          $tag = "v1.0.5"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.0.5.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 1.0.5" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 1.0.5" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: Lulu-Finity-Windows-v1.0.5
+          path: |
+            app/dist/Lulu-Finity-Setup-1.0.5.exe
+            app/dist/Lulu-Finity-1.0.5-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-1.0.5.exe.blockmap
+            Lulu-Finity-Source-1.0.5.zip
+          if-no-files-found: error
+          retention-days: 30
