@@ -20,7 +20,6 @@ const alias: Record<string, LiveEvent['type'] | undefined> = {
   like: 'like',
   webcastlikemessage: 'like',
   follow: 'follow',
-  social: 'follow',
   share: 'share',
   member: 'member',
   join: 'member',
@@ -153,7 +152,10 @@ function eventIdentity(payload: any) {
 }
 
 function eventTimestamp(payload: any) {
-  const rawTimestamp = number(payload?.timestamp ?? payload?.createTime, Date.now());
+  const rawTimestamp = number(
+    payload?.timestamp ?? payload?.createTime ?? payload?.common?.createTime,
+    Date.now(),
+  );
   return rawTimestamp > 0 && rawTimestamp < 1_000_000_000_000 ? rawTimestamp * 1000 : rawTimestamp;
 }
 
@@ -161,7 +163,7 @@ function baseEvent(raw: any, payload: any, type: LiveEvent['type'], suffix = '')
   const { user, uniqueId, nickname } = eventIdentity(payload);
   return {
     id:
-      text(payload?.id, payload?.msgId, raw?.id) ||
+      text(payload?.id, payload?.msgId, payload?.common?.msgId, raw?.id) ||
       `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}${suffix}`,
     type,
     timestamp: eventTimestamp(payload),
@@ -171,20 +173,76 @@ function baseEvent(raw: any, payload: any, type: LiveEvent['type'], suffix = '')
   };
 }
 
+function bundledMessages(raw: any): any[] | undefined {
+  const candidates = [
+    raw?.events,
+    raw?.messages,
+    raw?.data?.events,
+    raw?.data?.messages,
+    raw?.payload?.events,
+    raw?.payload?.messages,
+  ];
+  return candidates.find(Array.isArray);
+}
+
+function statsValue(payload: any, ...keys: string[]) {
+  const sources = [
+    payload,
+    payload?.stats,
+    payload?.room,
+    payload?.room?.stats,
+    payload?.roomInfo,
+    payload?.roomInfo?.stats,
+  ];
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of keys) {
+      const value = source[key];
+      if (value !== undefined && value !== null && value !== '') return value;
+    }
+  }
+  return undefined;
+}
+
 function normalizeOne(raw: any): ParsedRealtimeMessage[] {
   if (!raw) return [];
+  if (typeof raw === 'string') {
+    try {
+      return normalizeOne(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  }
   if (Array.isArray(raw)) return raw.flatMap(normalizeOne);
-  if (Array.isArray(raw?.events)) return raw.events.flatMap(normalizeOne);
+  const bundle = bundledMessages(raw);
+  if (bundle) return bundle.flatMap(normalizeOne);
 
   const rawType = compactType(raw?.type ?? raw?.event ?? raw?.eventType ?? raw?.msgType);
   const payload = raw?.data ?? raw?.payload ?? raw;
+
+  // Algunos gateways envuelven cada evento en `data` sin copiar el tipo al nivel
+  // superior. Abrimos ese sobre antes de intentar normalizarlo.
+  if (!rawType && payload !== raw && payload && typeof payload === 'object') {
+    return normalizeOne(payload);
+  }
 
   if (rawType === 'lulurelaystatus' || rawType === 'lulu_relay_status') {
     const state = compactType(payload?.state);
     return [
       {
         kind: 'relay',
-        state: state === 'connected' ? 'connected' : state === 'rotating' ? 'rotating' : 'connecting',
+        state:
+          state === 'connected'
+            ? 'connected'
+            : state === 'rotating'
+              ? 'rotating'
+              : state === 'offline'
+                ? 'offline'
+                : state === 'error'
+                  ? 'error'
+                  : state === 'idle'
+                    ? 'idle'
+                    : 'connecting',
         message: text(payload?.message),
       },
     ];
@@ -204,19 +262,25 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
   if (
     rawType === 'roomuser' ||
     rawType === 'roomusercount' ||
+    rawType === 'roominfo' ||
+    rawType === 'roomstats' ||
+    rawType === 'roomupdate' ||
     rawType === 'stats' ||
     rawType === 'live_stats' ||
     rawType.includes('roomuser') ||
-    rawType.includes('userseq')
+    rawType.includes('userseq') ||
+    rawType.includes('roominfo') ||
+    rawType.includes('roomstats') ||
+    rawType.includes('roomupdate')
   ) {
     return [
       {
         kind: 'stats',
         viewers: number(
-          payload?.viewerCount ?? payload?.roomUserCount ?? payload?.userCount ?? payload?.memberCount,
+          statsValue(payload, 'viewerCount', 'roomUserCount', 'userCount', 'memberCount'),
           NaN,
         ),
-        likes: number(payload?.totalLikeCount ?? payload?.likeCount, NaN),
+        likes: number(statsValue(payload, 'totalLikeCount', 'likeCount'), NaN),
       },
     ];
   }
@@ -225,9 +289,13 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
   const fanSticker = hasFanStickerSignal ? fanStickerFrom(payload) : undefined;
   let normalizedType = alias[rawType];
 
-  if (!normalizedType && rawType.includes('social')) {
+  if (rawType.includes('social')) {
     const socialSignal = compactType(
-      payload?.displayType ?? payload?.label ?? payload?.action ?? payload?.socialType,
+      payload?.displayType ??
+        payload?.label ??
+        payload?.action ??
+        payload?.socialType ??
+        payload?.common?.displayText,
     );
     if (socialSignal.includes('share')) normalizedType = 'share';
     else if (socialSignal.includes('follow')) normalizedType = 'follow';
@@ -253,7 +321,12 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
 
   const event = baseEvent(raw, payload, normalizedType);
   if (normalizedType === 'comment') {
-    event.comment = text(payload?.comment, payload?.text, payload?.message);
+    event.comment = text(
+      typeof payload?.comment === 'string' ? payload.comment : undefined,
+      payload?.comment?.text,
+      payload?.text,
+      payload?.message,
+    );
   } else if (normalizedType === 'fanSticker') {
     const resolved = fanSticker ?? {
       id: text(payload?.fanStickerId, payload?.fan_sticker_id, payload?.emoteId, payload?.emote_id),

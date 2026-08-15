@@ -1,10 +1,11 @@
-# Lulú Finity Mobile 1.1.0
+# Lulú Finity Mobile 1.1.1
 
-- Los stickers genéricos se reemplazan por **Fan Stickers**, usando la misma métrica `fanStickers` de Lulú Finity PC.
-- Automatizaciones por Fan Sticker específico: sonido, TTS o sonido + TTS.
-- Los Fan Stickers muestran nombre e ID en Historial para poder crear reglas exactas.
-- Nuevo ranking **Fan Stickers** en Top Fans.
-- Migración automática de las reglas y sonidos creados en la versión anterior.
-- Nueva pantalla **Actualizaciones** con búsqueda manual y automática cada 24 horas.
-- Las actualizaciones móviles usan releases `mobile-vX.Y.Z`, separados de los releases de Windows.
-- Cuando existe una versión nueva, la app muestra el changelog y permite abrir la descarga del APK.
+- Corrige la recepción de paquetes agrupados de EulerStream (`messages`), que antes se descartaban y dejaban el Dashboard sin comentarios ni eventos.
+- Los comentarios vuelven a activar TTS, sonidos, automatizaciones, metas, historial y rankings.
+- Lee correctamente paquetes de texto, `Blob`, `ArrayBuffer` y vistas binarias recibidas por el WebSocket de Android.
+- El estado “LIVE conectado” solo aparece después de que el relay confirme la conexión real con TikTok.
+- Distingue compartidos y follows en eventos sociales; antes algunos compartidos podían contarse como follow.
+- Añade compatibilidad con estadísticas de `roomInfo`, `roomStats` y `roomUpdate`.
+- La cola TTS conserva los comentarios recientes y reintenta con la voz predeterminada si Android eliminó la voz elegida.
+- Los builds oficiales ahora fallan si no se inyectó el token del relay, evitando generar APK que abren pero nunca reciben eventos.
+- Añade pruebas automáticas del contrato real del LIVE antes de compilar el APK.

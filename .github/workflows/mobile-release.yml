@@ -20,6 +20,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validar acceso al relay
+        shell: bash
+        run: |
+          if [ "${#EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN}" -lt 32 ]; then
+            echo "LULU_RELAY_CLIENT_TOKEN no está configurado o es inválido."
+            exit 1
+          fi
+
       - name: Node 22
         uses: actions/setup-node@v4
         with:
@@ -58,6 +66,7 @@ jobs:
         run: |
           npx expo install --check
           npm run typecheck
+          npm run test:realtime
           npm run doctor
 
       - name: Generar Android
