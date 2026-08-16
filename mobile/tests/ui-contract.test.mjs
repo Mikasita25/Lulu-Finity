@@ -19,6 +19,9 @@ assert.match(splash, /startup-lulu\.mp4/);
 assert.match(splash, /contentFit="contain"/);
 assert.match(splash, /Iniciando Lulu Finity/);
 assert.match(splash, /playToEnd/);
+assert.match(splash, /backgroundColor: '#000000'/);
+assert.doesNotMatch(splash, /LinearGradient/);
+assert.doesNotMatch(splash, /videoFrame/);
 
 const dashboard = read('src/screens/DashboardScreen.tsx');
 assert.match(dashboard, /<LiveConnectionCard\s*\/>/);

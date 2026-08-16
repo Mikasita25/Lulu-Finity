@@ -52,11 +52,11 @@ PC y Android tienen canales separados. El móvil solo reconoce tags de GitHub co
 
 La app consulta los releases públicos de `Mikasita25/Lulu-Finity`, compara la versión instalada y localiza el asset `.apk`. Si hay una versión superior, muestra el changelog y abre la descarga del APK.
 
-El workflow `.github/workflows/mobile-release.yml` compila y publica automáticamente el APK cuando se crea un tag móvil. Ejemplo para 1.1.2:
+El workflow `.github/workflows/mobile-release.yml` compila y publica automáticamente el APK cuando se crea un tag móvil. Ejemplo para 1.1.3:
 
 ```bash
-git tag mobile-v1.1.2
-git push origin mobile-v1.1.2
+git tag mobile-v1.1.3
+git push origin mobile-v1.1.3
 ```
 
 El tag debe coincidir con `mobile/package.json` y `mobile/app.json`. El `android.versionCode` debe incrementarse en cada release instalable.

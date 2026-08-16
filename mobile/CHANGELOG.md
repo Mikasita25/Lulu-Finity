@@ -1,5 +1,12 @@
 # Lulú Finity Mobile
 
+## 1.1.3
+
+- Integra el video directamente en la pantalla de inicio, sin marco, borde ni esquinas redondeadas.
+- Sustituye el degradado rosado del arranque por negro profundo para fundir el fondo del MP4 con toda la pantalla.
+- Mantiene el video centrado con `contain`, sin recortarlo ni deformarlo.
+- Actualiza Android a `versionCode` 5.
+
 ## 1.1.2
 
 - Muestra `1000127063.mp4` al iniciar, centrado y conservando su proporción 16:9 sin estirarlo horizontalmente.

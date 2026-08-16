@@ -125,7 +125,7 @@ export function SettingsScreen() {
       </GlassCard>
 
       <Text className="mt-6 text-center text-[10px] leading-5 text-white/25">
-        Lulú Finity Mobile 1.1.2 · Expo SDK 57 · Android
+        Lulú Finity Mobile 1.1.3 · Expo SDK 57 · Android
       </Text>
     </Screen>
   );

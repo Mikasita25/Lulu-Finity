@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useEventListener } from 'expo';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Animated, {
   useAnimatedStyle,
@@ -42,27 +41,20 @@ export function SplashView({ onFinished }: { onFinished: () => void }) {
   }));
 
   return (
-    <LinearGradient
-      colors={['#050508', '#130A16', '#050508']}
-      locations={[0, 0.5, 1]}
-      style={styles.root}
-    >
-      <View style={styles.videoFrame}>
-        <VideoView
-          player={player}
-          style={styles.video}
-          nativeControls={false}
-          contentFit="contain"
-          surfaceType="textureView"
-        />
-      </View>
+    <View style={styles.root}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls={false}
+        contentFit="contain"
+      />
 
       <Text style={styles.loadingLabel}>Iniciando Lulu Finity</Text>
 
       <View style={styles.track}>
         <Animated.View style={[styles.loader, loaderStyle]} />
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -71,26 +63,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  videoFrame: {
-    width: '88%',
-    maxWidth: 440,
-    aspectRatio: 16 / 9,
-    alignSelf: 'center',
-    overflow: 'hidden',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,121,207,0.22)',
-    backgroundColor: '#020204',
+    backgroundColor: '#000000',
   },
   video: {
     width: '100%',
-    height: '100%',
-    backgroundColor: '#020204',
+    maxWidth: 520,
+    aspectRatio: 16 / 9,
+    alignSelf: 'center',
+    backgroundColor: '#000000',
   },
   loadingLabel: {
-    color: '#F5D6EA',
+    color: '#F2F4F7',
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.2,
