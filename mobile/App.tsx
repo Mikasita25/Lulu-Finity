@@ -1,5 +1,5 @@
 import './global.css';
-import React, { Component, type ErrorInfo, type ReactNode, useEffect, useState } from 'react';
+import React, { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from '@/navigation/AppNavigator';
@@ -40,18 +40,21 @@ export default function App() {
   const hydrated = useAppStore((state) => state.hydrated);
   const setHydrated = useAppStore((state) => state.setHydrated);
   const [splashDone, setSplashDone] = useState(false);
+  const finishSplash = useCallback(() => setSplashDone(true), []);
 
   useEffect(() => {
-    const splashTimer = setTimeout(() => setSplashDone(true), 1250);
+    // El video dura 9.6 s. Este límite solo evita bloquear el arranque si el
+    // reproductor nativo no puede abrirlo en un dispositivo concreto.
+    const splashFallback = setTimeout(finishSplash, 14_000);
     const hydrationFallback = setTimeout(() => {
       if (!useAppStore.getState().hydrated) setHydrated(true);
     }, 3000);
     configureNotifications().catch((error) => console.warn('[LuluFinity] notification setup skipped', error));
     return () => {
-      clearTimeout(splashTimer);
+      clearTimeout(splashFallback);
       clearTimeout(hydrationFallback);
     };
-  }, [setHydrated]);
+  }, [finishSplash, setHydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -63,7 +66,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" backgroundColor="#09070D" />
       <AppErrorBoundary>
-        {!hydrated || !splashDone ? <SplashView /> : <View style={styles.appRoot}><AppNavigator /><CelebrationOverlay /></View>}
+        {!hydrated || !splashDone ? <SplashView onFinished={finishSplash} /> : <View style={styles.appRoot}><AppNavigator /><CelebrationOverlay /></View>}
       </AppErrorBoundary>
     </SafeAreaProvider>
   );

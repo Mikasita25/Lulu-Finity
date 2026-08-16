@@ -10,11 +10,11 @@ Versión Android, mobile-first, de Lulú Finity. Vive junto a la aplicación de 
 - NativeWind 4
 - Reanimated 4
 - WebSocket nativo hacia el relay actual de Lulú Finity
-- Expo Notifications, Haptics, Audio, Speech, Application, Document Picker y Sharing
+- Expo Notifications, Haptics, Audio, Video, Speech, Application, Document Picker y Sharing
 
 ## Funciones principales
 
-- Splash, onboarding y conexión por usuario de TikTok LIVE
+- Splash con video local centrado, onboarding y conexión por usuario de TikTok LIVE
 - Dashboard y Vista en Vivo
 - TTS Bot para comentarios
 - Metas animadas
@@ -52,11 +52,11 @@ PC y Android tienen canales separados. El móvil solo reconoce tags de GitHub co
 
 La app consulta los releases públicos de `Mikasita25/Lulu-Finity`, compara la versión instalada y localiza el asset `.apk`. Si hay una versión superior, muestra el changelog y abre la descarga del APK.
 
-El workflow `.github/workflows/mobile-release.yml` compila y publica automáticamente el APK cuando se crea un tag móvil. Ejemplo para 1.1.1:
+El workflow `.github/workflows/mobile-release.yml` compila y publica automáticamente el APK cuando se crea un tag móvil. Ejemplo para 1.1.2:
 
 ```bash
-git tag mobile-v1.1.1
-git push origin mobile-v1.1.1
+git tag mobile-v1.1.2
+git push origin mobile-v1.1.2
 ```
 
 El tag debe coincidir con `mobile/package.json` y `mobile/app.json`. El `android.versionCode` debe incrementarse en cada release instalable.

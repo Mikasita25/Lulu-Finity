@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: 22.13.1
           cache: npm
-          cache-dependency-path: mobile/package.json
+          cache-dependency-path: mobile/package-lock.json
       - name: Java 17
         uses: actions/setup-java@v4
         with:
@@ -51,13 +51,15 @@ jobs:
       - name: Android SDK
         uses: android-actions/setup-android@v3
       - name: Dependencias
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Validar versiones Expo
         run: npx expo install --check
       - name: TypeScript
         run: npm run typecheck
       - name: Pruebas del LIVE
         run: npm run test:realtime
+      - name: Pruebas de interfaz móvil
+        run: npm run test:ui
       - name: Expo Doctor
         run: npm run doctor
       - name: Generar proyecto Android

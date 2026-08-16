@@ -1,4 +1,15 @@
-# Lulú Finity Mobile 1.1.1
+# Lulú Finity Mobile
+
+## 1.1.2
+
+- Muestra `1000127063.mp4` al iniciar, centrado y conservando su proporción 16:9 sin estirarlo horizontalmente.
+- Reproduce el video completo una vez y continúa automáticamente; incluye una salida segura si Android no logra abrirlo.
+- Coloca el texto exacto “Iniciando Lulu Finity” debajo del video.
+- Lleva el panel de conexión al inicio, como en PC, con usuario, estado “Desconectado / Conectando / LIVE conectado” y el botón “Conectar al LIVE”.
+- Mantiene visible “Conectando…” hasta que el relay confirme la conexión real con TikTok.
+- Actualiza Android a `versionCode` 4.
+
+## 1.1.1
 
 - Corrige la recepción de paquetes agrupados de EulerStream (`messages`), que antes se descartaban y dejaban el Dashboard sin comentarios ni eventos.
 - Los comentarios vuelven a activar TTS, sonidos, automatizaciones, metas, historial y rankings.

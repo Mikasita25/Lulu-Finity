@@ -1,16 +1,36 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useEventListener } from 'expo';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles } from 'lucide-react-native';
 
-export function SplashView() {
+const startupVideo = require('../../assets/startup-lulu.mp4');
+
+export function SplashView({ onFinished }: { onFinished: () => void }) {
+  const finished = useRef(false);
   const pulse = useSharedValue(0.45);
+  const finish = useCallback(() => {
+    if (finished.current) return;
+    finished.current = true;
+    onFinished();
+  }, [onFinished]);
+
+  const player = useVideoPlayer(startupVideo, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.muted = true;
+    videoPlayer.play();
+  });
+
+  useEventListener(player, 'playToEnd', finish);
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'error') finish();
+  });
 
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1, { duration: 850 }), -1, true);
@@ -23,17 +43,21 @@ export function SplashView() {
 
   return (
     <LinearGradient
-      colors={['#09070D', '#1C0B20', '#09070D']}
+      colors={['#050508', '#130A16', '#050508']}
       locations={[0, 0.5, 1]}
       style={styles.root}
     >
-      <View style={styles.logoBox}>
-        <Sparkles size={44} color="#FF79CF" strokeWidth={2.4} />
+      <View style={styles.videoFrame}>
+        <VideoView
+          player={player}
+          style={styles.video}
+          nativeControls={false}
+          contentFit="contain"
+          surfaceType="textureView"
+        />
       </View>
 
-      <Text style={styles.title}>Lulú Finity</Text>
-      <Text style={styles.subtitle}>LIVE COMPANION PARA ANDROID</Text>
-      <Text style={styles.loadingLabel}>Iniciando Lulú Finity…</Text>
+      <Text style={styles.loadingLabel}>Iniciando Lulu Finity</Text>
 
       <View style={styles.track}>
         <Animated.View style={[styles.loader, loaderStyle]} />
@@ -49,32 +73,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  logoBox: {
-    width: 96,
-    height: 96,
-    borderRadius: 34,
+  videoFrame: {
+    width: '88%',
+    maxWidth: 440,
+    aspectRatio: 16 / 9,
+    alignSelf: 'center',
+    overflow: 'hidden',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,121,207,0.30)',
-    backgroundColor: 'rgba(255,95,200,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: 'rgba(255,121,207,0.22)',
+    backgroundColor: '#020204',
   },
-  title: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginTop: 24 },
-  subtitle: {
-    color: '#E6B7D5',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2.2,
-    marginTop: 7,
+  video: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#020204',
   },
-  loadingLabel: { color: '#B9A8B6', fontSize: 13, fontWeight: '700', marginTop: 34 },
+  loadingLabel: {
+    color: '#F5D6EA',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    marginTop: 28,
+  },
   track: {
     width: 148,
     height: 6,
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.10)',
     overflow: 'hidden',
-    marginTop: 12,
+    marginTop: 14,
   },
   loader: {
     width: '100%',

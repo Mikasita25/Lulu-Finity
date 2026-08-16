@@ -34,7 +34,7 @@ export function OnboardingScreen({ navigation }: any) {
     if (index < slides.length - 1) setIndex((value) => value + 1);
     else {
       finish();
-      navigation.replace('Connect');
+      navigation.replace('Main');
     }
   };
 

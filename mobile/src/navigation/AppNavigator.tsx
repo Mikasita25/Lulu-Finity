@@ -63,10 +63,9 @@ function MainTabs() {
 
 export function AppNavigator() {
   const onboardingDone = useAppStore((state) => state.onboardingDone);
-  const username = useAppStore((state) => state.username);
   const accentTheme = useAppStore((state) => state.accentTheme);
   const accent = accentByTheme[accentTheme];
-  const initial = !onboardingDone ? 'Onboarding' : username ? 'Main' : 'Connect';
+  const initial = !onboardingDone ? 'Onboarding' : 'Main';
 
   return (
     <NavigationContainer theme={makeNavTheme(accent)}>

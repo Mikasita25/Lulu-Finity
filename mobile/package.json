@@ -1,12 +1,13 @@
 {
   "name": "lulu-finity-mobile",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "test:realtime": "node --no-warnings --experimental-strip-types tests/realtime.test.mjs",
+    "test:ui": "node tests/ui-contract.test.mjs",
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
     "prebuild:android": "expo prebuild --platform android --clean"
@@ -29,6 +30,7 @@
     "expo-sharing": "~57.0.10",
     "expo-speech": "~57.0.1",
     "expo-splash-screen": "~57.0.5",
+    "expo-video": "~57.0.2",
     "lucide-react-native": "1.27.0",
     "nativewind": "4.2.6",
     "react": "19.2.3",
