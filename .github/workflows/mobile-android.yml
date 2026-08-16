@@ -51,7 +51,7 @@ jobs:
       - name: Android SDK
         uses: android-actions/setup-android@v3
       - name: Dependencias
-        run: npm ci --no-audit --no-fund
+        run: npm ci --prefix "$GITHUB_WORKSPACE/mobile" --no-audit --no-fund
       - name: Validar versiones Expo
         run: npx expo install --check
       - name: TypeScript
