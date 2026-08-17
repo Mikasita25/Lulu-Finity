@@ -1,7 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { checkForMobileUpdate, type MobileUpdate } from '@/services/updates';
+import {
+  checkForMobileUpdate,
+  currentMobileBuild,
+  currentMobileVersion,
+  type MobileUpdate,
+} from '@/services/updates';
 
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const FAILURE_RETRY_MS = 15 * 60 * 1000;
@@ -33,9 +38,22 @@ export const useUpdateStore = create<UpdateState>()(
       },
       dismissVersion: (dismissedVersion) => set({ dismissedVersion }),
       check: async (force = false) => {
-        const state = get();
+        let state = get();
         if (state.loading) return state.update;
         if (!force && !state.autoCheckEnabled) return state.update;
+
+        // Si Android ya instaló otra versión/build, una respuesta persistida de la
+        // instalación anterior deja de ser válida aunque todavía no hayan pasado 24 h.
+        const installedVersion = currentMobileVersion();
+        const installedBuild = currentMobileBuild();
+        const staleSnapshot = Boolean(
+          state.update &&
+          (state.update.currentVersion !== installedVersion || state.update.currentBuild !== installedBuild),
+        );
+        if (staleSnapshot) {
+          set({ update: undefined, lastCheckedAt: 0, dismissedVersion: undefined, error: '' });
+          state = get();
+        }
 
         const now = Date.now();
         const checkedRecently = now - state.lastCheckedAt < CHECK_INTERVAL_MS;
