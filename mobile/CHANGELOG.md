@@ -1,5 +1,16 @@
 # Lulú Finity Mobile
 
+## 1.1.4
+
+- Usa el logo oficial de Lulú Finity también dentro de la app móvil y como icono de Android.
+- Corrige la revisión automática para conservar la actualización encontrada entre reinicios de la app.
+- Un fallo temporal de red o de GitHub ya no bloquea nuevas comprobaciones durante 24 horas; se permite reintentar automáticamente después de 15 minutos.
+- Al encontrar una versión nueva, la app muestra un aviso automático con acceso directo al APK móvil.
+- Amplía la búsqueda de releases y evita respuestas cacheadas para detectar publicaciones móviles recién creadas.
+- Automatiza la publicación del APK móvil al cambiar la versión nativa en `app.json`, sin reemplazar la release "Latest" de PC.
+- Añade estado de última comprobación correcta y pruebas de regresión del actualizador.
+- Actualiza Android a `versionCode` 6.
+
 ## 1.1.3
 
 - Integra el video directamente en la pantalla de inicio, sin marco, borde ni esquinas redondeadas.
