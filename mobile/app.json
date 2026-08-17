@@ -8,7 +8,7 @@
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.mikasita.lulufinity.mobile",
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": ["POST_NOTIFICATIONS", "VIBRATE"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
