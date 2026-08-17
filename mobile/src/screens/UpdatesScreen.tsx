@@ -13,9 +13,15 @@ function dateLabel(value?: string) {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function checkedLabel(value: number) {
+  if (!value) return 'Todavía no se ha comprobado en este dispositivo.';
+  return `Última comprobación correcta: ${new Date(value).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}`;
+}
+
 export function UpdatesScreen() {
   const autoCheckEnabled = useUpdateStore((state) => state.autoCheckEnabled);
   const setAutoCheckEnabled = useUpdateStore((state) => state.setAutoCheckEnabled);
+  const lastCheckedAt = useUpdateStore((state) => state.lastCheckedAt);
   const loading = useUpdateStore((state) => state.loading);
   const error = useUpdateStore((state) => state.error);
   const update = useUpdateStore((state) => state.update);
@@ -51,12 +57,16 @@ export function UpdatesScreen() {
       </GlassCard>
 
       <GlassCard className="mb-4">
-        <View className="flex-row items-center gap-3 p-5">
-          <View className="flex-1">
-            <Text className="text-sm font-black text-white">Buscar automáticamente</Text>
-            <Text className="mt-1 text-xs leading-5 text-white/40">Revisa una vez cada 24 horas al abrir la app.</Text>
+        <View className="p-5">
+          <View className="flex-row items-center gap-3">
+            <View className="flex-1">
+              <Text className="text-sm font-black text-white">Buscar automáticamente</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/40">Al abrir la app revisa como máximo una vez cada 24 horas. Si encuentra una versión nueva, te muestra el aviso para descargarla.</Text>
+            </View>
+            <Switch value={autoCheckEnabled} onValueChange={setAutoCheckEnabled} trackColor={{ false: '#342C34', true: '#FF5FC8' }} thumbColor="#FFF7FC" />
           </View>
-          <Switch value={autoCheckEnabled} onValueChange={setAutoCheckEnabled} trackColor={{ false: '#342C34', true: '#FF5FC8' }} thumbColor="#FFF7FC" />
+          <Text className="mt-3 text-[11px] leading-5 text-white/30">{checkedLabel(lastCheckedAt)}</Text>
+          <Text className="mt-1 text-[11px] leading-5 text-white/25">Android siempre pedirá tu confirmación antes de instalar un APK nuevo.</Text>
         </View>
       </GlassCard>
 
@@ -72,7 +82,7 @@ export function UpdatesScreen() {
             </View>
             <View className="mt-4 rounded-2xl bg-black/20 p-4"><Text className="text-xs leading-5 text-white/55">{update.notes}</Text></View>
             <View className="mt-4"><Button label={update.downloadUrl ? 'Descargar APK' : 'Abrir release'} onPress={download} icon={<Download size={17} color="white" />} /></View>
-            <Text className="mt-3 text-[11px] leading-5 text-white/30">Android descargará el APK y puede pedir permiso para instalar aplicaciones desde tu navegador o gestor de archivos.</Text>
+            <Text className="mt-3 text-[11px] leading-5 text-white/30">La descarga abre directamente el APK de la release móvil cuando está disponible.</Text>
           </View>
         </GlassCard>
       ) : update ? (
