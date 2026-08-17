@@ -1,6 +1,6 @@
 import * as Application from 'expo-application';
 
-const RELEASES_URL = 'https://api.github.com/repos/Mikasita25/Lulu-Finity/releases?per_page=30';
+const RELEASES_URL = 'https://api.github.com/repos/Mikasita25/Lulu-Finity/releases';
 const MOBILE_TAG_PREFIX = 'mobile-v';
 
 export type MobileUpdate = {
@@ -56,10 +56,14 @@ export function currentMobileBuild() {
 export async function checkForMobileUpdate(): Promise<MobileUpdate> {
   const currentVersion = currentMobileVersion();
   const currentBuild = currentMobileBuild();
-  const response = await fetch(RELEASES_URL, {
+  // Pedimos hasta 100 releases y evitamos reutilizar una respuesta HTTP cacheada.
+  // Así las releases de Windows no pueden desplazar fácilmente a las móviles fuera
+  // de la primera página y una publicación recién creada aparece en la siguiente revisión.
+  const response = await fetch(`${RELEASES_URL}?per_page=100&_=${Date.now()}`, {
     headers: {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
+      'Cache-Control': 'no-cache',
     },
   });
   if (!response.ok) throw new Error(`GitHub respondió ${response.status} al buscar actualizaciones.`);
@@ -85,7 +89,11 @@ export async function checkForMobileUpdate(): Promise<MobileUpdate> {
     };
   }
 
-  const apk = latest.release.assets?.find((asset) => asset.name?.toLowerCase().endsWith('.apk'));
+  const apk = latest.release.assets?.find((asset) => {
+    const name = asset.name?.toLowerCase() ?? '';
+    return name.includes('lulu-finity-mobile-android') && name.endsWith('.apk');
+  });
+
   return {
     currentVersion,
     currentBuild,
