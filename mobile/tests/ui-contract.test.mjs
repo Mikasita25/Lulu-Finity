@@ -46,4 +46,20 @@ assert.equal(appConfig.expo.android.adaptiveIcon.foregroundImage, './assets/adap
 const navigator = read('src/navigation/AppNavigator.tsx');
 assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main'/);
 
-console.log('Interfaz móvil: video, conexión y logo oficial verificados.');
+const updateService = read('src/services/updates.ts');
+assert.match(updateService, /per_page=100/);
+assert.match(updateService, /Cache-Control/);
+assert.match(updateService, /lulu-finity-mobile-android/);
+
+const updateStore = read('src/store/useUpdateStore.ts');
+assert.match(updateStore, /lulu-finity-mobile-updates-v2/);
+assert.match(updateStore, /FAILURE_RETRY_MS/);
+assert.match(updateStore, /update: state\.update/);
+assert.doesNotMatch(updateStore, /error: message, lastCheckedAt: Date\.now\(\)/);
+
+const app = read('App.tsx');
+assert.match(app, /Alert\.alert/);
+assert.match(app, /dismissedVersion/);
+assert.match(app, /update\.downloadUrl \|\| update\.releaseUrl/);
+
+console.log('Interfaz móvil: video, conexión, logo y actualizador automático verificados.');
