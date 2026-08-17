@@ -1,6 +1,6 @@
 import './global.css';
 import React, { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Linking, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { SplashView } from '@/components/SplashView';
@@ -59,13 +59,16 @@ export default function App() {
 
   useEffect(() => {
     if (!hydrated || !splashDone) return;
-    const updateStore = useUpdateStore.getState();
-    if (!updateStore.autoCheckEnabled) return;
 
-    // No bloquea el arranque. Si la revisión ya se hizo recientemente, el store
-    // devuelve la actualización guardada en vez de olvidarla hasta el día siguiente.
-    updateStore.check(false).then((update) => {
+    const checkUpdatesAndPrompt = async () => {
+      const updateStore = useUpdateStore.getState();
+      if (!updateStore.autoCheckEnabled) return;
+
+      // Si la revisión ya se hizo recientemente, el store devuelve la actualización
+      // persistida. Si Android instaló otro build, el store la invalida y consulta de nuevo.
+      const update = await updateStore.check(false);
       if (!update?.available) return;
+
       const latestState = useUpdateStore.getState();
       if (latestState.dismissedVersion === update.latestVersion) return;
       if (promptedUpdate.current === update.latestVersion) return;
@@ -91,7 +94,13 @@ export default function App() {
             : []),
         ],
       );
-    }).catch(() => {});
+    };
+
+    void checkUpdatesAndPrompt();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') void checkUpdatesAndPrompt();
+    });
+    return () => subscription.remove();
   }, [hydrated, splashDone]);
 
   return (
