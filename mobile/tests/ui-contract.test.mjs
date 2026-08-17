@@ -55,11 +55,16 @@ const updateStore = read('src/store/useUpdateStore.ts');
 assert.match(updateStore, /lulu-finity-mobile-updates-v2/);
 assert.match(updateStore, /FAILURE_RETRY_MS/);
 assert.match(updateStore, /update: state\.update/);
+assert.match(updateStore, /currentMobileVersion/);
+assert.match(updateStore, /currentMobileBuild/);
+assert.match(updateStore, /staleSnapshot/);
 assert.doesNotMatch(updateStore, /error: message, lastCheckedAt: Date\.now\(\)/);
 
 const app = read('App.tsx');
 assert.match(app, /Alert\.alert/);
 assert.match(app, /dismissedVersion/);
 assert.match(app, /update\.downloadUrl \|\| update\.releaseUrl/);
+assert.match(app, /AppState\.addEventListener/);
+assert.match(app, /nextState === 'active'/);
 
 console.log('Interfaz móvil: video, conexión, logo y actualizador automático verificados.');
