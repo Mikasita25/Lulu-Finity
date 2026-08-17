@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import Animated, { FadeInRight, ZoomIn } from 'react-native-reanimated';
-import { BellRing, Radio, Sparkles, Trophy } from 'lucide-react-native';
+import { BellRing, Radio, Trophy } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/Button';
 import { useAppStore } from '@/store/useAppStore';
+
+const luluLogo = require('../../assets/icon.png');
 
 const slides = [
   {
@@ -43,9 +45,14 @@ export function OnboardingScreen({ navigation }: any) {
       <View className="pt-10">
         <Animated.View
           entering={ZoomIn.springify().damping(16)}
-          className="h-16 w-16 items-center justify-center rounded-3xl bg-lulu-500/20"
+          className="h-20 w-20 overflow-hidden rounded-[24px]"
         >
-          <Sparkles size={30} color="#FF79CF" strokeWidth={2.5} />
+          <Image
+            source={luluLogo}
+            resizeMode="contain"
+            style={{ width: 80, height: 80 }}
+            accessibilityLabel="Logo de Lulú Finity"
+          />
         </Animated.View>
         <Text className="mt-5 text-xs font-black uppercase tracking-[3px] text-lulu-200/60">
           LULÚ FINITY MOBILE
