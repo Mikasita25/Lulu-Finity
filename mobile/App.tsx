@@ -1,6 +1,6 @@
 import './global.css';
-import React, { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useState } from 'react';
-import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import React, { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Linking, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { SplashView } from '@/components/SplashView';
@@ -40,6 +40,7 @@ export default function App() {
   const hydrated = useAppStore((state) => state.hydrated);
   const setHydrated = useAppStore((state) => state.setHydrated);
   const [splashDone, setSplashDone] = useState(false);
+  const promptedUpdate = useRef<string>();
   const finishSplash = useCallback(() => setSplashDone(true), []);
 
   useEffect(() => {
@@ -57,10 +58,41 @@ export default function App() {
   }, [finishSplash, setHydrated]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    // No bloquea el arranque. El store limita la revisión automática a una vez por día.
-    useUpdateStore.getState().check(false).catch(() => {});
-  }, [hydrated]);
+    if (!hydrated || !splashDone) return;
+    const updateStore = useUpdateStore.getState();
+    if (!updateStore.autoCheckEnabled) return;
+
+    // No bloquea el arranque. Si la revisión ya se hizo recientemente, el store
+    // devuelve la actualización guardada en vez de olvidarla hasta el día siguiente.
+    updateStore.check(false).then((update) => {
+      if (!update?.available) return;
+      const latestState = useUpdateStore.getState();
+      if (latestState.dismissedVersion === update.latestVersion) return;
+      if (promptedUpdate.current === update.latestVersion) return;
+      promptedUpdate.current = update.latestVersion;
+
+      const url = update.downloadUrl || update.releaseUrl;
+      Alert.alert(
+        `Lulú Finity Mobile ${update.latestVersion}`,
+        'Hay una actualización disponible. Puedes descargar el APK nuevo ahora; Android te pedirá confirmar la instalación.',
+        [
+          {
+            text: 'Ahora no',
+            style: 'cancel',
+            onPress: () => useUpdateStore.getState().dismissVersion(update.latestVersion),
+          },
+          ...(url
+            ? [{
+                text: 'Descargar',
+                onPress: () => {
+                  Linking.openURL(url).catch((error) => console.warn('[LuluFinity] update link failed', error));
+                },
+              }]
+            : []),
+        ],
+      );
+    }).catch(() => {});
+  }, [hydrated, splashDone]);
 
   return (
     <SafeAreaProvider>
