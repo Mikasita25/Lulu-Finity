@@ -7,7 +7,7 @@ on:
     tags:
       - "mobile-v*"
     paths:
-      - "mobile/package.json"
+      - "mobile/app.json"
   workflow_dispatch:
 
 permissions:
@@ -52,10 +52,10 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION=$(node -p "require('./mobile/package.json').version")
+          VERSION=$(node -p "require('./mobile/app.json').expo.version")
           EXPECTED_TAG="mobile-v${VERSION}"
           if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "${EXPECTED_TAG}" ]]; then
-            echo "El tag ${GITHUB_REF_NAME} no coincide con mobile/package.json (${EXPECTED_TAG})."
+            echo "El tag ${GITHUB_REF_NAME} no coincide con mobile/app.json (${EXPECTED_TAG})."
             exit 1
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
