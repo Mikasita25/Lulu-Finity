@@ -3,7 +3,7 @@
 ## 1.1.4
 
 - Usa el logo oficial de Lulú Finity también dentro de la app móvil y como icono de Android.
-- Sustituye los PNG de icono dañados por una copia limpia del recurso original para que Expo pueda generar correctamente los iconos nativos.
+- Sustituye los PNG de icono dañados por una copia limpia y compatible con Expo del recurso original.
 - Corrige la revisión automática para conservar la actualización encontrada entre reinicios de la app.
 - Un fallo temporal de red o de GitHub ya no bloquea nuevas comprobaciones durante 24 horas; se permite reintentar automáticamente después de 15 minutos.
 - Al encontrar una versión nueva, la app muestra un aviso automático con acceso directo al APK móvil.
@@ -12,7 +12,7 @@
 - Amplía la búsqueda de releases y evita respuestas cacheadas para detectar publicaciones móviles recién creadas.
 - Automatiza la publicación del APK móvil al cambiar la versión nativa en `app.json`, sin reemplazar la release "Latest" de PC.
 - Añade estado de última comprobación correcta y pruebas de regresión del actualizador.
-- Actualiza Android a `versionCode` 7.
+- Actualiza Android a `versionCode` 8.
 
 ## 1.1.3
 
