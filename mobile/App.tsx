@@ -40,7 +40,7 @@ export default function App() {
   const hydrated = useAppStore((state) => state.hydrated);
   const setHydrated = useAppStore((state) => state.setHydrated);
   const [splashDone, setSplashDone] = useState(false);
-  const promptedUpdate = useRef<string>();
+  const promptedUpdate = useRef<string | undefined>(undefined);
   const finishSplash = useCallback(() => setSplashDone(true), []);
 
   useEffect(() => {
