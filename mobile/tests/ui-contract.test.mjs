@@ -31,7 +31,19 @@ assert.match(connection, /Conectar al LIVE/);
 assert.match(connection, /Desconectado/);
 assert.match(connection, /LIVE conectado/);
 
+const header = read('src/components/AppHeader.tsx');
+assert.match(header, /assets\/icon\.png/);
+assert.match(header, /Logo de Lulú Finity/);
+
+const onboarding = read('src/screens/OnboardingScreen.tsx');
+assert.match(onboarding, /assets\/icon\.png/);
+assert.match(onboarding, /Logo de Lulú Finity/);
+
+const appConfig = JSON.parse(read('app.json'));
+assert.equal(appConfig.expo.icon, './assets/icon.png');
+assert.equal(appConfig.expo.android.adaptiveIcon.foregroundImage, './assets/adaptive-icon.png');
+
 const navigator = read('src/navigation/AppNavigator.tsx');
 assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main'/);
 
-console.log('Interfaz móvil: video y conexión de Inicio verificados.');
+console.log('Interfaz móvil: video, conexión y logo oficial verificados.');
