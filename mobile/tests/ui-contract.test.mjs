@@ -45,6 +45,43 @@ assert.equal(appConfig.expo.android.adaptiveIcon.foregroundImage, './assets/adap
 
 const navigator = read('src/navigation/AppNavigator.tsx');
 assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main'/);
+assert.match(navigator, /name="Music"/);
+assert.match(navigator, /name="RecentActivity"/);
+
+const liveView = read('src/screens/LiveViewScreen.tsx');
+assert.match(liveView, /Control del LIVE/);
+assert.match(liveView, /Actividad reciente/);
+assert.match(liveView, /Ahora suena/);
+assert.match(liveView, /filterRecentEvents/);
+
+const recentActivity = read('src/screens/RecentActivityScreen.tsx');
+assert.match(recentActivity, /Mostrar todo/);
+assert.match(recentActivity, /Ocultar todo/);
+assert.match(recentActivity, /Nuevos seguidores/);
+assert.match(recentActivity, /Fan Stickers/);
+
+const music = read('src/screens/MusicScreen.tsx');
+assert.match(music, /Solicitudes del chat/);
+assert.match(music, /!song/);
+assert.match(music, /!sr/);
+assert.match(music, /Pausar solicitudes/);
+assert.match(music, /Abrir en YouTube|Lulú administra la cola/);
+
+const musicRuntime = read('src/services/music.ts');
+assert.match(musicRuntime, /parseSongRequest/);
+assert.match(musicRuntime, /state\.musicPaused/);
+assert.match(musicRuntime, /enqueueSong/);
+
+const liveRuntime = read('src/services/liveRuntime.ts');
+assert.match(liveRuntime, /handleMusicEvent\(message\.event\)/);
+assert.match(liveRuntime, /clearMusicCooldowns/);
+
+const mobileControls = read('src/store/useMobileControlStore.ts');
+assert.match(mobileControls, /!cancion/);
+assert.match(mobileControls, /!song/);
+assert.match(mobileControls, /!sr/);
+assert.match(mobileControls, /recentFilters/);
+assert.match(mobileControls, /songQueue/);
 
 const updateService = read('src/services/updates.ts');
 assert.match(updateService, /per_page=100/);
@@ -67,4 +104,4 @@ assert.match(app, /update\.downloadUrl \|\| update\.releaseUrl/);
 assert.match(app, /AppState\.addEventListener/);
 assert.match(app, /nextState === 'active'/);
 
-console.log('Interfaz móvil: video, conexión, logo y actualizador automático verificados.');
+console.log('Interfaz móvil: inicio, conexión, logo, control LIVE, actividad, música y actualizador verificados.');
