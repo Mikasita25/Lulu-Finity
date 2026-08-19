@@ -1,5 +1,32 @@
 # Lulú Finity Mobile
 
+## 1.2.0 — en preparación
+
+- Convierte **En Vivo** en un **Control del LIVE** para manejar TTS, música, actividad reciente, metas y ranking desde una sola pantalla.
+- Añade controles rápidos para activar/desactivar TTS y solicitudes de música sin salir del LIVE.
+- Añade una nueva sección **Música** con cola persistente de solicitudes.
+- Acepta solicitudes desde comentarios con `!cancion`, `!song` y `!sr`.
+- Permite agregar canciones manualmente, iniciar una solicitud, pasar a la siguiente, eliminar canciones y vaciar la cola.
+- Permite pausar temporalmente nuevas solicitudes del chat sin borrar la cola existente.
+- Abre la canción elegida mediante búsqueda directa en YouTube para evitar depender de reproductores web no oficiales dentro de Android.
+- Añade límites de cola, límite por usuario y cooldown para reducir spam de solicitudes.
+- Añade una nueva pantalla **Actividad reciente** totalmente configurable.
+- Permite mostrar u ocultar comentarios, regalos, follows, compartidos, suscripciones, Fan Stickers, likes y entradas al LIVE.
+- Permite mostrar todos, ocultar todos y elegir 10, 25 o 50 eventos visibles.
+- Los filtros de Actividad reciente se aplican también al Control del LIVE.
+- Añade pestaña **Música** dentro del Control del LIVE y conserva los modos Todo, Eventos, Meta y Ranking.
+- Mantiene la cola, filtros y preferencias nuevas entre reinicios mediante almacenamiento persistente.
+- Integra las solicitudes de canciones directamente en el runtime normalizado del LIVE, junto a automatizaciones, TTS y efectos existentes.
+- Añade pruebas de regresión para navegación, Control del LIVE, Actividad reciente, comandos de música y runtime.
+- Añade un workflow rápido de calidad que valida TypeScript, contrato del LIVE y contrato de interfaz móvil por separado del build nativo.
+
+### Validación actual
+
+- TypeScript: correcto.
+- Pruebas del LIVE: correctas.
+- Pruebas de interfaz móvil: correctas.
+- El build Android completo sigue detenido antes de Gradle porque `expo install --check` está pidiendo parches más recientes de varios paquetes Expo; no se ha publicado todavía una release 1.2.0 para evitar entregar un APK sin esa validación nativa.
+
 ## 1.1.4
 
 - Usa el logo oficial de Lulú Finity también dentro de la app móvil y como icono de Android.
