@@ -100,6 +100,17 @@ export function MusicScreen() {
               thumbColor="#FFF7FC"
             />
           </View>
+          {music.enabled ? (
+            <Pressable
+              onPress={() => setPaused(!paused)}
+              className={`mt-4 flex-row items-center justify-center gap-2 rounded-2xl px-4 py-3 ${paused ? 'bg-amber-500/15' : 'bg-white/[0.06]'}`}
+            >
+              {paused ? <Play size={16} color="#FCD34D" fill="#FCD34D" /> : <Pause size={16} color="#FF9DDA" />}
+              <Text className={`text-xs font-black ${paused ? 'text-amber-200' : 'text-white/60'}`}>
+                {paused ? 'Reanudar solicitudes' : 'Pausar solicitudes'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </GlassCard>
 
@@ -147,20 +158,14 @@ export function MusicScreen() {
               <Text className="text-lg font-black text-white">{current.query}</Text>
               <Text className="mt-1 text-xs text-white/35">pedido por @{current.requestedBy}</Text>
               <View className="mt-5 flex-row gap-2">
-                <Pressable
-                  onPress={() => setPaused(!paused)}
-                  className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3"
-                >
-                  {paused ? <Play size={16} color="#FF9DDA" fill="#FF9DDA" /> : <Pause size={16} color="#FF9DDA" />}
-                  <Text className="text-xs font-black text-white">{paused ? 'Reanudar' : 'Pausar'}</Text>
+                <Pressable onPress={() => openSong(current)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
+                  <ExternalLink size={16} color="#FF9DDA" />
+                  <Text className="text-xs font-black text-white">Abrir</Text>
                 </Pressable>
                 <Pressable onPress={skip} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                   <SkipForward size={16} color="#FF9DDA" />
                   <Text className="text-xs font-black text-white">Siguiente</Text>
                 </Pressable>
-              </View>
-              <View className="mt-3">
-                <Button label="Abrir en YouTube" variant="secondary" onPress={() => openSong(current)} icon={<ExternalLink size={17} color="white" />} />
               </View>
             </>
           ) : (
@@ -192,7 +197,7 @@ export function MusicScreen() {
       ) : null}
 
       <Text className="mt-4 text-center text-[10px] leading-5 text-white/25">
-        Lulú administra la cola dentro de la app. La canción actual se abre en YouTube para evitar depender de reproductores no oficiales que se rompen con cambios del servicio.
+        Lulú administra la cola dentro de la app y abre la canción elegida en YouTube. “Pausar solicitudes” detiene temporalmente nuevas peticiones del chat sin borrar la cola.
       </Text>
     </Screen>
   );
