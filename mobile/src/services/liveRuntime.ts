@@ -3,6 +3,7 @@ import { LiveSocket } from './realtime/LiveSocket';
 import { runEventEffects } from './effects';
 import { handleTtsEvent, stopTts } from './tts';
 import { clearInteractionCooldowns, runInteractionRules } from './interactions';
+import { clearMusicCooldowns, handleMusicEvent } from './music';
 
 function top3Snapshot() {
   return Object.values(useAppStore.getState().leaderboard)
@@ -32,6 +33,7 @@ const socket = new LiveSocket((message) => {
   // comandos, regalos y stickers comparten el mismo motor y no dependen del JSON
   // crudo que entregue TikTok/Euler en una versión concreta.
   runInteractionRules(message.event).catch(() => {});
+  handleMusicEvent(message.event);
   handleTtsEvent(message.event);
   runEventEffects(message.event, previousTop3).catch(() => {});
 });
@@ -42,6 +44,7 @@ export function connectLive(username?: string) {
   if (!target) throw new Error('Escribe un usuario de TikTok.');
   stopTts().catch(() => {});
   clearInteractionCooldowns();
+  clearMusicCooldowns();
   state.resetSession();
   socket.connect(target);
 }
@@ -49,5 +52,6 @@ export function connectLive(username?: string) {
 export function disconnectLive() {
   stopTts().catch(() => {});
   clearInteractionCooldowns();
+  clearMusicCooldowns();
   socket.disconnect();
 }
