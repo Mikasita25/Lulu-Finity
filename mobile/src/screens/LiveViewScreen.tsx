@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { AudioLines, Filter, Gift, ListMusic, Music2, Pause, Play, Share2, SkipForward, Sparkles, Trophy } from 'lucide-react-native';
@@ -13,6 +13,7 @@ import { useAppStore, getGoalProgress } from '@/store/useAppStore';
 import { useTtsStore } from '@/store/useTtsStore';
 import { filterRecentEvents, useMobileControlStore } from '@/store/useMobileControlStore';
 import { stopTts } from '@/services/tts';
+import { youtubeSearchUrl } from '@/services/music';
 import { compactNumber } from '@/utils/format';
 
 type LiveViewMode = 'full' | 'events' | 'goal' | 'ranking' | 'music';
@@ -50,7 +51,7 @@ function QuickControl({
   subtitle: string;
   active: boolean;
   onPress: () => void;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }) {
   return (
     <Pressable
@@ -96,6 +97,16 @@ export function LiveViewScreen({ navigation }: any) {
     if (!next) await stopTts().catch(() => {});
   };
 
+  const skipSong = async () => {
+    const next = skipCurrentSong();
+    if (!next) return;
+    try {
+      await Linking.openURL(youtubeSearchUrl(next.query));
+    } catch (error) {
+      Alert.alert('No se pudo abrir la siguiente canción', error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const share = async () => {
     if (!exportRef.current) return;
     try {
@@ -130,8 +141,8 @@ export function LiveViewScreen({ navigation }: any) {
         />
         <QuickControl
           title="Música"
-          subtitle={`${songQueue.length} en cola`}
-          active={music.enabled}
+          subtitle={musicPaused ? 'Solicitudes pausadas' : `${songQueue.length} en cola`}
+          active={music.enabled && !musicPaused}
           onPress={() => updateMusic({ enabled: !music.enabled })}
           icon={<Music2 size={17} color="#FF9DDA" />}
         />
@@ -189,11 +200,11 @@ export function LiveViewScreen({ navigation }: any) {
                     <View className="mt-4 flex-row gap-2">
                       <Pressable onPress={() => setMusicPaused(!musicPaused)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                         {musicPaused ? <Play size={15} color="#FF9DDA" fill="#FF9DDA" /> : <Pause size={15} color="#FF9DDA" />}
-                        <Text className="text-xs font-black text-white">{musicPaused ? 'Reanudar' : 'Pausar'}</Text>
+                        <Text className="text-xs font-black text-white">{musicPaused ? 'Reanudar pedidos' : 'Pausar pedidos'}</Text>
                       </Pressable>
-                      <Pressable onPress={() => skipCurrentSong()} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
+                      <Pressable onPress={() => void skipSong()} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                         <SkipForward size={15} color="#FF9DDA" />
-                        <Text className="text-xs font-black text-white">Saltar</Text>
+                        <Text className="text-xs font-black text-white">Siguiente</Text>
                       </Pressable>
                     </View>
                   </>
