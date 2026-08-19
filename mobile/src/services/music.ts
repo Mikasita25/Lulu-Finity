@@ -26,7 +26,7 @@ export function parseSongRequest(comment: string) {
 export function handleMusicEvent(event: LiveEvent) {
   if (event.type !== 'comment' || !event.comment) return;
   const state = useMobileControlStore.getState();
-  if (!state.music.enabled) return;
+  if (!state.music.enabled || state.musicPaused) return;
 
   const request = parseSongRequest(event.comment);
   if (!request?.query) return;
