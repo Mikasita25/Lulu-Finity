@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { AudioLines, ChevronRight, DownloadCloud, History, Palette, Settings, UserRound, Volume2, Zap } from 'lucide-react-native';
+import { AudioLines, ChevronRight, DownloadCloud, History, ListFilter, Music2, Palette, Settings, UserRound, Volume2, Zap } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { AppHeader } from '@/components/AppHeader';
 import { GlassCard } from '@/components/GlassCard';
@@ -8,6 +8,8 @@ import { useUpdateStore } from '@/store/useUpdateStore';
 
 const items = [
   { route: 'TTS', title: 'TTS Bot', subtitle: 'Leer comentarios del LIVE con voz', icon: AudioLines },
+  { route: 'Music', title: 'Música', subtitle: 'Solicitudes !cancion, cola y controles', icon: Music2 },
+  { route: 'RecentActivity', title: 'Actividad reciente', subtitle: 'Elegir qué eventos aparecen durante el LIVE', icon: ListFilter },
   { route: 'Interactions', title: 'Automatizaciones', subtitle: 'Comandos, Fan Stickers, sonidos y TTS', icon: Zap },
   { route: 'History', title: 'Historial', subtitle: 'Eventos y filtros', icon: History },
   { route: 'Sounds', title: 'Sonidos', subtitle: 'Alertas y preview', icon: Volume2 },
