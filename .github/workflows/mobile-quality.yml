@@ -1,0 +1,42 @@
+name: Lulú Finity Mobile Quality
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/lulu-finity-mobile-android
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-quality.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-quality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Dependencias
+        run: npm ci --no-audit --no-fund
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Pruebas del LIVE
+        run: npm run test:realtime
+      - name: Pruebas de interfaz móvil
+        run: npm run test:ui
