@@ -52,31 +52,30 @@ export function MusicScreen({ navigation }: any) {
 
   const startSong = (song: SongRequest) => {
     playSong(song);
-    openSong(song);
   };
 
   const startNext = () => {
-    const song = playNextSong();
-    if (song) openSong(song);
+    playNextSong();
   };
 
   const skip = () => {
-    const song = skipCurrentSong();
-    if (song) openSong(song);
+    skipCurrentSong();
   };
 
   const addManual = () => {
+    const wasIdle = !current;
     const result = enqueueSong(manualQuery, 'streamer', 'manual');
     if (!result.ok) {
       Alert.alert('No se pudo agregar', result.reason === 'queue_full' ? 'La cola está llena.' : 'Escribe una canción o artista.');
       return;
     }
+    if (wasIdle) playSong(result.song);
     setManualQuery('');
   };
 
   return (
     <Screen>
-      <AppHeader title="Música" subtitle="Solicitudes de canciones y reproducción dentro de Lulú Finity." />
+      <AppHeader title="Música" subtitle="Solicitudes automáticas y reproducción dentro de Lulú Finity." />
 
       <GlassCard>
         <View className="p-5">
@@ -114,9 +113,9 @@ export function MusicScreen({ navigation }: any) {
           <ShieldCheck size={18} color="#86EFAC" />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-black text-white">YouTube dentro de Lulú</Text>
+          <Text className="text-sm font-black text-white">Reproducción automática</Text>
           <Text className="mt-1 text-xs leading-5 text-white/40">
-            El reproductor ya no te saca de la app y usa bloqueo de anuncios, overlays y popups dentro del navegador.
+            Si alguien usa el comando y no hay nada sonando, Lulú busca la canción y la reproduce inmediatamente. Las siguientes solicitudes entran a la cola y avanzan solas al terminar.
           </Text>
         </View>
       </View>
@@ -152,7 +151,7 @@ export function MusicScreen({ navigation }: any) {
             className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-sm font-bold text-white"
           />
           <View className="mt-3">
-            <Button label="Agregar a la cola" onPress={addManual} icon={<ListMusic size={17} color="white" />} />
+            <Button label={current ? 'Agregar a la cola' : 'Reproducir ahora'} onPress={addManual} icon={<ListMusic size={17} color="white" />} />
           </View>
         </View>
       </GlassCard>
@@ -167,7 +166,7 @@ export function MusicScreen({ navigation }: any) {
               <View className="mt-5 flex-row gap-2">
                 <Pressable onPress={() => openSong(current)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-lulu-500/15 px-3 py-3">
                   <ShieldCheck size={16} color="#FF9DDA" />
-                  <Text className="text-xs font-black text-white">Abrir reproductor</Text>
+                  <Text className="text-xs font-black text-white">Abrir navegador</Text>
                 </Pressable>
                 <Pressable onPress={skip} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                   <SkipForward size={16} color="#FF9DDA" />
@@ -177,8 +176,8 @@ export function MusicScreen({ navigation }: any) {
             </>
           ) : (
             <>
-              <Text className="text-sm font-black text-white">No hay canción activa</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/35">La siguiente solicitud se abrirá en el navegador interno de YouTube.</Text>
+              <Text className="text-sm font-black text-white">Esperando una solicitud</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/35">El próximo comando válido empezará a reproducirse automáticamente.</Text>
               <View className="mt-4">
                 <Button label="Reproducir siguiente" onPress={startNext} disabled={!queue.length} icon={<Play size={17} color="white" />} />
               </View>
@@ -204,7 +203,7 @@ export function MusicScreen({ navigation }: any) {
       ) : null}
 
       <Text className="mt-4 text-center text-[10px] leading-5 text-white/25">
-        El bloqueo es de mejor esfuerzo: YouTube puede cambiar su página y requerir ajustes futuros. La cola y los comandos siguen siendo controlados por Lulú Finity.
+        Lulú mantiene el motor de YouTube activo mientras usas la app. El bloqueo de anuncios es de mejor esfuerzo y puede requerir ajustes si YouTube cambia su página.
       </Text>
     </Screen>
   );
