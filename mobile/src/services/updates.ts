@@ -1,5 +1,7 @@
 import * as Application from 'expo-application';
 
+export const MOBILE_UPDATES_ENABLED = false;
+
 const RELEASES_URL = 'https://api.github.com/repos/Mikasita25/Lulu-Finity/releases';
 const MOBILE_TAG_PREFIX = 'mobile-v';
 
@@ -56,9 +58,20 @@ export function currentMobileBuild() {
 export async function checkForMobileUpdate(): Promise<MobileUpdate> {
   const currentVersion = currentMobileVersion();
   const currentBuild = currentMobileBuild();
-  // Pedimos hasta 100 releases y evitamos reutilizar una respuesta HTTP cacheada.
-  // Así las releases de Windows no pueden desplazar fácilmente a las móviles fuera
-  // de la primera página y una publicación recién creada aparece en la siguiente revisión.
+
+  // Desactivado temporalmente mientras Lulú migra a un sistema de updates propio.
+  // Este retorno ocurre antes de cualquier request a GitHub.
+  if (!MOBILE_UPDATES_ENABLED) {
+    return {
+      currentVersion,
+      currentBuild,
+      latestVersion: currentVersion,
+      available: false,
+      releaseName: 'Lulú Finity Mobile',
+      notes: 'Actualizaciones automáticas temporalmente desactivadas.',
+    };
+  }
+
   const response = await fetch(`${RELEASES_URL}?per_page=100&_=${Date.now()}`, {
     headers: {
       Accept: 'application/vnd.github+json',
