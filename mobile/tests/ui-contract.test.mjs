@@ -42,9 +42,16 @@ assert.match(onboarding, /Logo de Lulú Finity/);
 const appConfig = JSON.parse(read('app.json'));
 assert.equal(appConfig.expo.icon, './assets/icon.png');
 assert.equal(appConfig.expo.android.adaptiveIcon.foregroundImage, './assets/adaptive-icon.png');
+assert.ok(
+  appConfig.expo.plugins.some(
+    (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-audio' && plugin[1]?.enableBackgroundPlayback === true,
+  ),
+  'expo-audio debe declarar enableBackgroundPlayback para mantener la sesión multimedia en Android.',
+);
 
 const packageJson = JSON.parse(read('package.json'));
 assert.equal(packageJson.dependencies['react-native-webview'], '13.16.1');
+assert.ok(packageJson.dependencies['expo-audio']);
 
 const navigator = read('src/navigation/AppNavigator.tsx');
 assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main'/);
@@ -58,6 +65,9 @@ assert.match(liveView, /Actividad reciente/);
 assert.match(liveView, /Ahora suena/);
 assert.match(liveView, /filterRecentEvents/);
 assert.match(liveView, /YouTubeBrowser/);
+assert.match(liveView, /MusicVolumeControl/);
+assert.match(liveView, /Pausar música/);
+assert.match(liveView, /Reanudar música/);
 assert.doesNotMatch(liveView, /Linking\.openURL/);
 
 const recentActivity = read('src/screens/RecentActivityScreen.tsx');
@@ -66,12 +76,21 @@ assert.match(recentActivity, /Ocultar todo/);
 assert.match(recentActivity, /Nuevos seguidores/);
 assert.match(recentActivity, /Fan Stickers/);
 
+const volumeControl = read('src/components/MusicVolumeControl.tsx');
+assert.match(volumeControl, /Volumen de música/);
+assert.match(volumeControl, /updateMusic\(\{ volume:/);
+assert.match(volumeControl, /Silenciar música/);
+assert.match(volumeControl, /Subir volumen/);
+assert.match(volumeControl, /Bajar volumen/);
+
 const music = read('src/screens/MusicScreen.tsx');
 assert.match(music, /Solicitudes del chat/);
 assert.match(music, /!song/);
 assert.match(music, /!sr/);
 assert.match(music, /Pausar solicitudes/);
-assert.match(music, /Reproducción automática/);
+assert.match(music, /Reproducción persistente/);
+assert.match(music, /MusicVolumeControl/);
+assert.match(music, /Pausar música/);
 assert.match(music, /YouTubeBrowser/);
 assert.match(music, /wasIdle/);
 assert.match(music, /if \(wasIdle\) playSong\(result\.song\)/);
@@ -89,6 +108,13 @@ assert.match(youtubeBrowser, /Bloqueo activo/);
 assert.match(youtubeBrowser, /skipCurrentSong/);
 
 const playbackHost = read('src/components/MusicPlaybackHost.tsx');
+assert.match(playbackHost, /setAudioModeAsync/);
+assert.match(playbackHost, /shouldPlayInBackground: true/);
+assert.match(playbackHost, /setActiveForLockScreen/);
+assert.match(playbackHost, /BACKGROUND_KEEPER_URI/);
+assert.match(playbackHost, /AppState\.addEventListener/);
+assert.match(playbackHost, /__luluDesiredVolume/);
+assert.match(playbackHost, /__luluPlaybackPaused/);
 assert.match(playbackHost, /mediaPlaybackRequiresUserAction=\{false\}/);
 assert.match(playbackHost, /openFirstResult/);
 assert.match(playbackHost, /video\.play\(\)/);
@@ -115,6 +141,9 @@ assert.match(mobileControls, /!song/);
 assert.match(mobileControls, /!sr/);
 assert.match(mobileControls, /recentFilters/);
 assert.match(mobileControls, /songQueue/);
+assert.match(mobileControls, /playbackPaused/);
+assert.match(mobileControls, /setPlaybackPaused/);
+assert.match(mobileControls, /volume:/);
 
 const updateService = read('src/services/updates.ts');
 assert.match(updateService, /per_page=100/);
@@ -138,4 +167,4 @@ assert.match(app, /AppState\.addEventListener/);
 assert.match(app, /nextState === 'active'/);
 assert.match(app, /MusicPlaybackHost/);
 
-console.log('Interfaz móvil: inicio, conexión, control LIVE, música automática, navegador interno y actualizador verificados.');
+console.log('Interfaz móvil: música automática, volumen, segundo plano, navegador interno y actualizador verificados.');
