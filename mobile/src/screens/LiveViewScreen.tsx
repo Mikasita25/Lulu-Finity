@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Linking, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import { AudioLines, Filter, Gift, ListMusic, Music2, Pause, Play, Share2, SkipForward, Sparkles, Trophy } from 'lucide-react-native';
+import { AudioLines, Filter, Gift, ListMusic, Music2, Pause, Play, Share2, ShieldCheck, SkipForward, Sparkles, Trophy } from 'lucide-react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { Screen } from '@/components/Screen';
 import { AppHeader } from '@/components/AppHeader';
@@ -13,7 +13,6 @@ import { useAppStore, getGoalProgress } from '@/store/useAppStore';
 import { useTtsStore } from '@/store/useTtsStore';
 import { filterRecentEvents, useMobileControlStore } from '@/store/useMobileControlStore';
 import { stopTts } from '@/services/tts';
-import { youtubeSearchUrl } from '@/services/music';
 import { compactNumber } from '@/utils/format';
 
 type LiveViewMode = 'full' | 'events' | 'goal' | 'ranking' | 'music';
@@ -97,14 +96,14 @@ export function LiveViewScreen({ navigation }: any) {
     if (!next) await stopTts().catch(() => {});
   };
 
-  const skipSong = async () => {
+  const openBrowser = (query?: string) => {
+    if (!query) return;
+    navigation.navigate('YouTubeBrowser', { query });
+  };
+
+  const skipSong = () => {
     const next = skipCurrentSong();
-    if (!next) return;
-    try {
-      await Linking.openURL(youtubeSearchUrl(next.query));
-    } catch (error) {
-      Alert.alert('No se pudo abrir la siguiente canción', error instanceof Error ? error.message : String(error));
-    }
+    if (next) openBrowser(next.query);
   };
 
   const share = async () => {
@@ -191,18 +190,25 @@ export function LiveViewScreen({ navigation }: any) {
                 <View className="flex-row items-center gap-2">
                   <ListMusic size={17} color="#FF9DDA" />
                   <Text className="flex-1 text-sm font-black text-white">Ahora suena</Text>
-                  <Text className="text-[10px] font-black text-white/35">{songQueue.length} EN COLA</Text>
+                  <View className="flex-row items-center gap-1">
+                    <ShieldCheck size={12} color="#86EFAC" />
+                    <Text className="text-[9px] font-black text-emerald-200/70">LULÚ BROWSER</Text>
+                  </View>
                 </View>
                 {currentSong ? (
                   <>
                     <Text numberOfLines={1} className="mt-4 text-base font-black text-white">{currentSong.query}</Text>
-                    <Text className="mt-1 text-xs text-white/35">@{currentSong.requestedBy}</Text>
-                    <View className="mt-4 flex-row gap-2">
+                    <Text className="mt-1 text-xs text-white/35">@{currentSong.requestedBy} · {songQueue.length} en cola</Text>
+                    <Pressable onPress={() => openBrowser(currentSong.query)} className="mt-4 flex-row items-center justify-center gap-2 rounded-2xl bg-lulu-500/15 px-3 py-3">
+                      <ShieldCheck size={15} color="#FF9DDA" />
+                      <Text className="text-xs font-black text-white">Abrir reproductor interno</Text>
+                    </Pressable>
+                    <View className="mt-3 flex-row gap-2">
                       <Pressable onPress={() => setMusicPaused(!musicPaused)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                         {musicPaused ? <Play size={15} color="#FF9DDA" fill="#FF9DDA" /> : <Pause size={15} color="#FF9DDA" />}
                         <Text className="text-xs font-black text-white">{musicPaused ? 'Reanudar pedidos' : 'Pausar pedidos'}</Text>
                       </Pressable>
-                      <Pressable onPress={() => void skipSong()} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
+                      <Pressable onPress={skipSong} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                         <SkipForward size={15} color="#FF9DDA" />
                         <Text className="text-xs font-black text-white">Siguiente</Text>
                       </Pressable>
