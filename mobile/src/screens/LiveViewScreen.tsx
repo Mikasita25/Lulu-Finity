@@ -9,6 +9,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { GlassCard } from '@/components/GlassCard';
 import { Button } from '@/components/Button';
 import { EventRow } from '@/components/EventRow';
+import { MusicVolumeControl } from '@/components/MusicVolumeControl';
 import { useAppStore, getGoalProgress } from '@/store/useAppStore';
 import { useTtsStore } from '@/store/useTtsStore';
 import { filterRecentEvents, useMobileControlStore } from '@/store/useMobileControlStore';
@@ -80,8 +81,10 @@ export function LiveViewScreen({ navigation }: any) {
   const currentSong = useMobileControlStore((state) => state.currentSong);
   const songQueue = useMobileControlStore((state) => state.songQueue);
   const musicPaused = useMobileControlStore((state) => state.musicPaused);
+  const playbackPaused = useMobileControlStore((state) => state.playbackPaused);
   const updateMusic = useMobileControlStore((state) => state.updateMusic);
   const setMusicPaused = useMobileControlStore((state) => state.setMusicPaused);
+  const setPlaybackPaused = useMobileControlStore((state) => state.setPlaybackPaused);
   const skipCurrentSong = useMobileControlStore((state) => state.skipCurrentSong);
   const ttsEnabled = useTtsStore((state) => state.enabled);
   const updateTts = useTtsStore((state) => state.updateTts);
@@ -102,8 +105,7 @@ export function LiveViewScreen({ navigation }: any) {
   };
 
   const skipSong = () => {
-    const next = skipCurrentSong();
-    if (next) openBrowser(next.query);
+    skipCurrentSong();
   };
 
   const share = async () => {
@@ -192,27 +194,43 @@ export function LiveViewScreen({ navigation }: any) {
                   <Text className="flex-1 text-sm font-black text-white">Ahora suena</Text>
                   <View className="flex-row items-center gap-1">
                     <ShieldCheck size={12} color="#86EFAC" />
-                    <Text className="text-[9px] font-black text-emerald-200/70">LULÚ BROWSER</Text>
+                    <Text className="text-[9px] font-black text-emerald-200/70">SEGUNDO PLANO</Text>
                   </View>
                 </View>
                 {currentSong ? (
                   <>
                     <Text numberOfLines={1} className="mt-4 text-base font-black text-white">{currentSong.query}</Text>
                     <Text className="mt-1 text-xs text-white/35">@{currentSong.requestedBy} · {songQueue.length} en cola</Text>
-                    <Pressable onPress={() => openBrowser(currentSong.query)} className="mt-4 flex-row items-center justify-center gap-2 rounded-2xl bg-lulu-500/15 px-3 py-3">
-                      <ShieldCheck size={15} color="#FF9DDA" />
-                      <Text className="text-xs font-black text-white">Abrir reproductor interno</Text>
-                    </Pressable>
+
+                    <MusicVolumeControl compact />
+
                     <View className="mt-3 flex-row gap-2">
-                      <Pressable onPress={() => setMusicPaused(!musicPaused)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
-                        {musicPaused ? <Play size={15} color="#FF9DDA" fill="#FF9DDA" /> : <Pause size={15} color="#FF9DDA" />}
-                        <Text className="text-xs font-black text-white">{musicPaused ? 'Reanudar pedidos' : 'Pausar pedidos'}</Text>
+                      <Pressable
+                        onPress={() => setPlaybackPaused(!playbackPaused)}
+                        className={`flex-1 flex-row items-center justify-center gap-2 rounded-2xl px-3 py-3 ${playbackPaused ? 'bg-emerald-500/15' : 'bg-white/[0.07]'}`}
+                      >
+                        {playbackPaused ? <Play size={15} color="#86EFAC" fill="#86EFAC" /> : <Pause size={15} color="#FF9DDA" />}
+                        <Text className={`text-xs font-black ${playbackPaused ? 'text-emerald-200' : 'text-white'}`}>
+                          {playbackPaused ? 'Reanudar música' : 'Pausar música'}
+                        </Text>
                       </Pressable>
                       <Pressable onPress={skipSong} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                         <SkipForward size={15} color="#FF9DDA" />
                         <Text className="text-xs font-black text-white">Siguiente</Text>
                       </Pressable>
                     </View>
+
+                    <Pressable onPress={() => setMusicPaused(!musicPaused)} className="mt-3 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.05] px-3 py-3">
+                      {musicPaused ? <Play size={15} color="#FCD34D" fill="#FCD34D" /> : <Pause size={15} color="#FF9DDA" />}
+                      <Text className={`text-xs font-black ${musicPaused ? 'text-amber-200' : 'text-white/60'}`}>
+                        {musicPaused ? 'Reanudar solicitudes' : 'Pausar solicitudes'}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable onPress={() => openBrowser(currentSong.query)} className="mt-3 flex-row items-center justify-center gap-2 rounded-2xl bg-lulu-500/15 px-3 py-3">
+                      <ShieldCheck size={15} color="#FF9DDA" />
+                      <Text className="text-xs font-black text-white">Abrir reproductor interno</Text>
+                    </Pressable>
                   </>
                 ) : (
                   <Text className="py-6 text-center text-xs font-semibold text-white/30">Sin canción activa.</Text>
