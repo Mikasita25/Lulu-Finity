@@ -34,6 +34,7 @@ type MobileControlState = {
   songQueue: SongRequest[];
   currentSong?: SongRequest;
   musicPaused: boolean;
+  playbackPaused: boolean;
 
   setRecentFilter: (type: LiveEventType, enabled: boolean) => void;
   setAllRecentFilters: (enabled: boolean) => void;
@@ -46,6 +47,7 @@ type MobileControlState = {
   removeSong: (id: string) => void;
   clearSongQueue: () => void;
   setMusicPaused: (paused: boolean) => void;
+  setPlaybackPaused: (paused: boolean) => void;
 };
 
 const defaultRecentFilters: RecentFilterMap = {
@@ -84,6 +86,7 @@ export const useMobileControlStore = create<MobileControlState>()(
       songQueue: [],
       currentSong: undefined,
       musicPaused: false,
+      playbackPaused: false,
 
       setRecentFilter: (type, enabled) =>
         set((state) => ({ recentFilters: { ...state.recentFilters, [type]: enabled } })),
@@ -151,15 +154,21 @@ export const useMobileControlStore = create<MobileControlState>()(
           currentSong: song,
           songQueue: state.songQueue.filter((item) => item.id !== song.id),
           musicPaused: false,
+          playbackPaused: false,
         })),
       playNextSong: () => {
         const state = get();
         const next = state.songQueue[0];
         if (!next) {
-          set({ currentSong: undefined, musicPaused: false });
+          set({ currentSong: undefined, musicPaused: false, playbackPaused: false });
           return undefined;
         }
-        set({ currentSong: next, songQueue: state.songQueue.slice(1), musicPaused: false });
+        set({
+          currentSong: next,
+          songQueue: state.songQueue.slice(1),
+          musicPaused: false,
+          playbackPaused: false,
+        });
         return next;
       },
       skipCurrentSong: () => {
@@ -169,12 +178,14 @@ export const useMobileControlStore = create<MobileControlState>()(
           currentSong: next,
           songQueue: next ? state.songQueue.slice(1) : [],
           musicPaused: false,
+          playbackPaused: false,
         });
         return next;
       },
       removeSong: (id) => set((state) => ({ songQueue: state.songQueue.filter((song) => song.id !== id) })),
       clearSongQueue: () => set({ songQueue: [] }),
       setMusicPaused: (musicPaused) => set({ musicPaused }),
+      setPlaybackPaused: (playbackPaused) => set({ playbackPaused }),
     }),
     {
       name: 'lulu-finity-mobile-controls-v2',
@@ -195,6 +206,7 @@ export const useMobileControlStore = create<MobileControlState>()(
           recentFilters: { ...defaultRecentFilters, ...(saved.recentFilters ?? {}) },
           music: { ...defaultMusic, ...(saved.music ?? {}) },
           songQueue: Array.isArray(saved.songQueue) ? saved.songQueue : [],
+          playbackPaused: false,
         };
       },
     },
