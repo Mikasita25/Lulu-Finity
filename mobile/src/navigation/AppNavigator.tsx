@@ -18,6 +18,7 @@ import { AppearanceScreen } from '@/screens/AppearanceScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { MusicScreen } from '@/screens/MusicScreen';
+import { YouTubeBrowserScreen } from '@/screens/YouTubeBrowserScreen';
 import { RecentActivityScreen } from '@/screens/RecentActivityScreen';
 import { useAppStore } from '@/store/useAppStore';
 import { accentByTheme } from '@/theme/palette';
@@ -77,6 +78,7 @@ export function AppNavigator() {
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="TTS" component={TtsScreen} />
         <Stack.Screen name="Music" component={MusicScreen} />
+        <Stack.Screen name="YouTubeBrowser" component={YouTubeBrowserScreen} options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="RecentActivity" component={RecentActivityScreen} />
         <Stack.Screen name="Interactions" component={InteractionsScreen} />
         <Stack.Screen name="Updates" component={UpdatesScreen} />
