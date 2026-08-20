@@ -45,5 +45,5 @@ export function clearMusicCooldowns() {
 }
 
 export function youtubeSearchUrl(query: string) {
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query.trim())}`;
+  return `https://m.youtube.com/results?search_query=${encodeURIComponent(query.trim())}`;
 }
