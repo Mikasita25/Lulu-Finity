@@ -43,9 +43,13 @@ const appConfig = JSON.parse(read('app.json'));
 assert.equal(appConfig.expo.icon, './assets/icon.png');
 assert.equal(appConfig.expo.android.adaptiveIcon.foregroundImage, './assets/adaptive-icon.png');
 
+const packageJson = JSON.parse(read('package.json'));
+assert.equal(packageJson.dependencies['react-native-webview'], '13.16.1');
+
 const navigator = read('src/navigation/AppNavigator.tsx');
 assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main'/);
 assert.match(navigator, /name="Music"/);
+assert.match(navigator, /name="YouTubeBrowser"/);
 assert.match(navigator, /name="RecentActivity"/);
 
 const liveView = read('src/screens/LiveViewScreen.tsx');
@@ -53,6 +57,8 @@ assert.match(liveView, /Control del LIVE/);
 assert.match(liveView, /Actividad reciente/);
 assert.match(liveView, /Ahora suena/);
 assert.match(liveView, /filterRecentEvents/);
+assert.match(liveView, /YouTubeBrowser/);
+assert.doesNotMatch(liveView, /Linking\.openURL/);
 
 const recentActivity = read('src/screens/RecentActivityScreen.tsx');
 assert.match(recentActivity, /Mostrar todo/);
@@ -65,12 +71,26 @@ assert.match(music, /Solicitudes del chat/);
 assert.match(music, /!song/);
 assert.match(music, /!sr/);
 assert.match(music, /Pausar solicitudes/);
-assert.match(music, /Abrir en YouTube|Lulú administra la cola/);
+assert.match(music, /YouTube dentro de Lulú/);
+assert.match(music, /YouTubeBrowser/);
+assert.doesNotMatch(music, /Linking\.openURL/);
+
+const youtubeBrowser = read('src/screens/YouTubeBrowserScreen.tsx');
+assert.match(youtubeBrowser, /react-native-webview/);
+assert.match(youtubeBrowser, /YOUTUBE_AD_CLEANUP/);
+assert.match(youtubeBrowser, /ytp-skip-ad-button/);
+assert.match(youtubeBrowser, /fastForwardVideoAd/);
+assert.match(youtubeBrowser, /MutationObserver/);
+assert.match(youtubeBrowser, /setSupportMultipleWindows=\{false\}/);
+assert.match(youtubeBrowser, /javaScriptCanOpenWindowsAutomatically=\{false\}/);
+assert.match(youtubeBrowser, /Bloqueo activo/);
+assert.match(youtubeBrowser, /skipCurrentSong/);
 
 const musicRuntime = read('src/services/music.ts');
 assert.match(musicRuntime, /parseSongRequest/);
 assert.match(musicRuntime, /state\.musicPaused/);
 assert.match(musicRuntime, /enqueueSong/);
+assert.match(musicRuntime, /https:\/\/m\.youtube\.com\/results/);
 
 const liveRuntime = read('src/services/liveRuntime.ts');
 assert.match(liveRuntime, /handleMusicEvent\(message\.event\)/);
@@ -104,4 +124,4 @@ assert.match(app, /update\.downloadUrl \|\| update\.releaseUrl/);
 assert.match(app, /AppState\.addEventListener/);
 assert.match(app, /nextState === 'active'/);
 
-console.log('Interfaz móvil: inicio, conexión, logo, control LIVE, actividad, música y actualizador verificados.');
+console.log('Interfaz móvil: inicio, conexión, control LIVE, actividad, música, navegador interno y actualizador verificados.');
