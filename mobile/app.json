@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Lulú Finity",
+    "slug": "lulu-finity-mobile",
+    "version": "1.2.4",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "com.mikasita.lulufinity.mobile",
+      "versionCode": 13,
+      "permissions": ["POST_NOTIFICATIONS", "VIBRATE"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      }
+    },
+    "plugins": [
+      ["expo-notifications", {"color": "#FF5FC8"}],
+      ["expo-audio", {"enableBackgroundPlayback": true}],
+      "expo-document-picker",
+      "expo-splash-screen"
+    ],
+    "extra": {"relayUrl": "wss://lulu-finity-production.up.railway.app/v1/tiktok/live"},
+    "platforms": ["android"]
+  }
+}

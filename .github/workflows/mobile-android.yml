@@ -1,0 +1,88 @@
+name: Lulú Finity Mobile Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/lulu-finity-mobile-android
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-android.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_PUBLIC_LULU_RELAY_URL: wss://lulu-finity-production.up.railway.app/v1/tiktok/live
+      EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validar acceso al relay
+        shell: bash
+        run: |
+          if [ "${#EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN}" -lt 32 ]; then
+            echo "LULU_RELAY_CLIENT_TOKEN no está configurado o es inválido."
+            exit 1
+          fi
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Dependencias
+        run: npm ci --prefix "$GITHUB_WORKSPACE/mobile" --no-audit --no-fund
+      - name: Alinear parches Expo 57
+        run: >-
+          npx expo install
+          expo@57.0.15
+          expo-asset@57.0.13
+          expo-audio@57.0.4
+          expo-file-system@57.0.5
+          expo-notifications@57.0.13
+          expo-sharing@57.0.14
+          expo-splash-screen@57.0.7
+      - name: Validar versiones Expo
+        run: npx expo install --check
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Pruebas del LIVE
+        run: npm run test:realtime
+      - name: Pruebas de interfaz móvil
+        run: npm run test:ui
+      - name: Expo Doctor
+        run: npm run doctor
+      - name: Generar proyecto Android
+        run: npx expo prebuild --platform android --clean --no-install
+      - name: Compilar APK Android Release ARM64
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+      - name: Publicar APK como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Mobile-Android-Release
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
