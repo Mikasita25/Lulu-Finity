@@ -1,5 +1,23 @@
 # Lulú Finity Mobile
 
+## 1.2.2
+
+- Hace que `!cancion`, `!song` y `!sr` funcionen como en la versión de PC: si no hay canción activa, la primera solicitud pasa inmediatamente a **Ahora suena** y comienza a reproducirse sin intervención manual.
+- Las solicitudes recibidas mientras ya hay una canción sonando se agregan automáticamente a la cola.
+- Añade un **motor de reproducción persistente** (`MusicPlaybackHost`) montado a nivel de la app, por lo que la música sigue funcionando aunque el streamer esté en Inicio, LIVE, Metas, Ranking u otra pantalla.
+- Lulú abre automáticamente la búsqueda móvil de YouTube, selecciona el primer resultado de video válido y ejecuta la reproducción.
+- Cuando el video actual termina, el motor detecta el evento `ended` y comienza automáticamente la siguiente solicitud de la cola.
+- Los pedidos manuales también empiezan a reproducirse inmediatamente cuando el reproductor está libre; si ya hay música, entran a la cola.
+- Los botones **Siguiente** y **Reproducir siguiente** ahora controlan directamente el motor persistente sin obligar a abrir el navegador visible.
+- Conserva **Lulú Browser** como vista opcional para inspeccionar/buscar manualmente, sin que sea necesario tenerlo abierto para reproducir las solicitudes.
+- Mantiene el bloqueo de mejor esfuerzo para banners, overlays, popups y anuncios de video dentro del WebView automático.
+- Mantiene el volumen configurado por Lulú y solicita reproducción sin gesto manual mediante `mediaPlaybackRequiresUserAction={false}`.
+- Añade pruebas de regresión que exigen: reproducción automática de la primera solicitud, motor persistente global, selección del primer resultado, `video.play()` y avance automático al terminar.
+- Confirma TypeScript, pruebas del LIVE, pruebas de interfaz, Expo Doctor, prebuild Android y compilación APK Release ARM64 con el motor automático.
+- Actualiza Android a `versionCode` 11.
+
+> La automatización de YouTube y el bloqueo de anuncios dependen de la estructura de la página web de YouTube y pueden necesitar ajustes futuros si YouTube cambia su interfaz.
+
 ## 1.2.1
 
 - Sustituye la apertura externa de YouTube por **Lulú Browser**, un navegador/reproductor de YouTube integrado dentro de la app.
