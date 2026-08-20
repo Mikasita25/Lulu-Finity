@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useMobileControlStore } from '@/store/useMobileControlStore';
@@ -123,6 +123,7 @@ export function MusicPlaybackHost() {
   const music = useMobileControlStore((state) => state.music);
   const currentSong = useMobileControlStore((state) => state.currentSong);
   const playNextSong = useMobileControlStore((state) => state.playNextSong);
+  const webRef = useRef<WebView>(null);
 
   const sourceUrl = currentSong ? youtubeSearchUrl(currentSong.query) : '';
   const automation = useMemo(() => playerAutomation(music.volume), [music.volume]);
@@ -137,6 +138,7 @@ export function MusicPlaybackHost() {
       style={{ position: 'absolute', left: -500, top: 0, width: 360, height: 640, opacity: 0.01 }}
     >
       <WebView
+        ref={webRef}
         key={currentSong.id}
         source={{ uri: sourceUrl }}
         style={{ width: 360, height: 640 }}
@@ -154,8 +156,8 @@ export function MusicPlaybackHost() {
         androidLayerType="hardware"
         injectedJavaScriptBeforeContentLoaded={automation}
         injectedJavaScript={automation}
-        onLoadEnd={(event) => {
-          event.currentTarget.injectJavaScript(automation);
+        onLoadEnd={() => {
+          webRef.current?.injectJavaScript(automation);
         }}
         onMessage={(event) => {
           try {
