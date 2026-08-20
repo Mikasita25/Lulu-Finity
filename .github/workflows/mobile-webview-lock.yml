@@ -6,6 +6,9 @@ on:
       - agent/lulu-finity-mobile-android
     paths:
       - ".github/workflows/mobile-webview-lock.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/mobile-webview-lock.yml"
   workflow_dispatch:
 
 permissions:
