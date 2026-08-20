@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Alert, Linking, Pressable, Switch, Text, TextInput, View } from 'react-native';
-import { ExternalLink, ListMusic, Pause, Play, SkipForward, Trash2 } from 'lucide-react-native';
+import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { ListMusic, Pause, Play, ShieldCheck, SkipForward, Trash2 } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { AppHeader } from '@/components/AppHeader';
 import { GlassCard } from '@/components/GlassCard';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Button } from '@/components/Button';
 import { useMobileControlStore, type SongRequest } from '@/store/useMobileControlStore';
-import { youtubeSearchUrl } from '@/services/music';
 
 function SongRow({ song, index, onPlay, onRemove }: { song: SongRequest; index: number; onPlay: () => void; onRemove: () => void }) {
   return (
@@ -29,7 +28,7 @@ function SongRow({ song, index, onPlay, onRemove }: { song: SongRequest; index: 
   );
 }
 
-export function MusicScreen() {
+export function MusicScreen({ navigation }: any) {
   const [manualQuery, setManualQuery] = useState('');
   const music = useMobileControlStore((state) => state.music);
   const queue = useMobileControlStore((state) => state.songQueue);
@@ -46,28 +45,24 @@ export function MusicScreen() {
 
   const commands = useMemo(() => [music.command, ...music.aliases].join(' · '), [music.aliases, music.command]);
 
-  const openSong = async (song?: SongRequest) => {
+  const openSong = (song?: SongRequest) => {
     if (!song) return;
-    try {
-      await Linking.openURL(youtubeSearchUrl(song.query));
-    } catch (error) {
-      Alert.alert('No se pudo abrir YouTube', error instanceof Error ? error.message : String(error));
-    }
+    navigation.navigate('YouTubeBrowser', { query: song.query });
   };
 
-  const startSong = async (song: SongRequest) => {
+  const startSong = (song: SongRequest) => {
     playSong(song);
-    await openSong(song);
+    openSong(song);
   };
 
-  const startNext = async () => {
+  const startNext = () => {
     const song = playNextSong();
-    if (song) await openSong(song);
+    if (song) openSong(song);
   };
 
-  const skip = async () => {
+  const skip = () => {
     const song = skipCurrentSong();
-    if (song) await openSong(song);
+    if (song) openSong(song);
   };
 
   const addManual = () => {
@@ -81,7 +76,7 @@ export function MusicScreen() {
 
   return (
     <Screen>
-      <AppHeader title="Música" subtitle="Solicitudes de canciones y cola del LIVE desde el celular." />
+      <AppHeader title="Música" subtitle="Solicitudes de canciones y reproducción dentro de Lulú Finity." />
 
       <GlassCard>
         <View className="p-5">
@@ -113,6 +108,18 @@ export function MusicScreen() {
           ) : null}
         </View>
       </GlassCard>
+
+      <View className="mt-4 flex-row items-center gap-3 rounded-3xl border border-emerald-400/15 bg-emerald-500/[0.07] p-4">
+        <View className="h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10">
+          <ShieldCheck size={18} color="#86EFAC" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-sm font-black text-white">YouTube dentro de Lulú</Text>
+          <Text className="mt-1 text-xs leading-5 text-white/40">
+            El reproductor ya no te saca de la app y usa bloqueo de anuncios, overlays y popups dentro del navegador.
+          </Text>
+        </View>
+      </View>
 
       <SectionTitle title="Comando principal" />
       <GlassCard>
@@ -158,9 +165,9 @@ export function MusicScreen() {
               <Text className="text-lg font-black text-white">{current.query}</Text>
               <Text className="mt-1 text-xs text-white/35">pedido por @{current.requestedBy}</Text>
               <View className="mt-5 flex-row gap-2">
-                <Pressable onPress={() => openSong(current)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
-                  <ExternalLink size={16} color="#FF9DDA" />
-                  <Text className="text-xs font-black text-white">Abrir</Text>
+                <Pressable onPress={() => openSong(current)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-lulu-500/15 px-3 py-3">
+                  <ShieldCheck size={16} color="#FF9DDA" />
+                  <Text className="text-xs font-black text-white">Abrir reproductor</Text>
                 </Pressable>
                 <Pressable onPress={skip} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                   <SkipForward size={16} color="#FF9DDA" />
@@ -171,7 +178,7 @@ export function MusicScreen() {
           ) : (
             <>
               <Text className="text-sm font-black text-white">No hay canción activa</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/35">La siguiente solicitud puede iniciarse desde aquí.</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/35">La siguiente solicitud se abrirá en el navegador interno de YouTube.</Text>
               <View className="mt-4">
                 <Button label="Reproducir siguiente" onPress={startNext} disabled={!queue.length} icon={<Play size={17} color="white" />} />
               </View>
@@ -197,7 +204,7 @@ export function MusicScreen() {
       ) : null}
 
       <Text className="mt-4 text-center text-[10px] leading-5 text-white/25">
-        Lulú administra la cola dentro de la app y abre la canción elegida en YouTube. “Pausar solicitudes” detiene temporalmente nuevas peticiones del chat sin borrar la cola.
+        El bloqueo es de mejor esfuerzo: YouTube puede cambiar su página y requerir ajustes futuros. La cola y los comandos siguen siendo controlados por Lulú Finity.
       </Text>
     </Screen>
   );
