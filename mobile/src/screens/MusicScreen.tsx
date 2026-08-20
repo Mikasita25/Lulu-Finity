@@ -6,6 +6,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { GlassCard } from '@/components/GlassCard';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Button } from '@/components/Button';
+import { MusicVolumeControl } from '@/components/MusicVolumeControl';
 import { useMobileControlStore, type SongRequest } from '@/store/useMobileControlStore';
 
 function SongRow({ song, index, onPlay, onRemove }: { song: SongRequest; index: number; onPlay: () => void; onRemove: () => void }) {
@@ -34,6 +35,7 @@ export function MusicScreen({ navigation }: any) {
   const queue = useMobileControlStore((state) => state.songQueue);
   const current = useMobileControlStore((state) => state.currentSong);
   const paused = useMobileControlStore((state) => state.musicPaused);
+  const playbackPaused = useMobileControlStore((state) => state.playbackPaused);
   const updateMusic = useMobileControlStore((state) => state.updateMusic);
   const enqueueSong = useMobileControlStore((state) => state.enqueueSong);
   const playSong = useMobileControlStore((state) => state.playSong);
@@ -42,6 +44,7 @@ export function MusicScreen({ navigation }: any) {
   const removeSong = useMobileControlStore((state) => state.removeSong);
   const clearSongQueue = useMobileControlStore((state) => state.clearSongQueue);
   const setPaused = useMobileControlStore((state) => state.setMusicPaused);
+  const setPlaybackPaused = useMobileControlStore((state) => state.setPlaybackPaused);
 
   const commands = useMemo(() => [music.command, ...music.aliases].join(' · '), [music.aliases, music.command]);
 
@@ -75,7 +78,7 @@ export function MusicScreen({ navigation }: any) {
 
   return (
     <Screen>
-      <AppHeader title="Música" subtitle="Solicitudes automáticas y reproducción dentro de Lulú Finity." />
+      <AppHeader title="Música" subtitle="Solicitudes automáticas, segundo plano y control de reproducción." />
 
       <GlassCard>
         <View className="p-5">
@@ -113,12 +116,22 @@ export function MusicScreen({ navigation }: any) {
           <ShieldCheck size={18} color="#86EFAC" />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-black text-white">Reproducción automática</Text>
+          <Text className="text-sm font-black text-white">Reproducción persistente</Text>
           <Text className="mt-1 text-xs leading-5 text-white/40">
-            Si alguien usa el comando y no hay nada sonando, Lulú busca la canción y la reproduce inmediatamente. Las siguientes solicitudes entran a la cola y avanzan solas al terminar.
+            Lulú mantiene una sesión multimedia de Android mientras hay música. Puedes minimizar la app o bloquear la pantalla sin desmontar el reproductor.
           </Text>
         </View>
       </View>
+
+      <SectionTitle title="Volumen" />
+      <GlassCard>
+        <View className="p-5">
+          <Text className="text-xs leading-5 text-white/40">
+            El cambio se aplica al instante a la canción de YouTube que esté sonando y se recuerda para las siguientes.
+          </Text>
+          <MusicVolumeControl />
+        </View>
+      </GlassCard>
 
       <SectionTitle title="Comando principal" />
       <GlassCard>
@@ -163,7 +176,18 @@ export function MusicScreen({ navigation }: any) {
             <>
               <Text className="text-lg font-black text-white">{current.query}</Text>
               <Text className="mt-1 text-xs text-white/35">pedido por @{current.requestedBy}</Text>
-              <View className="mt-5 flex-row gap-2">
+
+              <Pressable
+                onPress={() => setPlaybackPaused(!playbackPaused)}
+                className={`mt-4 flex-row items-center justify-center gap-2 rounded-2xl px-3 py-3 ${playbackPaused ? 'bg-emerald-500/15' : 'bg-white/[0.07]'}`}
+              >
+                {playbackPaused ? <Play size={16} color="#86EFAC" fill="#86EFAC" /> : <Pause size={16} color="#FF9DDA" />}
+                <Text className={`text-xs font-black ${playbackPaused ? 'text-emerald-200' : 'text-white'}`}>
+                  {playbackPaused ? 'Reanudar música' : 'Pausar música'}
+                </Text>
+              </Pressable>
+
+              <View className="mt-3 flex-row gap-2">
                 <Pressable onPress={() => openSong(current)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-lulu-500/15 px-3 py-3">
                   <ShieldCheck size={16} color="#FF9DDA" />
                   <Text className="text-xs font-black text-white">Abrir navegador</Text>
@@ -203,7 +227,7 @@ export function MusicScreen({ navigation }: any) {
       ) : null}
 
       <Text className="mt-4 text-center text-[10px] leading-5 text-white/25">
-        Lulú mantiene el motor de YouTube activo mientras usas la app. El bloqueo de anuncios es de mejor esfuerzo y puede requerir ajustes si YouTube cambia su página.
+        Android puede mostrar una notificación multimedia mientras hay una canción activa. Esto ayuda a conservar la reproducción cuando Lulú está en segundo plano.
       </Text>
     </Screen>
   );
