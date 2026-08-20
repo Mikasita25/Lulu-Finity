@@ -1,0 +1,39 @@
+name: Prepare Mobile WebView Lock
+
+on:
+  push:
+    branches:
+      - agent/lulu-finity-mobile-android
+    paths:
+      - ".github/workflows/mobile-webview-lock.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Generar package.json y lockfile con WebView
+        working-directory: mobile
+        run: |
+          npm install --package-lock-only --save-exact --ignore-scripts --no-audit --no-fund react-native-webview@13.16.1
+      - name: Subir manifiestos
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-webview-manifests
+          path: |
+            mobile/package.json
+            mobile/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
