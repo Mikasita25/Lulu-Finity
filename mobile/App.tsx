@@ -8,6 +8,7 @@ import { CelebrationOverlay } from '@/components/CelebrationOverlay';
 import { MusicPlaybackHost } from '@/components/MusicPlaybackHost';
 import { useAppStore } from '@/store/useAppStore';
 import { useUpdateStore } from '@/store/useUpdateStore';
+import { MOBILE_UPDATES_ENABLED } from '@/services/updates';
 import { configureNotifications } from '@/services/notifications';
 
 type BoundaryState = { error?: Error };
@@ -59,14 +60,14 @@ export default function App() {
   }, [finishSplash, setHydrated]);
 
   useEffect(() => {
-    if (!hydrated || !splashDone) return;
+    // Desactivado temporalmente hasta migrar a un sistema de actualizaciones propio.
+    // Mientras esta bandera sea false no se consulta GitHub ni se muestran avisos guardados.
+    if (!MOBILE_UPDATES_ENABLED || !hydrated || !splashDone) return;
 
     const checkUpdatesAndPrompt = async () => {
       const updateStore = useUpdateStore.getState();
       if (!updateStore.autoCheckEnabled) return;
 
-      // Si la revisión ya se hizo recientemente, el store devuelve la actualización
-      // persistida. Si Android instaló otro build, el store la invalida y consulta de nuevo.
       const update = await updateStore.check(false);
       if (!update?.available) return;
 
