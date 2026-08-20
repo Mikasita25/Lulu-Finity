@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
+  MOBILE_UPDATES_ENABLED,
   checkForMobileUpdate,
   currentMobileBuild,
   currentMobileVersion,
@@ -27,23 +28,38 @@ type UpdateState = {
 export const useUpdateStore = create<UpdateState>()(
   persist(
     (set, get) => ({
-      autoCheckEnabled: true,
+      autoCheckEnabled: MOBILE_UPDATES_ENABLED,
       lastCheckedAt: 0,
       lastAttemptAt: 0,
       loading: false,
       error: '',
       setAutoCheckEnabled: (autoCheckEnabled) => {
+        if (!MOBILE_UPDATES_ENABLED) {
+          set({ autoCheckEnabled: false, update: undefined, loading: false, error: '' });
+          return;
+        }
         set({ autoCheckEnabled });
         if (autoCheckEnabled) void get().check(true);
       },
       dismissVersion: (dismissedVersion) => set({ dismissedVersion }),
       check: async (force = false) => {
+        if (!MOBILE_UPDATES_ENABLED) {
+          set({
+            autoCheckEnabled: false,
+            lastCheckedAt: 0,
+            lastAttemptAt: 0,
+            dismissedVersion: undefined,
+            loading: false,
+            error: '',
+            update: undefined,
+          });
+          return undefined;
+        }
+
         let state = get();
         if (state.loading) return state.update;
         if (!force && !state.autoCheckEnabled) return state.update;
 
-        // Si Android ya instaló otra versión/build, una respuesta persistida de la
-        // instalación anterior deja de ser válida aunque todavía no hayan pasado 24 h.
         const installedVersion = currentMobileVersion();
         const installedBuild = currentMobileBuild();
         const staleSnapshot = Boolean(
@@ -78,8 +94,6 @@ export const useUpdateStore = create<UpdateState>()(
           return update;
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          // Un fallo temporal de red/GitHub no cuenta como una revisión exitosa.
-          // Se puede reintentar automáticamente después de 15 minutos, no 24 horas.
           set({ loading: false, error: message, lastAttemptAt: Date.now() });
           return undefined;
         }
@@ -95,6 +109,16 @@ export const useUpdateStore = create<UpdateState>()(
         dismissedVersion: state.dismissedVersion,
         update: state.update,
       }),
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<UpdateState>;
+        return {
+          ...current,
+          ...saved,
+          autoCheckEnabled: MOBILE_UPDATES_ENABLED && Boolean(saved.autoCheckEnabled),
+          update: MOBILE_UPDATES_ENABLED ? saved.update : undefined,
+          dismissedVersion: MOBILE_UPDATES_ENABLED ? saved.dismissedVersion : undefined,
+        };
+      },
     },
   ),
 );
