@@ -1,5 +1,24 @@
 # Lulú Finity Mobile
 
+## 1.2.3
+
+- Añade reproducción de música persistente en segundo plano mediante la sesión multimedia/foreground service de Android configurada con `expo-audio`.
+- Mantiene una sesión multimedia activa mientras existe una canción actual para reducir que Android suspenda Lulú al minimizarla o bloquear la pantalla.
+- Muestra la canción actual y quién la pidió en los controles multimedia/notificación de Android.
+- Sincroniza **Pausar/Reanudar música** con el reproductor interno de YouTube y con los controles multimedia del sistema.
+- Añade un control de volumen de música de 0% a 100%, con mute, subir y bajar volumen.
+- El volumen se aplica en tiempo real al video de YouTube que ya está sonando y se guarda para las siguientes canciones.
+- Añade el control de volumen tanto en **Música** como dentro de **Control del LIVE**.
+- Separa claramente **Pausar música** de **Pausar solicitudes**: una controla la reproducción actual y la otra decide si el chat puede seguir usando `!cancion`, `!song` y `!sr`.
+- El botón **Siguiente** desde Control del LIVE cambia directamente la canción del motor persistente sin abrir el navegador visible.
+- Reinyecta el estado de reproducción y volumen cuando Android cambia Lulú entre primer plano, inactiva y segundo plano.
+- Configura `expo-audio` con `enableBackgroundPlayback` para generar el servicio/permisos nativos de reproducción multimedia durante el prebuild Android.
+- Añade pruebas de regresión para el servicio de segundo plano, controles multimedia, volumen en vivo y estado de pausa.
+- Confirma TypeScript, pruebas del LIVE, pruebas de interfaz, Expo Doctor, prebuild Android y compilación APK Release ARM64 con el servicio multimedia habilitado.
+- Actualiza Android a `versionCode` 12.
+
+> La sesión multimedia de Android hace la reproducción en segundo plano mucho más resistente. Algunos fabricantes pueden aplicar optimizaciones de batería especialmente agresivas, y forzar el cierre de la app siempre detendrá la reproducción.
+
 ## 1.2.2
 
 - Hace que `!cancion`, `!song` y `!sr` funcionen como en la versión de PC: si no hay canción activa, la primera solicitud pasa inmediatamente a **Ahora suena** y comienza a reproducirse sin intervención manual.
