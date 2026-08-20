@@ -71,8 +71,10 @@ assert.match(music, /Solicitudes del chat/);
 assert.match(music, /!song/);
 assert.match(music, /!sr/);
 assert.match(music, /Pausar solicitudes/);
-assert.match(music, /YouTube dentro de Lulú/);
+assert.match(music, /Reproducción automática/);
 assert.match(music, /YouTubeBrowser/);
+assert.match(music, /wasIdle/);
+assert.match(music, /if \(wasIdle\) playSong\(result\.song\)/);
 assert.doesNotMatch(music, /Linking\.openURL/);
 
 const youtubeBrowser = read('src/screens/YouTubeBrowserScreen.tsx');
@@ -86,10 +88,21 @@ assert.match(youtubeBrowser, /javaScriptCanOpenWindowsAutomatically=\{false\}/);
 assert.match(youtubeBrowser, /Bloqueo activo/);
 assert.match(youtubeBrowser, /skipCurrentSong/);
 
+const playbackHost = read('src/components/MusicPlaybackHost.tsx');
+assert.match(playbackHost, /mediaPlaybackRequiresUserAction=\{false\}/);
+assert.match(playbackHost, /openFirstResult/);
+assert.match(playbackHost, /video\.play\(\)/);
+assert.match(playbackHost, /addEventListener\('ended'/);
+assert.match(playbackHost, /playNextSong\(\)/);
+assert.match(playbackHost, /ytp-skip-ad-button/);
+assert.match(playbackHost, /currentSong\.id/);
+
 const musicRuntime = read('src/services/music.ts');
 assert.match(musicRuntime, /parseSongRequest/);
 assert.match(musicRuntime, /state\.musicPaused/);
 assert.match(musicRuntime, /enqueueSong/);
+assert.match(musicRuntime, /const wasIdle = !state\.currentSong/);
+assert.match(musicRuntime, /playSong\(result\.song\)/);
 assert.match(musicRuntime, /https:\/\/m\.youtube\.com\/results/);
 
 const liveRuntime = read('src/services/liveRuntime.ts');
@@ -123,5 +136,6 @@ assert.match(app, /dismissedVersion/);
 assert.match(app, /update\.downloadUrl \|\| update\.releaseUrl/);
 assert.match(app, /AppState\.addEventListener/);
 assert.match(app, /nextState === 'active'/);
+assert.match(app, /MusicPlaybackHost/);
 
-console.log('Interfaz móvil: inicio, conexión, control LIVE, actividad, música, navegador interno y actualizador verificados.');
+console.log('Interfaz móvil: inicio, conexión, control LIVE, música automática, navegador interno y actualizador verificados.');
