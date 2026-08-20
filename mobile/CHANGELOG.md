@@ -1,5 +1,25 @@
 # Lulú Finity Mobile
 
+## 1.2.1
+
+- Sustituye la apertura externa de YouTube por **Lulú Browser**, un navegador/reproductor de YouTube integrado dentro de la app.
+- Añade `react-native-webview` 13.16.1, la versión compatible recomendada para Expo SDK 57.
+- Las canciones de la cola, `!cancion`, `!song` y `!sr` ahora pueden reproducirse sin salir de Lulú Finity.
+- Añade buscador de YouTube dentro del reproductor para cambiar de canción manualmente.
+- Añade controles **Atrás**, **Recargar** y **Siguiente** dentro del navegador.
+- El botón **Siguiente** consume directamente la siguiente solicitud de la cola y carga su búsqueda dentro del mismo navegador.
+- Añade un bloqueador de mejor esfuerzo para elementos publicitarios de YouTube: limpia banners/overlays promocionales, intenta pulsar los botones de omitir anuncios y acelera al final los segmentos detectados como anuncio de video.
+- Bloquea popups publicitarios conocidos y desactiva la apertura de ventanas adicionales desde WebView.
+- Limita la navegación integrada a dominios de YouTube/Google necesarios para reproducción e inicio de sesión, bloqueando esquemas externos como `intent:`, `market:` y `vnd.youtube:`.
+- Muestra un contador de elementos publicitarios bloqueados durante la sesión del navegador.
+- Desde **Control del LIVE**, “Abrir reproductor interno” y “Siguiente” ya usan Lulú Browser en vez de `Linking.openURL()`.
+- Mantiene cookies y almacenamiento web para que YouTube pueda conservar sesión/preferencias dentro del navegador.
+- Añade pruebas de regresión que exigen el navegador interno, WebView, limpieza publicitaria y ausencia de apertura externa en Música/Control del LIVE.
+- Confirma TypeScript, pruebas del LIVE, pruebas de interfaz, Expo Doctor, prebuild Android y compilación APK Release ARM64 con WebView.
+- Actualiza Android a `versionCode` 10.
+
+> El bloqueo de anuncios funciona por limpieza e interacción con la página y puede requerir ajustes si YouTube cambia su estructura interna.
+
 ## 1.2.0
 
 - Convierte **En Vivo** en un **Control del LIVE** para manejar TTS, música, actividad reciente, metas y ranking desde una sola pantalla.
