@@ -1,16 +1,46 @@
-import { useMemo, useRef } from 'react';
-import { View } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { AppState, View } from 'react-native';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { WebView } from 'react-native-webview';
 import { useMobileControlStore } from '@/store/useMobileControlStore';
 import { youtubeSearchUrl } from '@/services/music';
 
-function playerAutomation(volume: number) {
+// A one-second silent MP3 keeps Expo Audio's MediaSessionService active while the
+// audible YouTube media remains in WebView. The foreground media session prevents
+// Android from treating Lulú as an ordinary background process during playback.
+const BACKGROUND_KEEPER_URI =
+  'data:audio/mpeg;base64,SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYxLjcuMTAzAAAAAAAAAAAAAAD/4zjAAAAAAAAAAAAASW5mbwAAAA8AAAAQAAAFWAA1NTU1NTVDQ0NDQ0NQUFBQUFBeXl5eXl5ra2tra2treXl5eXl5hoaGhoaGlJSUlJSUoaGhoaGhoa+vr6+vr7y8vLy8vMrKysrKytfX19fX19fl5eXl5eXy8vLy8vL///////8AAAAATGF2YzYxLjE5AAAAAAAAAAAAAAAAJAKAAAAAAAAABVgIAJWUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/4xjEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEOwAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEdgAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEsQAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=';
+
+function playerAutomation(volume: number, paused: boolean) {
   const safeVolume = Math.max(0, Math.min(1, volume));
   return `
 (() => {
-  if (window.__luluAutoPlayerInstalled) return true;
+  window.__luluDesiredVolume = ${safeVolume};
+  window.__luluPlaybackPaused = ${paused ? 'true' : 'false'};
+
+  const applyPlaybackState = () => {
+    document.querySelectorAll('video, audio').forEach((media) => {
+      try {
+        if (media.tagName === 'VIDEO') {
+          media.muted = false;
+          media.volume = window.__luluDesiredVolume;
+        }
+        if (window.__luluPlaybackPaused) {
+          media.pause();
+        } else if (media.tagName === 'VIDEO') {
+          const promise = media.play();
+          if (promise && typeof promise.catch === 'function') promise.catch(() => {});
+        }
+      } catch (_) {}
+    });
+  };
+
+  if (window.__luluAutoPlayerInstalled) {
+    applyPlaybackState();
+    return true;
+  }
+
   window.__luluAutoPlayerInstalled = true;
-  const VOLUME = ${safeVolume};
   let navigating = false;
   let lastEndedAt = 0;
 
@@ -76,7 +106,7 @@ function playerAutomation(volume: number) {
 
     try {
       video.muted = false;
-      video.volume = VOLUME;
+      video.volume = window.__luluDesiredVolume;
       video.autoplay = true;
     } catch (_) {}
 
@@ -93,6 +123,11 @@ function playerAutomation(volume: number) {
         send({ type: 'ended', title: document.title || '', url: location.href });
       });
       video.addEventListener('error', () => send({ type: 'video-error' }));
+    }
+
+    if (window.__luluPlaybackPaused) {
+      try { video.pause(); } catch (_) {}
+      return true;
     }
 
     try {
@@ -122,11 +157,110 @@ function playerAutomation(volume: number) {
 export function MusicPlaybackHost() {
   const music = useMobileControlStore((state) => state.music);
   const currentSong = useMobileControlStore((state) => state.currentSong);
+  const playbackPaused = useMobileControlStore((state) => state.playbackPaused);
   const playNextSong = useMobileControlStore((state) => state.playNextSong);
+  const setPlaybackPaused = useMobileControlStore((state) => state.setPlaybackPaused);
   const webRef = useRef<WebView>(null);
+  const keeperHasPlayed = useRef(false);
+  const remotePauseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const keeper = useAudioPlayer(BACKGROUND_KEEPER_URI, { updateInterval: 400 });
+  const keeperStatus = useAudioPlayerStatus(keeper);
 
   const sourceUrl = currentSong ? youtubeSearchUrl(currentSong.query) : '';
-  const automation = useMemo(() => playerAutomation(music.volume), [music.volume]);
+  const automation = useMemo(
+    () => playerAutomation(music.volume, playbackPaused),
+    [music.volume, playbackPaused],
+  );
+
+  useEffect(() => {
+    void setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: 'doNotMix',
+    }).catch((error) => console.warn('[LuluFinity] background audio mode failed', error));
+  }, []);
+
+  useEffect(() => {
+    keeper.loop = true;
+    keeper.volume = 0;
+  }, [keeper]);
+
+  useEffect(() => {
+    clearTimeout(remotePauseTimer.current);
+    keeperHasPlayed.current = false;
+
+    if (!music.enabled || !currentSong) {
+      keeper.pause();
+      keeper.clearLockScreenControls();
+      return;
+    }
+
+    keeper.setActiveForLockScreen(
+      true,
+      {
+        title: currentSong.query,
+        artist: `Pedido por @${currentSong.requestedBy}`,
+        albumTitle: 'Lulú Finity',
+      },
+      { showSeekBackward: false, showSeekForward: false },
+    );
+
+    if (!playbackPaused) keeper.play();
+  }, [currentSong?.id, keeper, music.enabled]);
+
+  useEffect(() => {
+    if (!music.enabled || !currentSong) return;
+
+    webRef.current?.injectJavaScript(automation);
+    if (playbackPaused) {
+      keeper.pause();
+    } else {
+      keeper.play();
+    }
+  }, [automation, currentSong?.id, keeper, music.enabled, playbackPaused]);
+
+  useEffect(() => {
+    clearTimeout(remotePauseTimer.current);
+    if (!music.enabled || !currentSong || !keeperStatus.isLoaded) return;
+
+    if (keeperStatus.playing) {
+      keeperHasPlayed.current = true;
+      if (playbackPaused) setPlaybackPaused(false);
+      return;
+    }
+
+    if (!keeperHasPlayed.current || playbackPaused) return;
+    remotePauseTimer.current = setTimeout(() => {
+      if (
+        !keeper.playing &&
+        useMobileControlStore.getState().currentSong?.id === currentSong.id &&
+        !useMobileControlStore.getState().playbackPaused
+      ) {
+        setPlaybackPaused(true);
+      }
+    }, 600);
+
+    return () => clearTimeout(remotePauseTimer.current);
+  }, [currentSong?.id, keeper, keeperStatus.isLoaded, keeperStatus.playing, music.enabled, playbackPaused, setPlaybackPaused]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (!music.enabled || !currentSong || playbackPaused) return;
+      if (nextState === 'background' || nextState === 'inactive' || nextState === 'active') {
+        keeper.play();
+        webRef.current?.injectJavaScript(playerAutomation(music.volume, false));
+      }
+    });
+    return () => subscription.remove();
+  }, [currentSong?.id, keeper, music.enabled, music.volume, playbackPaused]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(remotePauseTimer.current);
+      keeper.clearLockScreenControls();
+    },
+    [keeper],
+  );
 
   if (!music.enabled || !currentSong || !sourceUrl) return null;
 
