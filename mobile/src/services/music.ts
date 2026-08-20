@@ -36,8 +36,14 @@ export function handleMusicEvent(event: LiveEvent) {
   const previous = lastRequestAt.get(user) ?? 0;
   if (now - previous < state.music.cooldownSeconds * 1000) return;
 
+  const wasIdle = !state.currentSong;
   const result = state.enqueueSong(request.query, user, 'chat');
-  if (result.ok) lastRequestAt.set(user, now);
+  if (!result.ok) return;
+
+  lastRequestAt.set(user, now);
+  if (wasIdle) {
+    useMobileControlStore.getState().playSong(result.song);
+  }
 }
 
 export function clearMusicCooldowns() {
