@@ -15,7 +15,12 @@
         "backgroundColor": "#000000"
       }
     },
-    "plugins": [["expo-notifications", {"color": "#FF5FC8"}], "expo-document-picker", "expo-splash-screen"],
+    "plugins": [
+      ["expo-notifications", {"color": "#FF5FC8"}],
+      ["expo-audio", {"enableBackgroundPlayback": true}],
+      "expo-document-picker",
+      "expo-splash-screen"
+    ],
     "extra": {"relayUrl": "wss://lulu-finity-production.up.railway.app/v1/tiktok/live"},
     "platforms": ["android"]
   }
