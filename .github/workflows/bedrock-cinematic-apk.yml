@@ -5,11 +5,16 @@ on:
     branches:
       - bedrock-cinematic-build
     paths:
-      - '.bedrock-build/**'
+      - '.bedrock-build/part00.b64'
+      - '.bedrock-build/part01.b64'
+      - '.bedrock-build/part02.b64'
+      - '.bedrock-build/part03.b64'
+      - '.bedrock-build/part04.b64'
+      - '.bedrock-build/part05.b64'
       - '.github/workflows/bedrock-cinematic-apk.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -18,6 +23,17 @@ jobs:
     steps:
       - name: Checkout temporary build branch
         uses: actions/checkout@v4
+
+      - name: Record workflow run ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_RUN_ID" > .bedrock-build/run_id.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .bedrock-build/run_id.txt
+          git commit -m 'Record Bedrock APK workflow run' || true
+          git push origin HEAD:bedrock-cinematic-build
 
       - name: Reconstruct Android project
         shell: bash
