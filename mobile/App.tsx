@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { SplashView } from '@/components/SplashView';
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
+import { MusicPlaybackHost } from '@/components/MusicPlaybackHost';
 import { useAppStore } from '@/store/useAppStore';
 import { useUpdateStore } from '@/store/useUpdateStore';
 import { configureNotifications } from '@/services/notifications';
@@ -107,7 +108,15 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" backgroundColor="#09070D" />
       <AppErrorBoundary>
-        {!hydrated || !splashDone ? <SplashView onFinished={finishSplash} /> : <View style={styles.appRoot}><AppNavigator /><CelebrationOverlay /></View>}
+        {!hydrated || !splashDone ? (
+          <SplashView onFinished={finishSplash} />
+        ) : (
+          <View style={styles.appRoot}>
+            <AppNavigator />
+            <MusicPlaybackHost />
+            <CelebrationOverlay />
+          </View>
+        )}
       </AppErrorBoundary>
     </SafeAreaProvider>
   );
