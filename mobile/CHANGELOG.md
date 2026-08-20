@@ -1,6 +1,6 @@
 # Lulú Finity Mobile
 
-## 1.2.0 — en preparación
+## 1.2.0
 
 - Convierte **En Vivo** en un **Control del LIVE** para manejar TTS, música, actividad reciente, metas y ranking desde una sola pantalla.
 - Añade controles rápidos para activar/desactivar TTS y solicitudes de música sin salir del LIVE.
@@ -19,13 +19,8 @@
 - Integra las solicitudes de canciones directamente en el runtime normalizado del LIVE, junto a automatizaciones, TTS y efectos existentes.
 - Añade pruebas de regresión para navegación, Control del LIVE, Actividad reciente, comandos de música y runtime.
 - Añade un workflow rápido de calidad que valida TypeScript, contrato del LIVE y contrato de interfaz móvil por separado del build nativo.
-
-### Validación actual
-
-- TypeScript: correcto.
-- Pruebas del LIVE: correctas.
-- Pruebas de interfaz móvil: correctas.
-- El build Android completo sigue detenido antes de Gradle porque `expo install --check` está pidiendo parches más recientes de varios paquetes Expo; no se ha publicado todavía una release 1.2.0 para evitar entregar un APK sin esa validación nativa.
+- Corrige el build Android para alinear automáticamente los parches compatibles de Expo 57 antes de ejecutar `expo install --check`.
+- Actualiza Android a `versionCode` 9.
 
 ## 1.1.4
 
