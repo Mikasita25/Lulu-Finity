@@ -1,0 +1,240 @@
+name: Lulu Finity 1.1.0
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v1100/**"
+      - "railway-relay/**"
+      - ".github/workflows/v1100.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v1100/**"
+      - "railway-relay/**"
+      - ".github/workflows/v1100.yml"
+
+permissions:
+  contents: write
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.0.5/Lulu-Finity-Source-1.0.5.zip
+  BASE_SHA256: 5a8bd10c468c24b2e85144fcbcb7bb6e4065330e5b55a4740f2a7905a8b56ac2
+  CLOUDFLARED_VERSION: 2026.8.2
+  CLOUDFLARED_SHA256: c29eee2b121f5436a642eed69fd9767da7e7b8c510fa50aaa130337f931357b5
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir Lulu Finity 1.1.0
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error "$BASE_URL" -o base.zip
+          echo "$BASE_SHA256  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v1100/apply-v1100.py app
+      - name: Validar rediseño, ciclo de vida y regresiones
+        run: |
+          set -euo pipefail
+          python build-v1100/test-v1100.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/automation-engine.js
+          node --check app/src/live-reconnect-policy.js
+          node --check app/src/relay-protocol.js
+          node build-v1005/test-main-startup.js app
+          node --test app/src/live-reconnect-policy.test.js app/src/online-voice-catalog.test.js app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js app/src/relay-protocol.test.js
+          python build-v0342/test-preload-sandbox.py app
+          node build-v0320/test-live-games.js app/src/live-games.js
+          node build-v0330/test-automation-engine.js app/src/automation-engine.js
+      - name: Validar dependencias y ambos relays
+        run: |
+          set -euo pipefail
+          cd app
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ls adm-zip sherpa-onnx-node edge-tts-universal ws --depth=0
+          npm audit --omit=dev --audit-level=high
+          node ../build-v1005/test-live-reconnect.js .
+          npm test
+          cd railway-relay
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high
+          npm run check
+          npm test
+          cd ../..
+          cd railway-relay
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high
+          npm run check
+          npm test
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir fuente 1.1.0
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente 1.0.5 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1100/apply-v1100.py app
+          python build-v1100/test-v1100.py app
+          node --check app/src/main.js
+          node --check app/src/renderer.js
+          node build-v1005/test-main-startup.js app
+          node --test app/src/live-reconnect-policy.test.js app/src/online-voice-catalog.test.js app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js app/src/relay-protocol.test.js
+      - name: Preparar HTTPS oficial verificado
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tools = "app/resources/tools"
+          New-Item -ItemType Directory $tools -Force | Out-Null
+          $binary = "$tools/cloudflared.exe"
+          $url = "https://github.com/cloudflare/cloudflared/releases/download/$env:CLOUDFLARED_VERSION/cloudflared-windows-amd64.exe"
+          Invoke-WebRequest -Uri $url -OutFile $binary
+          $actual = (Get-FileHash $binary -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:CLOUDFLARED_SHA256) { throw "cloudflared no coincide con el SHA-256 oficial: $actual" }
+          $version = & $binary --version
+          if ($LASTEXITCODE -ne 0 -or "$version" -notmatch "cloudflared version $env:CLOUDFLARED_VERSION") { throw "cloudflared no pudo validarse: $version" }
+      - name: Probar túnel HTTPS real
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $cloudflared = Resolve-Path "app/resources/tools/cloudflared.exe"
+          $stdout = Join-Path $env:RUNNER_TEMP "cloudflared-out.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "cloudflared-error.log"
+          $server = Start-Process python -ArgumentList "-m","http.server","17345","--bind","127.0.0.1" -WindowStyle Hidden -PassThru
+          $tunnel = $null
+          try {
+            $tunnel = Start-Process $cloudflared -ArgumentList "tunnel","--url","http://127.0.0.1:17345","--no-autoupdate","--loglevel","info" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
+            $publicUrl = $null
+            for ($attempt = 0; $attempt -lt 90; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              $log = ""
+              if (Test-Path $stdout) { $log += Get-Content $stdout -Raw -ErrorAction SilentlyContinue }
+              if (Test-Path $stderr) { $log += Get-Content $stderr -Raw -ErrorAction SilentlyContinue }
+              $match = [regex]::Match($log, "https://[a-z0-9-]+\.trycloudflare\.com")
+              if ($match.Success) { $publicUrl = $match.Value; break }
+              $tunnel.Refresh()
+              if ($tunnel.HasExited) { throw "cloudflared se cerró antes de entregar una URL HTTPS: $log" }
+            }
+            if (!$publicUrl) { throw "cloudflared no entregó una URL HTTPS en 45 segundos" }
+            $response = Invoke-WebRequest -Uri $publicUrl -UseBasicParsing -TimeoutSec 30
+            if ($response.StatusCode -ne 200) { throw "El túnel HTTPS respondió $($response.StatusCode)" }
+          }
+          finally {
+            if ($tunnel) { Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue }
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
+      - name: Crear fuente reproducible
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory source-v1100 -Force | Out-Null
+          foreach ($file in @("package.json","package-lock.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v1100/$file" -Force } }
+          foreach ($folder in @("src","resources","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v1100/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v1100/*" -DestinationPath "Lulu-Finity-Source-1.1.0.zip" -Force
+      - name: Inyectar token oficial del relay
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund
+          node ../build-v1005/test-live-reconnect.js .
+          npm test
+          npm run build:win -- --publish never
+      - name: Probar arranque real de Windows y renderer
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $profile = Join-Path $env:RUNNER_TEMP "lulu-startup-profile"
+          $marker = Join-Path $env:RUNNER_TEMP "lulu-renderer-ready.txt"
+          $navigationMarker = Join-Path $env:RUNNER_TEMP "lulu-navigation-ready.json"
+          New-Item -ItemType Directory -Path $profile -Force | Out-Null
+          Remove-Item $marker -Force -ErrorAction SilentlyContinue
+          Remove-Item $navigationMarker -Force -ErrorAction SilentlyContinue
+          $env:LULU_STARTUP_SMOKE_MARKER = $marker
+          $env:LULU_NAVIGATION_SMOKE_MARKER = $navigationMarker
+          $executable = Resolve-Path "app/dist/win-unpacked/Lulu Finity.exe"
+          $process = Start-Process -FilePath $executable -ArgumentList "--user-data-dir=$profile" -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 60; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+              if ($process.HasExited) { throw "Lulu Finity se cerró durante el arranque con código $($process.ExitCode)" }
+              if ((Test-Path $marker) -and (Test-Path $navigationMarker)) { $ready = $true; break }
+            }
+            if (!$ready) { throw "El renderer no confirmó un arranque completo en 30 segundos" }
+            if ((Get-Content $marker -Raw).Trim() -ne "ready") { throw "La marca de arranque del renderer es inválida" }
+            $navigation = Get-Content $navigationMarker -Raw | ConvertFrom-Json
+            if (!$navigation.ok) { throw "Una o más categorías no fueron visibles: $($navigation | ConvertTo-Json -Depth 8 -Compress)" }
+            if (@($navigation.results).Count -lt 12) { throw "La prueba recorrió menos categorías de las esperadas" }
+          }
+          finally {
+            Remove-Item Env:LULU_STARTUP_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Stop-Process -Name "Lulu Finity" -Force -ErrorAction SilentlyContinue
+          }
+      - name: Verificar y publicar 1.1.0
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-1.1.0.exe"
+          $zip = "app/dist/Lulu-Finity-1.1.0-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-1.1.0.exe.blockmap"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.1.0.zip")) { if (!(Test-Path $file)) { throw "No se generó $file" } }
+          $packagedCloudflared = "app/dist/win-unpacked/resources/lulu-tools/cloudflared.exe"
+          if (!(Test-Path $packagedCloudflared)) { throw "El instalador no contiene cloudflared.exe" }
+          if ((Get-FileHash $packagedCloudflared -Algorithm SHA256).Hash.ToLower() -ne $env:CLOUDFLARED_SHA256) { throw "cloudflared cambió dentro del paquete" }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          foreach ($token in @("v1.1.0","themeChoiceGrid","automationModal","OPTIMIZACIÓN SEGURA","powerSaveBlocker","prevent-app-suspension","validateCloudflaredExecutable","lulu-tools","cloudflared.exe","activeServiceSnapshot","profile==='saving'?30000:profile==='balanced'?180000:0","backgroundThrottling")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
+          $tag = "v1.1.0"
+          $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.1.0.zip")
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag $files --clobber; gh release edit $tag --title "Lulu Finity 1.1.0" --notes-file "app/CHANGELOG.md" }
+          else { gh release create $tag $files --target main --title "Lulu Finity 1.1.0" --notes-file "app/CHANGELOG.md" }
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: Lulu-Finity-Windows-v1.1.0
+          path: |
+            app/dist/Lulu-Finity-Setup-1.1.0.exe
+            app/dist/Lulu-Finity-1.1.0-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-1.1.0.exe.blockmap
+            Lulu-Finity-Source-1.1.0.zip
+          if-no-files-found: error
+          retention-days: 30
