@@ -228,7 +228,7 @@ jobs:
           $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
           if (!$asar) { throw "Falta app.asar" }
           $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
-          foreach ($token in @("v1.1.0","themeChoiceGrid","automationModal","OPTIMIZACIÓN SEGURA","powerSaveBlocker","prevent-app-suspension","validateCloudflaredExecutable","lulu-tools","cloudflared.exe","activeServiceSnapshot","profile==='saving'?30000:profile==='balanced'?180000:0","backgroundThrottling")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
+          foreach ($token in @("v1.1.0","themeChoiceGrid","automationModal","OPTIMIZACIÓN SEGURA","powerSaveBlocker","prevent-app-suspension","validateCloudflaredExecutable","lulu-tools","cloudflared.exe","activeServiceSnapshot","profile==='saving'?30000:profile==='balanced'?180000:0","backgroundThrottling","STREAM_WIDGET_THEME_CATALOG","widget-theme-gallery","permanent-preview-badge","streamWidgetThemeCss","setTimeout(poll,preview?1500:600)")) { if (!$text.Contains($token)) { throw "app.asar no contiene $token" } }
           if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "Token inválido en asar" }
           $tag = "v1.1.0"
           $files = @($installer,$zip,$latest,$blockmap,"Lulu-Finity-Source-1.1.0.zip")

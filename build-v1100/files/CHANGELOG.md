@@ -2,6 +2,9 @@
 
 ## 1.1.0
 
+- Añade catorce temas independientes para las fuentes de Música, Monedas, Juegos, Alertas, Metas y Regalos: Lulu Rosa, Aurora, Cyber, Arcade, Holograma, Sakura, Miku, Lavanda, Atardecer, Dorado, Menta, Océano, Vampiro y Monocromo.
+- Guarda un tema distinto por cada fuente, lo integra en los enlaces HTTPS/locales y actualiza automáticamente las fuentes conectadas al cambiar de diseño.
+- Mantiene vistas previas permanentes con datos de muestra para comparar diseños sin comentarios, comandos, regalos, canciones ni actividad del LIVE.
 - Unifica los doce temas de Lulu Finity: acentos, títulos, texto, campos, botones, casillas, radios y estados ahora comparten contraste y color de tema.
 - Convierte Apariencia en una galería visual para elegir cada tema con una vista previa reconocible.
 - Rediseña la creación de comandos y automatizaciones como experiencias guiadas de tres pasos con resumen en vivo, jerarquía clara y acciones persistentes.

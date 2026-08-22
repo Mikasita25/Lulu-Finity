@@ -83,7 +83,9 @@ La sección **Rankings** genera cuatro enlaces locales para fuentes de navegador
 
 ## Widgets del stream
 
-La sección Rankings también ofrece una lista de reproducción y una tarjeta compacta de monedas. Ambos widgets generan enlaces HTTPS para TikTok LIVE Studio y enlaces locales para OBS. La tarjeta utiliza el último usuario cuyo saldo se modificó, y la lista se sincroniza con YouTube o Spotify.
+La sección Rankings también ofrece una lista de reproducción y una tarjeta compacta de monedas. Juegos y Automatizaciones añaden fuentes para partidas, alertas, metas y regalos. Las seis fuentes generan enlaces HTTPS para TikTok LIVE Studio y enlaces locales para OBS.
+
+Cada fuente conserva su propio diseño entre catorce temas: **Lulu Rosa, Aurora, Cyber, Arcade, Holograma, Sakura, Miku, Lavanda, Atardecer, Dorado, Menta, Océano, Vampiro y Monocromo**. El tema forma parte del enlace copiado y las fuentes ya conectadas se actualizan automáticamente al elegir otro, así que TikTok LIVE Studio u OBS coincide con la muestra de Lulu. Todas las tarjetas muestran datos permanentes de ejemplo para elegir el diseño sin esperar comentarios, comandos, regalos, canciones ni actividad del LIVE.
 
 ## Relay de Railway
 

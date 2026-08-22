@@ -411,6 +411,65 @@ const DEFAULT_RANKING_OVERLAYS = [1, 2, 3, 4].map((slot) => ({
   uppercaseNames: false
 }));
 
+const STREAM_WIDGET_THEME_IDS = new Set([
+  'lulu', 'aurora', 'cyber', 'arcade', 'hologram', 'sakura', 'miku',
+  'lavender', 'sunset', 'gold', 'mint', 'ocean', 'vampire', 'mono'
+]);
+
+const DEFAULT_STREAM_WIDGET_THEMES = Object.freeze({
+  playlist: 'aurora',
+  wallet: 'gold',
+  game: 'arcade',
+  alert: 'lulu',
+  goal: 'hologram',
+  gift: 'sakura'
+});
+
+const STREAM_WIDGET_THEME_TOKENS = Object.freeze({
+  lulu: { a:'#ff67ad', b:'#5fe8ff', money:'#ffe287', bg:'linear-gradient(135deg,rgba(24,14,36,.96),rgba(67,29,72,.92))' },
+  aurora: { a:'#71ffd6', b:'#9782ff', money:'#bcffea', bg:'linear-gradient(135deg,rgba(8,31,43,.96),rgba(61,37,99,.92))' },
+  cyber: { a:'#00f6ff', b:'#ff2bd6', money:'#f6ff00', bg:'linear-gradient(145deg,rgba(5,9,27,.98),rgba(24,9,46,.96))', font:'"Trebuchet MS",sans-serif' },
+  arcade: { a:'#75ff4d', b:'#ff3dd1', money:'#ffe84a', bg:'linear-gradient(180deg,rgba(12,9,34,.98),rgba(30,12,55,.98))', font:'"Courier New",monospace' },
+  hologram: { a:'#80fff4', b:'#ff80eb', money:'#c8fff7', bg:'linear-gradient(135deg,rgba(16,36,62,.88),rgba(77,29,88,.84))' },
+  sakura: { a:'#ff9fc9', b:'#c79bff', money:'#fff0a8', bg:'linear-gradient(135deg,rgba(72,31,58,.95),rgba(48,32,78,.94))' },
+  miku: { a:'#39f1d2', b:'#ff68a9', money:'#adfff0', bg:'linear-gradient(135deg,rgba(8,43,47,.97),rgba(20,48,70,.94))' },
+  lavender: { a:'#c7a0ff', b:'#ff91cf', money:'#efd5ff', bg:'linear-gradient(135deg,rgba(44,29,74,.96),rgba(78,39,84,.92))' },
+  sunset: { a:'#ff7657', b:'#ff3f9f', money:'#ffd55b', bg:'linear-gradient(135deg,rgba(74,24,41,.97),rgba(68,34,78,.94))' },
+  gold: { a:'#ffd56a', b:'#d99832', money:'#fff2a9', bg:'linear-gradient(135deg,rgba(39,29,14,.97),rgba(73,48,19,.94))' },
+  mint: { a:'#7dffc5', b:'#42d8ba', money:'#d7ffae', bg:'linear-gradient(135deg,rgba(10,47,43,.96),rgba(20,64,60,.93))' },
+  ocean: { a:'#48c8ff', b:'#4267ff', money:'#8ff8ff', bg:'linear-gradient(135deg,rgba(8,27,58,.97),rgba(15,49,91,.94))' },
+  vampire: { a:'#ff365f', b:'#9e38ff', money:'#ffb3c0', bg:'linear-gradient(135deg,rgba(35,7,19,.98),rgba(58,12,49,.96))' },
+  mono: { a:'#ffffff', b:'#9da7b8', money:'#ffffff', bg:'linear-gradient(135deg,rgba(15,17,22,.98),rgba(38,42,50,.96))', font:'Arial,sans-serif' }
+});
+
+function normalizeStreamWidgetTheme(value, fallback = 'lulu') {
+  const normalized = String(value || '').trim().toLowerCase();
+  return STREAM_WIDGET_THEME_IDS.has(normalized) ? normalized : fallback;
+}
+
+function normalizeStreamWidgetThemes(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  return Object.fromEntries(Object.entries(DEFAULT_STREAM_WIDGET_THEMES).map(([type, fallback]) => [
+    type,
+    normalizeStreamWidgetTheme(source[type], fallback)
+  ]));
+}
+
+function streamWidgetThemeCss(theme) {
+  const normalized = normalizeStreamWidgetTheme(theme);
+  const tokens = STREAM_WIDGET_THEME_TOKENS[normalized] || STREAM_WIDGET_THEME_TOKENS.lulu;
+  const special = normalized === 'arcade'
+    ? '.card{border-radius:6px!important;box-shadow:6px 6px 0 color-mix(in srgb,var(--wb) 35%,transparent),-4px -4px 0 color-mix(in srgb,var(--wa) 28%,transparent)!important}.card:before{height:5px!important;animation:flow 1s steps(6) infinite!important}'
+    : normalized === 'hologram'
+      ? '.card{box-shadow:0 0 34px color-mix(in srgb,var(--wa) 24%,transparent),inset 0 0 28px color-mix(in srgb,var(--wb) 8%,transparent)!important}'
+      : normalized === 'sakura'
+        ? '.card:after{background:radial-gradient(circle at 30% 30%,var(--wa) 0 5px,transparent 6px),radial-gradient(circle at 70% 60%,var(--wb) 0 4px,transparent 5px)!important;background-size:42px 42px!important;opacity:.32!important}'
+        : normalized === 'mono'
+          ? '.card:before{animation:none!important;background:var(--wa)!important}'
+          : '';
+  return `body{--wa:${tokens.a};--wb:${tokens.b};--wt:#fff9fd;--wm:rgba(255,249,253,.68);--wl:rgba(255,255,255,.14);--wp:rgba(255,255,255,.075);--wmoney:${tokens.money};font-family:${tokens.font || '"Segoe UI",Arial,sans-serif'}!important;color:var(--wt)!important}.card{--pink:var(--wa)!important;--cyan:var(--wb)!important;color:var(--wt)!important;background:${tokens.bg}!important;border-color:var(--wl)!important;box-shadow:0 18px 55px color-mix(in srgb,var(--wa) 13%,rgba(0,0,0,.48))!important}.card:before{background:linear-gradient(90deg,var(--wa),var(--wb),var(--wa))!important;background-size:200% 100%!important}.card:after{content:"";position:absolute;right:-58px;bottom:-84px;width:190px;height:190px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--wb) 25%,transparent),transparent 68%);pointer-events:none}.card>*{position:relative;z-index:1}.badge{color:var(--wt)!important;background:color-mix(in srgb,var(--wa) 17%,transparent)!important;border-color:color-mix(in srgb,var(--wa) 38%,transparent)!important}.now{background:linear-gradient(90deg,color-mix(in srgb,var(--wa) 20%,transparent),color-mix(in srgb,var(--wb) 10%,transparent))!important;border-color:var(--wl)!important}.disc,.avatar,.alert-icon{background:linear-gradient(135deg,var(--wa),var(--wb))!important;box-shadow:0 0 24px color-mix(in srgb,var(--wa) 28%,transparent)!important}.song,.game-result,.gift-grid>div{background:var(--wp)!important;border-color:var(--wl)!important}.song>span{color:var(--wa)!important}.copy small,.empty,.wallet-name small,.balance small,.game-copy small,.game-meta,.alert-copy span,.goal-meta small,.gift-grid small,.gift-grid span,.gift-last{color:var(--wm)!important}.balance strong,.game-payout{color:var(--wmoney)!important}.goal-track{background:var(--wp)!important}.goal-track span{background:linear-gradient(90deg,var(--wa),var(--wb),var(--wa))!important}${special}`;
+}
+
 const DEFAULT_SETTINGS = {
   username: '',
   tiktokConnectionMode: 'railway-relay',
@@ -534,6 +593,7 @@ const DEFAULT_SETTINGS = {
   rankingOverlays: DEFAULT_RANKING_OVERLAYS,
   rankingsMigratedV016: false,
   streamWidgetsMigratedV019: false,
+  streamWidgetThemes: { ...DEFAULT_STREAM_WIDGET_THEMES },
   giftRewardsMigratedV019: false,
   customCommands: [
     { id: 'song', trigger: '!cancion', action: 'song', response: '', permission: 'music', enabled: false, cost: 0 },
@@ -733,8 +793,13 @@ function setStreamWidgetState(type, payload = {}) {
 async function streamWidgetSnapshot(type, preview = false) {
   const normalized = normalizeStreamWidgetType(type);
   const current = streamWidgetStates.get(normalized);
-  if (current) return current;
+  // La vista de diseño siempre usa una muestra estable y no requiere actividad del LIVE.
+  if (!preview && current) return current;
   if (normalized === 'wallet') {
+    if (preview) {
+      const settings = runtimeResourceSettings || DEFAULT_SETTINGS;
+      return { type:'wallet', id:'wallet-preview', updatedAt:1, user:'lulu_fan', displayName:'Lulu Fan', profilePictureUrl:'', balance:2450, currencyName:String(settings.currencyName || 'Lunitas'), currencySymbol:String(settings.currencySymbol || '🌙') };
+    }
     const economy = await economySnapshot();
     const settings = { ...DEFAULT_SETTINGS, ...(await readJson(getDataPaths().settings, DEFAULT_SETTINGS)) };
     const currencyName = String(settings.currencyName || 'Lunitas');
@@ -746,27 +811,26 @@ async function streamWidgetSnapshot(type, preview = false) {
       profilePictureUrl: recent.profilePictureUrl || '', balance: Number(recent.balance || 0),
       currencyName, currencySymbol
     };
-    if (preview) return { type:'wallet', id:'wallet-preview', updatedAt:Date.now(), user:'lulu_fan', displayName:'Lulu Fan', profilePictureUrl:'', balance:2450, currencyName, currencySymbol };
     return { type:'wallet', id:'wallet-empty', updatedAt:0, user:'', displayName:'Esperando usuario', profilePictureUrl:'', balance:0, currencyName, currencySymbol };
   }
   if (normalized === 'alert') {
-    if (preview) return { type:'alert', id:'alert-preview', updatedAt:Date.now(), title:'Gracias por el apoyo', text:'Lulu Fan envió un regalo', icon:'✦', durationSeconds:6, expiresAt:Date.now()+6000 };
+    if (preview) return { type:'alert', id:'alert-preview', updatedAt:1, title:'Gracias por el apoyo', text:'Lulu Fan envió un regalo', icon:'✦', durationSeconds:6, expiresAt:0 };
     return { type:'alert', id:'alert-empty', updatedAt:0, title:'Alertas de Lulu', text:'Esperando un evento del LIVE.', icon:'✦', durationSeconds:6, expiresAt:0 };
   }
   if (normalized === 'goal') {
-    if (preview) return { type:'goal', id:'goal-preview', updatedAt:Date.now(), title:'Meta de likes', goalType:'likes', progress:725, target:1000, percent:72.5, text:'725 / 1,000' };
+    if (preview) return { type:'goal', id:'goal-preview', updatedAt:1, title:'Meta de likes', goalType:'likes', progress:725, target:1000, percent:72.5, text:'725 / 1,000' };
     return { type:'goal', id:'goal-empty', updatedAt:0, title:'Meta del LIVE', goalType:'likes', progress:0, target:100, percent:0, text:'0 / 100' };
   }
   if (normalized === 'gift') {
-    if (preview) return { type:'gift', id:'gift-preview', updatedAt:Date.now(), totalGifts:46, totalDiamonds:1840, topGift:{displayName:'Lulu Fan',giftName:'TikTok Universe',diamonds:1000,repeatCount:1}, topStreak:{displayName:'Miku Fan',giftName:'Rose',diamonds:24,repeatCount:24}, lastGift:{displayName:'Miku Fan',giftName:'Rose',diamonds:24,repeatCount:24} };
+    if (preview) return { type:'gift', id:'gift-preview', updatedAt:1, totalGifts:46, totalDiamonds:1840, topGift:{displayName:'Lulu Fan',giftName:'TikTok Universe',diamonds:1000,repeatCount:1}, topStreak:{displayName:'Miku Fan',giftName:'Rose',diamonds:24,repeatCount:24}, lastGift:{displayName:'Miku Fan',giftName:'Rose',diamonds:24,repeatCount:24} };
     return { type:'gift', id:'gift-empty', updatedAt:0, totalGifts:0, totalDiamonds:0, topGift:null, topStreak:null, lastGift:null };
   }
   if (normalized === 'game') {
-    if (preview) return { type:'game', id:'game-preview', updatedAt:Date.now(), title:'Blackjack', displayName:'Lulu Fan', user:'lulu_fan', status:'win', bet:100, payout:200, profit:100, detail:'A♠ K♥ = 21 · Dealer 19', text:'Lulu Fan ganó 100 Lunitas en Blackjack.', currencyName:'Lunitas', currencySymbol:'🌙', playerCards:['A♠','K♥'], dealerCards:['10♦','9♣'] };
+    if (preview) return { type:'game', id:'game-preview', updatedAt:1, title:'Blackjack', displayName:'Lulu Fan', user:'lulu_fan', status:'win', bet:100, payout:200, profit:100, detail:'A♠ K♥ = 21 · Dealer 19', text:'Lulu Fan ganó 100 Lunitas en Blackjack.', currencyName:'Lunitas', currencySymbol:'🌙', playerCards:['A♠','K♥'], dealerCards:['10♦','9♣'] };
     return { type:'game', id:'game-empty', updatedAt:0, title:'Juegos del LIVE', displayName:'Esperando jugador', user:'', status:'pending', bet:0, payout:0, profit:0, detail:'Usa un comando de juego en el chat.', text:'Esperando una partida.', currencyName:'Lunitas', currencySymbol:'🌙' };
   }
   if (preview) return {
-    type:'playlist', id:'playlist-preview', updatedAt:Date.now(), provider:'YouTube',
+    type:'playlist', id:'playlist-preview', updatedAt:1, provider:'YouTube',
     current:{ title:'Canción actual de ejemplo', requestedBy:'Lulu Fan' },
     queue:[
       { title:'Siguiente canción', requestedBy:'AlyaTeam' },
@@ -777,29 +841,31 @@ async function streamWidgetSnapshot(type, preview = false) {
   return { type:'playlist', id:'playlist-empty', updatedAt:0, provider:'YouTube', current:null, queue:[] };
 }
 
-function streamWidgetUrl(type, token, baseUrl = localOverlayBaseUrl()) {
-  return `${String(baseUrl || '').replace(/\/+$/, '')}/widget?type=${encodeURIComponent(normalizeStreamWidgetType(type))}&token=${encodeURIComponent(token)}`;
+function streamWidgetUrl(type, token, baseUrl = localOverlayBaseUrl(), theme = 'lulu') {
+  return `${String(baseUrl || '').replace(/\/+$/, '')}/widget?type=${encodeURIComponent(normalizeStreamWidgetType(type))}&theme=${encodeURIComponent(normalizeStreamWidgetTheme(theme))}&token=${encodeURIComponent(token)}`;
 }
 
-function streamWidgetHtml(type, token, preview = false) {
+function streamWidgetHtml(type, token, preview = false, theme = 'lulu') {
   const normalized = normalizeStreamWidgetType(type);
+  const normalizedTheme = normalizeStreamWidgetTheme(theme, DEFAULT_STREAM_WIDGET_THEMES[normalized] || 'lulu');
   const safeType = JSON.stringify(normalized);
   const safeToken = JSON.stringify(String(token || ''));
+  const safeTheme = JSON.stringify(normalizedTheme);
   const previewFlag = preview ? '1' : '0';
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${streamWidgetThemeCss(normalizedTheme)}
   *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Segoe UI,Arial,sans-serif;color:#fff}body{display:flex;align-items:flex-start;justify-content:flex-start;padding:14px}.hidden{display:none!important}.card{--pink:#ff4f9b;--cyan:#25f4ee;position:relative;background:linear-gradient(135deg,rgba(24,14,36,.94),rgba(67,29,72,.9));border:1px solid rgba(255,255,255,.16);box-shadow:0 18px 50px rgba(0,0,0,.4);backdrop-filter:blur(16px);overflow:hidden}.card:before{content:'';position:absolute;inset:0 0 auto;height:3px;background:linear-gradient(90deg,var(--cyan),var(--pink),var(--cyan));background-size:200% 100%;animation:flow 3s linear infinite}.playlist{width:min(560px,100%);border-radius:22px;padding:18px}.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}.head strong{font-size:22px;letter-spacing:.02em}.badge{font-size:11px;font-weight:800;padding:6px 9px;border-radius:999px;background:rgba(255,79,155,.17);border:1px solid rgba(255,79,155,.35)}.now{display:grid;grid-template-columns:46px minmax(0,1fr);gap:12px;align-items:center;padding:12px;border-radius:16px;background:linear-gradient(90deg,rgba(255,79,155,.2),rgba(37,244,238,.09));border:1px solid rgba(255,255,255,.11);margin-bottom:10px}.disc{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--pink),#8a5cff);font-size:20px;box-shadow:0 0 18px rgba(255,79,155,.28)}.copy strong,.copy small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.copy strong{font-size:17px}.copy small{margin-top:4px;color:rgba(255,255,255,.66)}.queue{display:flex;flex-direction:column;gap:7px}.song{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:center;padding:9px 11px;border-radius:13px;background:rgba(255,255,255,.065);border:1px solid rgba(255,255,255,.07)}.song>span{font-weight:900;color:#ff9fc5;text-align:center}.empty{padding:18px;text-align:center;color:rgba(255,255,255,.65)}.wallet{width:min(470px,100%);min-height:112px;border-radius:999px;display:grid;grid-template-columns:72px minmax(0,1fr) auto;align-items:center;gap:13px;padding:12px 22px 12px 12px}.avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--pink);background:linear-gradient(135deg,var(--pink),var(--cyan));display:grid;place-items:center;font-size:26px;font-weight:900;box-shadow:0 0 20px rgba(255,79,155,.28)}.wallet-name{min-width:0}.wallet-name strong,.wallet-name small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wallet-name strong{font-size:20px}.wallet-name small{color:rgba(255,255,255,.62);margin-top:3px}.balance{text-align:right;white-space:nowrap}.balance strong{display:block;font-size:25px;color:#ffe07d;text-shadow:0 0 12px rgba(255,224,125,.25)}.balance small{font-size:11px;color:rgba(255,255,255,.65)}.game{width:min(620px,100%);border-radius:24px;padding:18px}.game-player{display:flex;align-items:center;justify-content:space-between;gap:14px}.game-copy strong,.game-copy small{display:block}.game-copy strong{font-size:22px}.game-copy small{margin-top:4px;color:rgba(255,255,255,.65)}.game-result{margin-top:13px;padding:15px;border-radius:17px;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.1);font-size:22px;font-weight:850;letter-spacing:.02em}.game-result.win{box-shadow:inset 0 0 0 1px rgba(81,255,166,.22)}.game-result.loss{box-shadow:inset 0 0 0 1px rgba(255,89,122,.24)}.game-meta{display:flex;justify-content:space-between;gap:12px;margin-top:11px;color:rgba(255,255,255,.73);font-size:13px}.game-payout{font-weight:900;color:#ffe07d}.lulu-alert{width:min(660px,100%);padding:18px 20px;display:flex;align-items:center;gap:15px}.alert-icon{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:linear-gradient(135deg,rgba(255,112,180,.34),rgba(144,92,255,.30));font-size:30px;box-shadow:0 0 32px rgba(255,104,190,.18)}.alert-copy strong,.alert-copy span{display:block}.alert-copy strong{font-size:23px}.alert-copy span{margin-top:5px;color:rgba(255,255,255,.78);font-size:16px}.lulu-goal{width:min(660px,100%);padding:18px}.goal-track{height:14px;margin-top:14px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.goal-track span{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#ff70b5,#a667ff,#65dcff);transition:width .5s ease}.goal-meta{display:flex;align-items:center;justify-content:space-between;margin-top:10px}.goal-meta strong{font-size:19px}.goal-meta small{color:rgba(255,255,255,.62);letter-spacing:.12em}.lulu-gifts{width:min(720px,100%);padding:18px}.gift-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.gift-grid>div{padding:13px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)}.gift-grid small,.gift-grid strong,.gift-grid span{display:block}.gift-grid small{font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.12em}.gift-grid strong{margin-top:5px;font-size:17px}.gift-grid span{margin-top:3px;color:rgba(255,255,255,.72)}.gift-last{margin-top:11px;color:rgba(255,255,255,.72);font-size:13px}@keyframes flow{to{background-position:200% 0}}@media(max-width:420px){.wallet{grid-template-columns:58px minmax(0,1fr);border-radius:24px}.avatar{width:58px;height:58px}.balance{grid-column:2;text-align:left}.playlist{padding:14px}}
   </style></head><body><section id="playlistCard" class="card playlist hidden"><div class="head"><strong>Lista de reproducción</strong><span class="badge" id="provider">LIVE</span></div><div id="now"></div><div class="queue" id="queue"></div></section><section id="walletCard" class="card wallet hidden"><div id="avatar" class="avatar">L</div><div class="wallet-name"><strong id="displayName">Esperando usuario</strong><small id="username">@usuario</small></div><div class="balance"><strong id="balance">0</strong><small id="currency">Lunitas</small></div></section><section id="gameCard" class="card game hidden"><div class="head"><strong id="gameTitle">Juegos del LIVE</strong><span class="badge" id="gameBadge">LIVE</span></div><div class="game-player"><div class="game-copy"><strong id="gamePlayer">Esperando jugador</strong><small id="gameUser">@usuario</small></div><div class="game-payout" id="gamePayout">🌙 0</div></div><div class="game-result" id="gameResult">Usa un comando de juego en el chat.</div><div class="game-meta"><span id="gameBet">Apuesta: —</span><span id="gameStatus">Esperando</span></div></section><section id="alertCard" class="card lulu-alert hidden"><div class="alert-icon" id="alertIcon">✦</div><div class="alert-copy"><strong id="alertTitle">Alertas de Lulu</strong><span id="alertText">Esperando un evento del LIVE.</span></div></section><section id="goalCard" class="card lulu-goal hidden"><div class="head"><strong id="goalTitle">Meta del LIVE</strong><span class="badge" id="goalPercent">0%</span></div><div class="goal-track"><span id="goalBar"></span></div><div class="goal-meta"><strong id="goalText">0 / 100</strong><small id="goalType">LIKES</small></div></section><section id="giftCard" class="card lulu-gifts hidden"><div class="head"><strong>Regalos del LIVE</strong><span class="badge" id="giftTotal">0 regalos</span></div><div class="gift-grid"><div><small>TOP REGALO</small><strong id="topGiftName">Esperando</strong><span id="topGiftDetail">—</span></div><div><small>MEJOR RACHA</small><strong id="topStreakName">Esperando</strong><span id="topStreakDetail">—</span></div></div><div class="gift-last" id="lastGiftText">Esperando regalos…</div></section><script>
-  const widget=${safeType},preview='${previewFlag}'==='1',clientId=(globalThis.crypto?.randomUUID?.()||('lf-'+Date.now()+'-'+Math.random().toString(16).slice(2)));let last='';
+  const widget=${safeType},preview='${previewFlag}'==='1',activeTheme=${safeTheme},clientId=(globalThis.crypto?.randomUUID?.()||('lf-'+Date.now()+'-'+Math.random().toString(16).slice(2)));let last='';
   const playlistCard=document.getElementById('playlistCard'),walletCard=document.getElementById('walletCard'),gameCard=document.getElementById('gameCard'),alertCard=document.getElementById('alertCard'),goalCard=document.getElementById('goalCard'),giftCard=document.getElementById('giftCard');
   const text=(v,f='')=>String(v??f);function renderPlaylist(data){playlistCard.classList.remove('hidden');walletCard.classList.add('hidden');gameCard.classList.add('hidden');document.getElementById('provider').textContent=text(data.provider,'Música');const now=document.getElementById('now'),queue=document.getElementById('queue');now.replaceChildren();queue.replaceChildren();if(data.current){const box=document.createElement('div');box.className='now';const disc=document.createElement('div');disc.className='disc';disc.textContent='♪';const copy=document.createElement('div');copy.className='copy';const title=document.createElement('strong');title.textContent=text(data.current.title,'Canción actual');const by=document.createElement('small');by.textContent=data.current.requestedBy?'Solicitada por '+data.current.requestedBy:'Reproduciendo ahora';copy.append(title,by);box.append(disc,copy);now.appendChild(box)}else{const empty=document.createElement('div');empty.className='empty';empty.textContent='No hay una canción reproduciéndose.';now.appendChild(empty)}const items=Array.isArray(data.queue)?data.queue:[];if(!items.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='La cola está vacía.';queue.appendChild(empty)}items.slice(0,5).forEach((item,index)=>{const row=document.createElement('div');row.className='song';const number=document.createElement('span');number.textContent=String(index+1);const copy=document.createElement('div');copy.className='copy';const title=document.createElement('strong');title.textContent=text(item.title,'Canción');const by=document.createElement('small');by.textContent=item.requestedBy?'Pedida por '+item.requestedBy:'Solicitud manual';copy.append(title,by);row.append(number,copy);queue.appendChild(row)})}
   function renderWallet(data){walletCard.classList.remove('hidden');playlistCard.classList.add('hidden');gameCard.classList.add('hidden');const name=text(data.displayName||data.user,'Esperando usuario'),currentAvatar=document.getElementById('avatar');let avatar;if(data.profilePictureUrl){avatar=document.createElement('img');avatar.src=text(data.profilePictureUrl);avatar.alt='';avatar.referrerPolicy='no-referrer'}else{avatar=document.createElement('div');avatar.textContent=name.slice(0,1).toUpperCase()}avatar.id='avatar';avatar.className='avatar';currentAvatar.replaceWith(avatar);document.getElementById('displayName').textContent=name;document.getElementById('username').textContent=data.user?'@'+text(data.user):'Último saldo actualizado';const symbol=text(data.currencySymbol,'🌙');document.getElementById('balance').textContent=symbol+' '+Number(data.balance||0).toLocaleString('es-MX');document.getElementById('currency').textContent=text(data.currencyName,'Lunitas')}
   function renderGame(data){gameCard.classList.remove('hidden');playlistCard.classList.add('hidden');walletCard.classList.add('hidden');document.getElementById('gameTitle').textContent=text(data.title,'Juegos del LIVE');document.getElementById('gameBadge').textContent=data.status==='win'?'GANÓ':data.status==='loss'?'PERDIÓ':data.status==='push'?'EMPATE':'JUGANDO';document.getElementById('gamePlayer').textContent=text(data.displayName||data.user,'Esperando jugador');document.getElementById('gameUser').textContent=data.user?'@'+text(data.user):'Comandos activos';const symbol=text(data.currencySymbol,'🌙');document.getElementById('gamePayout').textContent=Number(data.payout||0)>0?symbol+' '+Number(data.payout||0).toLocaleString('es-MX'):symbol+' 0';const result=document.getElementById('gameResult');result.textContent=text(data.detail||data.text,'Usa un comando de juego en el chat.');result.className='game-result '+text(data.status,'pending');document.getElementById('gameBet').textContent=Number(data.bet||0)>0?'Apuesta: '+symbol+' '+Number(data.bet).toLocaleString('es-MX'):'Apuesta: —';document.getElementById('gameStatus').textContent=data.status==='win'?'Victoria':data.status==='loss'?'Derrota':data.status==='push'?'Empate':'En juego'}
   function hideAll(){[playlistCard,walletCard,gameCard,alertCard,goalCard,giftCard].forEach((card)=>card&&card.classList.add('hidden'))}
-  function renderAlert(data){hideAll();alertCard.classList.remove('hidden');document.getElementById('alertIcon').textContent=text(data.icon,'✦');document.getElementById('alertTitle').textContent=text(data.title,'Alertas de Lulu');document.getElementById('alertText').textContent=text(data.text,'Esperando un evento del LIVE.');if(Number(data.expiresAt||0)>Date.now())setTimeout(()=>{if(widget==='alert')alertCard.classList.add('hidden')},Math.max(250,Number(data.expiresAt)-Date.now()))}
+  function renderAlert(data){hideAll();alertCard.classList.remove('hidden');document.getElementById('alertIcon').textContent=text(data.icon,'✦');document.getElementById('alertTitle').textContent=text(data.title,'Alertas de Lulu');document.getElementById('alertText').textContent=text(data.text,'Esperando un evento del LIVE.');if(!preview&&Number(data.expiresAt||0)>Date.now())setTimeout(()=>{if(widget==='alert')alertCard.classList.add('hidden')},Math.max(250,Number(data.expiresAt)-Date.now()))}
   function renderGoal(data){hideAll();goalCard.classList.remove('hidden');const target=Math.max(1,Number(data.target||1)),progress=Math.max(0,Number(data.progress||0)),percent=Math.max(0,Math.min(100,Number(data.percent??(progress/target*100))));document.getElementById('goalTitle').textContent=text(data.title,'Meta del LIVE');document.getElementById('goalPercent').textContent=Math.round(percent)+'%';document.getElementById('goalBar').style.width=percent+'%';document.getElementById('goalText').textContent=text(data.text,progress.toLocaleString('es-MX')+' / '+target.toLocaleString('es-MX'));document.getElementById('goalType').textContent=text(data.goalType,'META').toUpperCase()}
   function renderGift(data){hideAll();giftCard.classList.remove('hidden');document.getElementById('giftTotal').textContent=Number(data.totalGifts||0).toLocaleString('es-MX')+' regalos';const top=data.topGift||{},streak=data.topStreak||{},last=data.lastGift||{};document.getElementById('topGiftName').textContent=text(top.displayName,'Esperando');document.getElementById('topGiftDetail').textContent=top.giftName?text(top.giftName)+' · '+Number(top.diamonds||0).toLocaleString('es-MX')+' monedas':'—';document.getElementById('topStreakName').textContent=text(streak.displayName,'Esperando');document.getElementById('topStreakDetail').textContent=streak.giftName?text(streak.giftName)+' ×'+Number(streak.repeatCount||1).toLocaleString('es-MX'):'—';document.getElementById('lastGiftText').textContent=last.giftName?text(last.displayName)+' envió '+text(last.giftName)+' ×'+Number(last.repeatCount||1).toLocaleString('es-MX'):'Esperando regalos…'}
-  function render(data){if(widget==='wallet')renderWallet(data);else if(widget==='game')renderGame(data);else if(widget==='alert')renderAlert(data);else if(widget==='goal')renderGoal(data);else if(widget==='gift')renderGift(data);else renderPlaylist(data)}
-  async function poll(){try{const response=await fetch('/widget-snapshot?type='+encodeURIComponent(widget)+'&preview='+(preview?'1':'0')+'&client='+encodeURIComponent(clientId)+'&token='+encodeURIComponent(${safeToken}),{cache:'no-store'});if(response.ok){const payload=await response.text();if(payload!==last){last=payload;render(JSON.parse(payload))}}}catch{}setTimeout(poll,600)}poll();
+  function render(data){if(data.theme&&data.theme!==activeTheme){const next=new URL(location.href);next.searchParams.set('theme',data.theme);location.replace(next);return}if(widget==='wallet')renderWallet(data);else if(widget==='game')renderGame(data);else if(widget==='alert')renderAlert(data);else if(widget==='goal')renderGoal(data);else if(widget==='gift')renderGift(data);else renderPlaylist(data)}
+  async function poll(){try{const response=await fetch('/widget-snapshot?type='+encodeURIComponent(widget)+'&preview='+(preview?'1':'0')+'&client='+encodeURIComponent(clientId)+'&token='+encodeURIComponent(${safeToken}),{cache:'no-store'});if(response.ok){const payload=await response.text();if(payload!==last){last=payload;render(JSON.parse(payload))}}}catch{}setTimeout(poll,preview?1500:600)}poll();
   </script></body></html>`;
 }
 
@@ -813,11 +879,13 @@ async function streamWidgetInfo(type = 'playlist', forceTunnel = false) {
   await startOverlayServer();
   const token = await overlayIdentity();
   const normalized = normalizeStreamWidgetType(type);
-  const localUrl = streamWidgetUrl(normalized, token, localOverlayBaseUrl());
+  const themes = normalizeStreamWidgetThemes(runtimeResourceSettings?.streamWidgetThemes);
+  const theme = themes[normalized];
+  const localUrl = streamWidgetUrl(normalized, token, localOverlayBaseUrl(), theme);
   const tunnel = forceTunnel ? await ensureOverlayHttpsTunnel(true) : currentOverlayTunnelInfo();
-  const url = tunnel.ok && tunnel.url ? streamWidgetUrl(normalized, token, tunnel.url) : '';
+  const url = tunnel.ok && tunnel.url ? streamWidgetUrl(normalized, token, tunnel.url, theme) : '';
   return {
-    ok: Boolean(url), widget: normalized, url, localUrl, previewUrl: `${localUrl}&preview=1`,
+    ok: Boolean(url), widget: normalized, theme, url, localUrl, previewUrl: `${localUrl}&preview=1`,
     connected: streamWidgetClientCount(normalized), totalConnected: streamWidgetClientCount(),
     tunnelStatus: tunnel.status || overlayTunnelStatus.status,
     tunnelMessage: tunnel.message || overlayTunnelStatus.message,
@@ -1189,14 +1257,18 @@ async function startOverlayServer() {
       }
       const widgetType = normalizeStreamWidgetType(url.searchParams.get('type'));
       const widgetPreview = url.searchParams.get('preview') === '1';
+      const widgetTheme = normalizeStreamWidgetTheme(url.searchParams.get('theme'), DEFAULT_STREAM_WIDGET_THEMES[widgetType]);
       if (url.pathname === '/widget') {
         response.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store' });
-        response.end(streamWidgetHtml(widgetType, token, widgetPreview)); return;
+        response.end(streamWidgetHtml(widgetType, token, widgetPreview, widgetTheme)); return;
       }
       if (url.pathname === '/widget-snapshot') {
         const clientId = url.searchParams.get('client');
         const isNew = touchPollingClient(streamWidgetPollClients, widgetType, clientId, widgetPreview);
-        const snapshot = await streamWidgetSnapshot(widgetType, widgetPreview);
+        const snapshot = {
+          ...(await streamWidgetSnapshot(widgetType, widgetPreview)),
+          theme: normalizeStreamWidgetThemes(runtimeResourceSettings?.streamWidgetThemes)[widgetType]
+        };
         response.writeHead(200, { 'Content-Type':'application/json; charset=utf-8', 'Cache-Control':'no-store' });
         response.end(JSON.stringify(snapshot));
         if (isNew) send('widget:status', { widget:widgetType, connected:streamWidgetClientCount(widgetType), totalConnected:streamWidgetClientCount() });
@@ -3945,6 +4017,7 @@ async function pickAndCopyMedia(kind) {
 ipcMain.handle('app:get-state', async () => {
   const p = getDataPaths();
   const settings = normalizeVoiceSettings({ ...DEFAULT_SETTINGS, ...(await readJson(p.settings, DEFAULT_SETTINGS)) });
+  settings.streamWidgetThemes = normalizeStreamWidgetThemes(settings.streamWidgetThemes);
   runtimeResourceSettings=settings;
   youtubeVolume=normalizedAudioVolume(settings.youtubeVolume,.8);
   spotifyVolume=normalizedAudioVolume(settings.spotifyVolume,.8);
@@ -3988,6 +4061,7 @@ ipcMain.handle('settings:save', async (_event, incoming) => {
   next.liveGameCommands = Array.isArray(next.liveGameCommands) ? next.liveGameCommands : DEFAULT_SETTINGS.liveGameCommands;
   next.automationRules = Array.isArray(next.automationRules) ? next.automationRules : DEFAULT_SETTINGS.automationRules;
   next.liveGoals = Array.isArray(next.liveGoals) ? next.liveGoals : DEFAULT_SETTINGS.liveGoals;
+  next.streamWidgetThemes = normalizeStreamWidgetThemes(next.streamWidgetThemes);
   delete next.eulerApiKey;
   delete next.relayUrl;
   delete next.relayClientToken;

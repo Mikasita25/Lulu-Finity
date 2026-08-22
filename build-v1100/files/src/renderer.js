@@ -63,6 +63,7 @@ const state = {
   ranking: { slot: 1, url: '', previewUrl: '', connected: 0, totalConnected: 0, snapshot: null },
   streamWidgets: { playlist: {}, wallet: {}, game: {}, alert: {}, goal: {}, gift: {} },
   streamWidgetSyncTimer: null,
+  streamWidgetThemeSaving: false,
   rankingSaveTimer: null,
   relayUsage: null,
   relayUsageTimer: null,
@@ -78,6 +79,80 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 const qsa = (selector) => [...document.querySelectorAll(selector)];
+
+const STREAM_WIDGET_THEME_CATALOG = Object.freeze([
+  { id:'lulu', name:'Lulu Rosa', mood:'Firma de Lulu', a:'#ff67ad', b:'#5fe8ff' },
+  { id:'aurora', name:'Aurora', mood:'Verde y violeta', a:'#71ffd6', b:'#9782ff' },
+  { id:'cyber', name:'Cyber', mood:'Neón futurista', a:'#00f6ff', b:'#ff2bd6' },
+  { id:'arcade', name:'Arcade', mood:'Pixel y energía', a:'#75ff4d', b:'#ff3dd1' },
+  { id:'hologram', name:'Holograma', mood:'Cristal luminoso', a:'#80fff4', b:'#ff80eb' },
+  { id:'sakura', name:'Sakura', mood:'Pétalos suaves', a:'#ff9fc9', b:'#c79bff' },
+  { id:'miku', name:'Miku', mood:'Turquesa pop', a:'#39f1d2', b:'#ff68a9' },
+  { id:'lavender', name:'Lavanda', mood:'Pastel profundo', a:'#c7a0ff', b:'#ff91cf' },
+  { id:'sunset', name:'Atardecer', mood:'Coral intenso', a:'#ff7657', b:'#ff3f9f' },
+  { id:'gold', name:'Dorado', mood:'Premium cálido', a:'#ffd56a', b:'#d99832' },
+  { id:'mint', name:'Menta', mood:'Fresco y limpio', a:'#7dffc5', b:'#42d8ba' },
+  { id:'ocean', name:'Océano', mood:'Azul eléctrico', a:'#48c8ff', b:'#4267ff' },
+  { id:'vampire', name:'Vampiro', mood:'Rojo nocturno', a:'#ff365f', b:'#9e38ff' },
+  { id:'mono', name:'Monocromo', mood:'Blanco editorial', a:'#ffffff', b:'#9da7b8' }
+]);
+const STREAM_WIDGET_THEME_IDS = new Set(STREAM_WIDGET_THEME_CATALOG.map((theme) => theme.id));
+const DEFAULT_STREAM_WIDGET_THEMES = Object.freeze({ playlist:'aurora', wallet:'gold', game:'arcade', alert:'lulu', goal:'hologram', gift:'sakura' });
+
+function normalizedStreamWidgetThemes(value = state.settings?.streamWidgetThemes) {
+  const source = value && typeof value === 'object' ? value : {};
+  return Object.fromEntries(Object.entries(DEFAULT_STREAM_WIDGET_THEMES).map(([type, fallback]) => [
+    type,
+    STREAM_WIDGET_THEME_IDS.has(String(source[type] || '')) ? String(source[type]) : fallback
+  ]));
+}
+
+function renderStreamWidgetThemeStudios() {
+  if (!state.settings) return;
+  state.settings.streamWidgetThemes = normalizedStreamWidgetThemes();
+  qsa('[data-widget-theme-gallery]').forEach((gallery) => {
+    const type = gallery.dataset.widgetThemeGallery;
+    const selected = state.settings.streamWidgetThemes[type] || DEFAULT_STREAM_WIDGET_THEMES[type] || 'lulu';
+    gallery.innerHTML = STREAM_WIDGET_THEME_CATALOG.map((theme) => `<button type="button" class="widget-theme-choice ${theme.id === selected ? 'active' : ''}" data-widget-theme-choice="${theme.id}" data-widget-theme-for="${type}" aria-pressed="${theme.id === selected ? 'true' : 'false'}" ${state.streamWidgetThemeSaving ? 'disabled' : ''} style="--widget-swatch-a:${theme.a};--widget-swatch-b:${theme.b}"><span class="widget-theme-swatch"><i></i></span><strong>${escapeHtml(theme.name)}</strong><small>${escapeHtml(theme.mood)}</small></button>`).join('');
+    const selectedTheme = STREAM_WIDGET_THEME_CATALOG.find((theme) => theme.id === selected);
+    const label = document.querySelector(`[data-widget-theme-label="${type}"]`);
+    if (label) label.textContent = selectedTheme?.name || 'Lulu Rosa';
+  });
+}
+
+async function selectStreamWidgetTheme(type, theme) {
+  if (state.streamWidgetThemeSaving || !Object.prototype.hasOwnProperty.call(DEFAULT_STREAM_WIDGET_THEMES, type) || !STREAM_WIDGET_THEME_IDS.has(theme)) return;
+  const previous = normalizedStreamWidgetThemes();
+  if (previous[type] === theme) return;
+  state.streamWidgetThemeSaving = true;
+  clearTimeout(state.saveTimer);
+  state.saveTimer = null;
+  state.settings.streamWidgetThemes = { ...previous, [type]:theme };
+  renderStreamWidgetThemeStudios();
+  try {
+    state.settings = await api.saveSettings(state.settings);
+    state.settings.streamWidgetThemes = normalizedStreamWidgetThemes(state.settings.streamWidgetThemes);
+    renderStreamWidgetThemeStudios();
+    await refreshStreamWidgetInfo(type, true);
+    const selectedTheme = STREAM_WIDGET_THEME_CATALOG.find((item) => item.id === theme);
+    toast('Tema aplicado', `${selectedTheme?.name || theme} · la vista previa y las fuentes conectadas se actualizaron.`, 'success');
+  } catch (error) {
+    state.settings.streamWidgetThemes = previous;
+    renderStreamWidgetThemeStudios();
+    toast('No se guardó el tema', error.message || String(error), 'error');
+  } finally {
+    state.streamWidgetThemeSaving = false;
+    renderStreamWidgetThemeStudios();
+  }
+}
+
+function bindStreamWidgetThemeStudios() {
+  qsa('[data-widget-theme-gallery]').forEach((gallery) => gallery.addEventListener('click', (event) => {
+    const choice = event.target.closest('[data-widget-theme-choice]');
+    if (!choice || !gallery.contains(choice)) return;
+    void selectStreamWidgetTheme(choice.dataset.widgetThemeFor, choice.dataset.widgetThemeChoice);
+  }));
+}
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number(value)));
@@ -1382,6 +1457,8 @@ function populateSettings() {
   state.settings.liveGameCommands = normalizedLiveGameCommands().map(({id,trigger,enabled})=>({id,trigger,enabled}));
   state.settings.automationRules = Array.isArray(state.settings.automationRules) ? state.settings.automationRules : [];
   state.settings.liveGoals = Array.isArray(state.settings.liveGoals) ? state.settings.liveGoals : [];
+  state.settings.streamWidgetThemes = normalizedStreamWidgetThemes(state.settings.streamWidgetThemes);
+  renderStreamWidgetThemeStudios();
   renderLiveGames();
   renderAutomationStudio();
   syncOutputs();
@@ -3191,6 +3268,7 @@ function syncRecommendedSetting(value) {
 }
 
 function setupEvents() {
+  bindStreamWidgetThemeStudios();
   $('minimizeBtn').addEventListener('click', api.minimize);
   $('maximizeBtn').addEventListener('click', api.maximize);
   $('closeBtn').addEventListener('click', api.close);
