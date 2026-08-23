@@ -42,6 +42,7 @@ test('las únicas dependencias de ejecución son musicales y de conexión', () =
     '@ghostery/adblocker-electron', 'tiktok-live-connector', 'ws'
   ]);
   assert.equal(packageJson.dependencies['electron-updater'], undefined);
+  assert.match(packageJson.scripts['build:win'], /create-portable\.ps1/);
 });
 
 test('preload expone solo operaciones musicales y de conexión', () => {

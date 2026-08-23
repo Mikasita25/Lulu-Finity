@@ -63,7 +63,7 @@ jobs:
       - name: Compilar instalador y ZIP
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npm run build:win -- --publish never
+        run: npm run build:win
       - name: Verificar contenido del paquete
         shell: pwsh
         run: |
