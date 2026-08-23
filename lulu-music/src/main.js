@@ -117,20 +117,25 @@ function broadcastState() {
 function notice(message) { send('app:notice', { message:String(message || '') }); }
 
 function markRendererReady(event) {
-  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  if (!mainWindow || mainWindow.isDestroyed() || event?.sender?.id !== mainWindow.webContents.id) return false;
   rendererReady = true;
   const waiters = rendererReadyWaiters;
   rendererReadyWaiters = [];
   waiters.forEach((resolve) => resolve(true));
+  return true;
 }
 
 function waitForRendererReady(timeoutMs = 8_000) {
   if (rendererReady) return Promise.resolve(true);
   return new Promise((resolve, reject) => {
     const ready = () => { clearTimeout(timer); resolve(true); };
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       rendererReadyWaiters = rendererReadyWaiters.filter((waiter) => waiter !== ready);
-      reject(new Error('El renderer musical no confirmó que estaba listo.'));
+      let phase = 'no disponible';
+      try {
+        phase = await mainWindow.webContents.executeJavaScript(`JSON.stringify({phase:window.__LULU_MUSIC_RENDERER_PHASE__||'',api:typeof window.luluMusic,policy:typeof window.LuluMusicPolicy})`, true);
+      } catch {}
+      reject(new Error(`El renderer musical no confirmó que estaba listo (${phase}).`));
     }, timeoutMs);
     rendererReadyWaiters.push(ready);
   });
@@ -627,7 +632,7 @@ async function disconnectLive() {
 }
 
 function registerIpc() {
-  ipcMain.on('app:renderer-ready',markRendererReady);
+  ipcMain.handle('app:renderer-ready',(event)=>markRendererReady(event));
   ipcMain.on('audius:state',handleAudiusState);
   ipcMain.handle('app:get-state',()=>currentState());
   ipcMain.handle('settings:save',async(_event,input)=>{settings=sanitizeSettings(input);if(musicQueue.length>settings.queueLimit)musicQueue=musicQueue.slice(0,settings.queueLimit);await writeSettings();await setPlayerVolume(settings.volume).catch(()=>{});broadcastState();return currentState()});

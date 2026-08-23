@@ -3,6 +3,7 @@
 const api = window.luluMusic;
 const policy = window.LuluMusicPolicy;
 const $ = (id) => document.getElementById(id);
+window.__LULU_MUSIC_RENDERER_PHASE__ = 'booting';
 
 let appState = null;
 let saveTimer = null;
@@ -307,7 +308,8 @@ async function start() {
     showToast(`Nueva solicitud: ${request.query}`);
   });
   api.onNotice((notice) => showToast(notice?.message || notice));
-  api.rendererReady();
+  window.__LULU_MUSIC_RENDERER_PHASE__ = 'listeners-ready';
+  await api.rendererReady();
   try {
     renderState(await api.getState());
   } catch (error) {
@@ -315,4 +317,7 @@ async function start() {
   }
 }
 
-void start();
+void start().catch((error) => {
+  window.__LULU_MUSIC_RENDERER_PHASE__ = `error:${String(error?.message || error)}`;
+  console.error('No se pudo iniciar el renderer musical.', error);
+});

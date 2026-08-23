@@ -84,6 +84,7 @@ test('preload expone solo operaciones musicales y de conexión', () => {
   const preload = source('preload.js');
   ['getState','rendererReady','saveSettings','connectLive','disconnectLive','addSong','removeSong','moveSong','clearQueue','playerControl','showPlayer','reportAudiusState','onAudiusLoad','onAudiusCommand']
     .forEach((name) => assert.match(preload, new RegExp(`\\b${name}\\b`)));
+  assert.match(preload, /invoke\('app:renderer-ready'\)/);
   assert.doesNotMatch(preload, /tts|voice|game|gift|automation|economy/i);
 });
 
