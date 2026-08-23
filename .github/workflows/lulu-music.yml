@@ -1,0 +1,128 @@
+name: Lulu Music Windows
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "lulu-music/**"
+      - ".github/workflows/lulu-music.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lulu-music
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lulu-music/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm test
+      - name: Probar búsqueda ligera real de YouTube
+        run: node scripts/smoke-youtube-light.js
+      - name: Probar búsqueda y stream directo real de Audius
+        run: node scripts/smoke-audius-light.js
+      - name: Auditar dependencias de producción
+        run: |
+          npm ls tiktok-live-connector ws --depth=0
+          npm audit --omit=dev --audit-level=high
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: lulu-music
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lulu-music/package-lock.json
+      - name: Instalar y probar
+        run: |
+          npm ci --no-audit --no-fund
+          npm run check
+          npm test
+      - name: Integrar token privado en compilación manual
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Falta el token privado del relay" }
+          $file = "src/main.js"
+          $text = Get-Content $file -Raw
+          if (!$text.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta el marcador privado" }
+          [IO.File]::WriteAllText($file, $text.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN), [Text.UTF8Encoding]::new($false))
+      - name: Compilar instalador y ZIP
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win
+      - name: Verificar contenido del paquete
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $exe = "dist/win-unpacked/Lulu Music.exe"
+          $asar = "dist/win-unpacked/resources/app.asar"
+          foreach ($file in @($exe,$asar,"dist/Lulu-Music-Setup-1.0.0.exe","dist/Lulu-Music-1.0.0-x64.zip")) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          $listing = & node_modules/.bin/asar list $asar
+          $appSource = ($listing | Where-Object { $_ -like "\src\*" }) -join "`n"
+          foreach ($forbidden in @("src\local-tts", "src\local-voice", "src\live-games", "src\automation-engine", "src\economy", ".test.js")) {
+            if ($appSource.Contains($forbidden)) { throw "El paquete contiene un módulo prohibido: $forbidden" }
+          }
+      - name: Probar arranque real y pantalla única
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $profile = Join-Path $env:RUNNER_TEMP "lulu-music-profile"
+          $marker = Join-Path $env:RUNNER_TEMP "lulu-music-smoke.json"
+          New-Item -ItemType Directory $profile -Force | Out-Null
+          Remove-Item $marker -Force -ErrorAction SilentlyContinue
+          $env:LULU_MUSIC_SMOKE_TEST = "1"
+          $env:LULU_MUSIC_PLAYER_SMOKE_TEST = "1"
+          $env:LULU_MUSIC_SMOKE_MARKER = $marker
+          $process = Start-Process -FilePath "dist/win-unpacked/Lulu Music.exe" -ArgumentList "--user-data-dir=$profile" -PassThru
+          try {
+            for ($attempt = 0; $attempt -lt 60 -and !(Test-Path $marker); $attempt++) {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+              if ($process.HasExited -and !(Test-Path $marker)) { throw "Lulu Music se cerró antes de confirmar su renderer" }
+            }
+            if (!(Test-Path $marker)) { throw "El renderer no respondió en 30 segundos" }
+            $result = Get-Content $marker -Raw | ConvertFrom-Json
+            if ($result.title -ne "Lulu Music" -or !$result.hasQueue -or !$result.hasPlayer -or !$result.hasSettings -or $result.hasSidebar -or $result.hasIframe -or $result.panels -lt 4) {
+              throw "La pantalla única no pasó la prueba: $($result | ConvertTo-Json -Compress)"
+            }
+            if (!$result.lightweightPlayer -or !$result.playerWindowReused -or !$result.playerWebContentsReused -or $result.appWindowCount -ne 2 -or $result.playerUrl -notmatch '^https://www\.youtube\.com/embed/' -or $result.workingSetMb -ge 750) {
+              throw "El reproductor ligero no reutilizó su proceso o excedió 750 MB: $($result | ConvertTo-Json -Compress)"
+            }
+            if (!$result.audiusDirectAudio -or !$result.audiusUsedMainRenderer -or $result.audiusWindowCount -ne 1 -or $result.audiusReadyState -lt 1 -or $result.audiusWorkingSetMb -ge 500 -or $result.audiusWorkingSetMb -ge $result.workingSetMb) {
+              throw "Audius no usó audio directo o no redujo memoria frente a YouTube: $($result | ConvertTo-Json -Compress)"
+            }
+            Write-Host "LULU_MUSIC_PLAYER_METRICS:$($result | ConvertTo-Json -Compress)"
+          }
+          finally {
+            Stop-Process -Name "Lulu Music" -Force -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_MUSIC_SMOKE_TEST -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_MUSIC_PLAYER_SMOKE_TEST -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_MUSIC_SMOKE_MARKER -ErrorAction SilentlyContinue
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Music-1.0.0-Windows
+          path: |
+            lulu-music/dist/Lulu-Music-Setup-1.0.0.exe
+            lulu-music/dist/Lulu-Music-1.0.0-x64.zip
+          if-no-files-found: error
