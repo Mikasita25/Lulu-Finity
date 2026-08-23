@@ -1,0 +1,62 @@
+{
+  "name": "lulu-music",
+  "version": "1.0.0",
+  "description": "Lulu Music: comandos musicales de TikTok LIVE, cola y reproductor",
+  "main": "src/main.js",
+  "author": "Mikasita25",
+  "license": "AGPL-3.0-or-later",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test src/*.test.js tests/*.test.js",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js",
+    "build:win": "electron-builder --win nsis zip --x64",
+    "build:dir": "electron-builder --dir --win --x64"
+  },
+  "dependencies": {
+    "@ghostery/adblocker-electron": "2.18.1",
+    "tiktok-live-connector": "2.4.3",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "electron": "43.2.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.mikasita.lulumusic",
+    "productName": "Lulu Music",
+    "asar": true,
+    "compression": "normal",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": ["src/**/*", "!src/*.test.js", "package.json", "NOTICE.md"],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "Lulu-Music-${version}-${arch}.${ext}",
+      "legalTrademarks": "Lulu Music"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "packElevateHelper": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Lulu Music",
+      "uninstallDisplayName": "Lulu Music",
+      "artifactName": "Lulu-Music-Setup-${version}.exe",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    }
+  }
+}

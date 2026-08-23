@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self'; style-src-attr 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Lulu Music</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span>♪</span></div>
+        <div>
+          <h1>Lulu Music</h1>
+          <p>Solo solicitudes musicales del LIVE</p>
+        </div>
+      </div>
+      <div class="live-pill" id="livePill" data-status="offline">
+        <span class="live-dot"></span>
+        <span id="livePillText">Sin conectar</span>
+      </div>
+    </header>
+
+    <section class="hero-card panel">
+      <div class="hero-copy">
+        <span class="eyebrow">CONEXIÓN MUSICAL</span>
+        <h2>Tu chat elige. Lulu pone la música.</h2>
+        <p>Solo entra a la app el comando musical configurado. Las conversaciones, menciones y demás comandos se descartan.</p>
+      </div>
+      <form id="connectForm" class="connect-form">
+        <label for="creatorUsername">Cuenta que está en LIVE</label>
+        <div class="input-action">
+          <span class="input-prefix">@</span>
+          <input id="creatorUsername" type="text" maxlength="64" autocomplete="off" spellcheck="false" placeholder="usuario_tiktok">
+          <button id="connectBtn" type="submit" class="button primary">Conectar</button>
+          <button id="disconnectBtn" type="button" class="button ghost hidden">Desconectar</button>
+        </div>
+        <p id="liveMessage" class="status-copy" aria-live="polite">Lista para conectarse a un LIVE.</p>
+      </form>
+    </section>
+
+    <div class="dashboard-grid">
+      <section class="panel now-panel">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">REPRODUCIENDO</span>
+            <h2>Ahora suena</h2>
+          </div>
+          <span id="providerBadge" class="provider-badge">YOUTUBE</span>
+        </div>
+        <div id="nowEmpty" class="now-empty">
+          <div class="empty-disc">♪</div>
+          <strong>La pista está libre</strong>
+          <span>Agrega una canción o espera una solicitud del LIVE.</span>
+        </div>
+        <div id="nowContent" class="now-content hidden">
+          <div class="record-wrap">
+            <div class="record"><span>♪</span></div>
+            <div class="record-glow"></div>
+          </div>
+          <div class="track-copy">
+            <span id="trackStatus" class="track-status">CARGANDO</span>
+            <h3 id="trackTitle">Canción</h3>
+            <p id="trackMeta">Solicitud manual</p>
+            <div class="progress-track"><span id="progressBar"></span></div>
+            <div class="time-row"><span id="currentTime">0:00</span><span id="duration">--:--</span></div>
+          </div>
+        </div>
+        <div class="player-controls">
+          <button id="restartBtn" class="icon-button" type="button" title="Reiniciar">↺</button>
+          <button id="playPauseBtn" class="play-button" type="button" title="Pausar o continuar">▶</button>
+          <button id="skipBtn" class="icon-button" type="button" title="Siguiente">↠</button>
+          <button id="showPlayerBtn" class="button ghost compact" type="button">Abrir reproductor</button>
+        </div>
+        <div class="volume-row">
+          <span aria-hidden="true">◖</span>
+          <input id="volumeRange" type="range" min="0" max="100" value="80" aria-label="Volumen">
+          <output id="volumeValue">80%</output>
+        </div>
+      </section>
+
+      <section class="panel queue-panel">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">SIGUIENTES</span>
+            <h2>Cola musical</h2>
+          </div>
+          <span id="queueCount" class="count-badge">0 / 30</span>
+        </div>
+        <form id="manualSongForm" class="manual-form">
+          <input id="manualSongInput" type="text" maxlength="180" placeholder="Canción, artista o enlace de YouTube/Spotify" autocomplete="off">
+          <button class="button primary" type="submit">Agregar</button>
+        </form>
+        <div id="queueEmpty" class="queue-empty">La cola está vacía.</div>
+        <ol id="queueList" class="queue-list"></ol>
+        <div class="queue-footer">
+          <p id="lastRequest">Las solicitudes aceptadas aparecerán aquí.</p>
+          <button id="clearQueueBtn" class="text-button danger" type="button">Vaciar cola</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel settings-panel">
+      <div class="section-head wide">
+        <div>
+          <span class="eyebrow">REGLAS DEL CHAT</span>
+          <h2>Un solo comando, bajo tu control</h2>
+          <p>Los ajustes se guardan automáticamente.</p>
+        </div>
+        <div class="command-preview"><span id="commandPreview">!cancion</span> nombre de la canción</div>
+      </div>
+      <div class="settings-grid">
+        <label class="field">
+          <span>Comando musical</span>
+          <input id="musicCommand" type="text" maxlength="32" value="!cancion" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Proveedor</span>
+          <select id="musicProvider">
+            <option value="youtube">YouTube</option>
+            <option value="spotify">Spotify</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Quién puede solicitar</span>
+          <select id="requestPermission">
+            <option value="all">Todos</option>
+            <option value="followers">Seguidores</option>
+            <option value="subscribers">Suscriptores</option>
+            <option value="selected">Usuarios seleccionados</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Máximo de canciones</span>
+          <input id="queueLimit" type="number" min="1" max="100" value="30">
+        </label>
+        <label class="field span-two" id="selectedUsersField">
+          <span>Usuarios permitidos <small>(separados por coma)</small></span>
+          <input id="selectedUsers" type="text" maxlength="500" placeholder="usuario1, usuario2">
+        </label>
+        <label class="field span-two">
+          <span>Palabras o canales bloqueados <small>(separados por coma)</small></span>
+          <input id="blockedTerms" type="text" maxlength="500" placeholder="término, canal">
+        </label>
+      </div>
+      <div class="toggle-grid">
+        <label class="toggle-card">
+          <input id="preventDuplicates" type="checkbox" checked>
+          <span class="toggle-ui"></span>
+          <span><strong>Evitar duplicados</strong><small>No repite una solicitud que ya esté en cola.</small></span>
+        </label>
+        <label class="toggle-card">
+          <input id="onePerUser" type="checkbox" checked>
+          <span class="toggle-ui"></span>
+          <span><strong>Una por usuario</strong><small>Cada persona espera a que salga su canción.</small></span>
+        </label>
+        <label class="toggle-card">
+          <input id="continueRecommended" type="checkbox">
+          <span class="toggle-ui"></span>
+          <span><strong>Continuar recomendado</strong><small>Si se vacía la cola, YouTube continúa con una sugerencia.</small></span>
+        </label>
+      </div>
+    </section>
+
+    <footer>
+      <span>Lulu Music <strong id="appVersion">1.0.0</strong></span>
+      <span>Una app, una función: música.</span>
+    </footer>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="music-command-policy.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
