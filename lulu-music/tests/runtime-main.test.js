@@ -13,7 +13,7 @@ test('sanea todos los ajustes antes de usarlos', () => {
   });
   assert.equal(value.creatorUsername,'lulu fan');
   assert.equal(value.command,'!canción');
-  assert.equal(value.provider,'youtube');
+  assert.equal(value.provider,'auto');
   assert.equal(value.permission,'all');
   assert.equal(value.queueLimit,100);
   assert.equal(value.volume,1);

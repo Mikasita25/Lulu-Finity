@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self'; style-src-attr 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; media-src https:; style-src 'self'; style-src-attr 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Lulu Music</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -92,7 +92,7 @@
           <span id="queueCount" class="count-badge">0 / 30</span>
         </div>
         <form id="manualSongForm" class="manual-form">
-          <input id="manualSongInput" type="text" maxlength="180" placeholder="Canción, artista o enlace de YouTube/Spotify" autocomplete="off">
+          <input id="manualSongInput" type="text" maxlength="180" placeholder="Canción, artista o enlace de YouTube/Audius" autocomplete="off">
           <button class="button primary" type="submit">Agregar</button>
         </form>
         <div id="queueEmpty" class="queue-empty">La cola está vacía.</div>
@@ -121,9 +121,11 @@
         <label class="field">
           <span>Proveedor</span>
           <select id="musicProvider">
-            <option value="youtube">YouTube ligero · recomendado</option>
-            <option value="spotify">Spotify</option>
+            <option value="auto">Automático · Audius + YouTube</option>
+            <option value="audius">Solo Audius · mínimo consumo</option>
+            <option value="youtube">Solo YouTube · catálogo completo</option>
           </select>
+          <small id="providerHint" class="field-hint">Prueba audio directo de Audius y usa YouTube si no hay una coincidencia exacta.</small>
         </label>
         <label class="field">
           <span>Quién puede solicitar</span>
@@ -172,6 +174,7 @@
     </footer>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <audio id="audiusPlayer" class="hidden" preload="none"></audio>
   <script src="music-command-policy.js"></script>
   <script src="renderer.js"></script>
 </body>

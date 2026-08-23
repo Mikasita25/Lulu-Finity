@@ -56,9 +56,33 @@ test('YouTube usa una sola ventana ligera y nunca carga la página completa', ()
   assert.doesNotMatch(source('../package.json'), /@ghostery/);
 });
 
+test('Audius usa audio directo en el renderer existente y automático conserva fallback a YouTube', () => {
+  const main = source('main.js');
+  const renderer = source('renderer.js');
+  const html = source('index.html');
+  const engine = source('audius-light-engine.js');
+  assert.match(html, /<audio id="audiusPlayer"/);
+  assert.match(html, /media-src https:/);
+  assert.match(main, /resolveAudiusRequest\(item\.query, \{ requireConfident:true \}\)/);
+  assert.match(main, /item\.provider = 'youtube'/);
+  assert.match(renderer, /api\.onAudiusLoad/);
+  assert.match(renderer, /api\.reportAudiusState/);
+  assert.match(engine, /https:\/\/api\.audius\.co\/v1/);
+  assert.doesNotMatch(main, /createAudiusWindow|AUDIUS_PARTITION/);
+});
+
+test('la aplicación ofrece únicamente Automático, Audius y YouTube', () => {
+  const combined = [source('main.js'), source('renderer.js'), source('index.html')].join('\n').toLowerCase();
+  assert.match(source('main.js'), /new Set\(\['auto','audius','youtube'\]\)/);
+  assert.match(source('index.html'), /value="auto"/);
+  assert.match(source('index.html'), /value="audius"/);
+  assert.match(source('index.html'), /value="youtube"/);
+  assert.equal(combined.includes('spotify'), false);
+});
+
 test('preload expone solo operaciones musicales y de conexión', () => {
   const preload = source('preload.js');
-  ['getState','saveSettings','connectLive','disconnectLive','addSong','removeSong','moveSong','clearQueue','playerControl','showPlayer']
+  ['getState','saveSettings','connectLive','disconnectLive','addSong','removeSong','moveSong','clearQueue','playerControl','showPlayer','reportAudiusState','onAudiusLoad','onAudiusCommand']
     .forEach((name) => assert.match(preload, new RegExp(`\\b${name}\\b`)));
   assert.doesNotMatch(preload, /tts|voice|game|gift|automation|economy/i);
 });

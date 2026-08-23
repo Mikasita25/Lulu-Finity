@@ -21,8 +21,11 @@ contextBridge.exposeInMainWorld('luluMusic', Object.freeze({
   clearQueue: () => invoke('music:clear'),
   playerControl: (action, value) => invoke('player:control', { action, value }),
   showPlayer: () => invoke('player:show'),
+  reportAudiusState: (state) => ipcRenderer.send('audius:state', state),
   onState: (callback) => listen('music:state', callback),
   onLiveStatus: (callback) => listen('live:status', callback),
   onRequest: (callback) => listen('music:request', callback),
-  onNotice: (callback) => listen('app:notice', callback)
+  onNotice: (callback) => listen('app:notice', callback),
+  onAudiusLoad: (callback) => listen('audius:load', callback),
+  onAudiusCommand: (callback) => listen('audius:command', callback)
 }));
