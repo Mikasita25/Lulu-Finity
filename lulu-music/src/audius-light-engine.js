@@ -56,7 +56,9 @@ function audiusStreamUrl(trackId) {
 function isAudiusStreamUrl(value) {
   try {
     const url = new URL(String(value || ''));
-    return url.protocol === 'https:' && url.hostname === 'api.audius.co' && /^\/v1\/tracks\/[A-Za-z0-9_-]{2,32}\/stream$/.test(url.pathname);
+    if (url.protocol !== 'https:') return false;
+    if (url.hostname === 'api.audius.co' && /^\/v1\/tracks\/[A-Za-z0-9_-]{2,32}\/stream$/.test(url.pathname)) return true;
+    return /^\/tracks\/cidstream\/[A-Za-z0-9_-]{20,120}$/.test(url.pathname) && url.searchParams.has('signature');
   } catch {
     return false;
   }
@@ -81,7 +83,7 @@ function trackCandidate(track) {
     title,
     artist,
     duration:Math.max(0, Number(track?.duration) || 0),
-    streamUrl:audiusStreamUrl(id),
+    streamUrl:isAudiusStreamUrl(track?.stream?.url) ? String(track.stream.url) : audiusStreamUrl(id),
     sourceUrl,
     verified:Boolean(track?.user?.is_verified || track?.user?.verified_with_tiktok || track?.user?.verified_with_twitter || track?.user?.verified_with_instagram),
     playCount:Math.max(0, Number(track?.play_count) || 0)

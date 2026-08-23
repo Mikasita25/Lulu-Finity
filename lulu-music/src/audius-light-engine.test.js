@@ -29,6 +29,15 @@ test('reconoce enlaces oficiales y genera solo endpoints de streaming de Audius'
   assert.equal(isAudiusStreamUrl(stream), true);
   assert.match(stream, /^https:\/\/api\.audius\.co\/v1\/tracks\/D7KyD\/stream\?/);
   assert.equal(isAudiusStreamUrl('https://audius.co/skrillex/bangarang'), false);
+  assert.equal(isAudiusStreamUrl('https://audio.example/tracks/cidstream/QmdRZn5tCwgWbPiB4w3e15j2XAnoeyrooZLhD7c9jeKaDM?signature=temporal'), true);
+});
+
+test('prefiere la URL firmada que entrega Audius para evitar una redirección adicional', async () => {
+  const signed = 'https://audio.example/tracks/cidstream/QmdRZn5tCwgWbPiB4w3e15j2XAnoeyrooZLhD7c9jeKaDM?signature=temporal';
+  const result = await resolveAudiusRequest('Skrillex Bangarang', {
+    fetchImpl:async () => response({ data:[{ ...TRACK, stream:{ url:signed } }] })
+  });
+  assert.equal(result.streamUrl, signed);
 });
 
 test('el modo automático exige título y artista o un creador verificado', () => {

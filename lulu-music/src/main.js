@@ -633,10 +633,10 @@ async function audiusSmokeDiagnostics() {
     while (Date.now() < deadline && playback.current?.id === item.id && playback.loading) {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
+    const rendererAudio = await mainWindow.webContents.executeJavaScript(`(() => {const audio=document.getElementById('audiusPlayer');const clean=(value)=>{try{const url=new URL(value);return url.origin+url.pathname}catch{return''}};return{exists:Boolean(audio),readyState:Number(audio?.readyState||0),networkState:Number(audio?.networkState||0),errorCode:Number(audio?.error?.code||0),errorMessage:String(audio?.error?.message||''),paused:Boolean(audio?.paused),source:clean(audio?.currentSrc||audio?.src),hasSource:Boolean(audio?.currentSrc||audio?.src)}})()`, true);
     if (playback.current?.id !== item.id || playback.current?.provider !== 'audius' || playback.loading) {
-      throw new Error('El audio directo de Audius no confirmó su carga.');
+      throw new Error(`El audio directo de Audius no confirmó su carga: ${JSON.stringify(rendererAudio)}`);
     }
-    const rendererAudio = await mainWindow.webContents.executeJavaScript(`(() => {const audio=document.getElementById('audiusPlayer');return{exists:Boolean(audio),readyState:Number(audio?.readyState||0),hasSource:Boolean(audio?.currentSrc||audio?.src)}})()`, true);
     if (!rendererAudio.exists || rendererAudio.readyState < 1 || !rendererAudio.hasSource) throw new Error('El elemento de audio de Audius no quedó activo.');
     const workingSetKb = app.getAppMetrics().reduce((total, metric) => total + (Number(metric.memory?.workingSetSize) || 0), 0);
     return {
@@ -686,6 +686,7 @@ function createMainWindow() {
   mainWindow.webContents.on('will-navigate',(event,url)=>{if(url!==mainWindow.webContents.getURL())event.preventDefault()});
   mainWindow.once('ready-to-show',()=>mainWindow.show());
   if(process.env.LULU_MUSIC_SMOKE_TEST==='1')mainWindow.webContents.once('did-finish-load',async()=>{
+    const marker=String(process.env.LULU_MUSIC_SMOKE_MARKER||'');
     try{
       const result=await mainWindow.webContents.executeJavaScript(`(() => ({title:document.title,panels:document.querySelectorAll('.panel').length,hasQueue:Boolean(document.getElementById('queueList')),hasPlayer:Boolean(document.getElementById('nowContent')),hasSettings:Boolean(document.getElementById('musicCommand')),hasSidebar:Boolean(document.querySelector('nav,.sidebar')),hasIframe:Boolean(document.querySelector('iframe'))}))()`,true);
       if(process.env.LULU_MUSIC_PLAYER_SMOKE_TEST==='1'){
@@ -693,9 +694,13 @@ function createMainWindow() {
         Object.assign(result,await youtubeSmokeDiagnostics());
       }
       console.log(`LULU_MUSIC_SMOKE_OK:${JSON.stringify(result)}`);
-      const marker=String(process.env.LULU_MUSIC_SMOKE_MARKER||'');
       if(marker)await fsp.writeFile(marker,JSON.stringify(result),'utf8');
-    }catch(error){console.error('LULU_MUSIC_SMOKE_FAIL:',error?.message||error);process.exitCode=1}
+    }catch(error){
+      const failure={error:String(error?.message||error),stack:String(error?.stack||'')};
+      console.error('LULU_MUSIC_SMOKE_FAIL:',failure.error);
+      if(marker)await fsp.writeFile(marker,JSON.stringify(failure),'utf8').catch(()=>{});
+      process.exitCode=1;
+    }
     setTimeout(()=>app.quit(),300);
   });
   mainWindow.on('closed',()=>{mainWindow=null;if(!shuttingDown)app.quit()});

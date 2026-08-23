@@ -222,7 +222,9 @@ function bindAudiusPlayer() {
     const streamUrl = String(payload.streamUrl || '');
     try {
       const parsed = new URL(streamUrl);
-      if (parsed.protocol !== 'https:' || parsed.hostname !== 'api.audius.co' || !/^\/v1\/tracks\/[A-Za-z0-9_-]+\/stream$/.test(parsed.pathname)) {
+      const stableApi = parsed.hostname === 'api.audius.co' && /^\/v1\/tracks\/[A-Za-z0-9_-]+\/stream$/.test(parsed.pathname);
+      const signedStream = /^\/tracks\/cidstream\/[A-Za-z0-9_-]{20,120}$/.test(parsed.pathname) && parsed.searchParams.has('signature');
+      if (parsed.protocol !== 'https:' || (!stableApi && !signedStream)) {
         throw new Error('dirección de audio rechazada');
       }
       stopAudius();
