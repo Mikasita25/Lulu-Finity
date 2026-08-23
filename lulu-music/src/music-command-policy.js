@@ -47,6 +47,6 @@ function blockedRequest(query, blockedTerms = []) {
     .some((term) => normalized.includes(term));
 }
 
-const api = { normalizeUsername, normalizeMusicCommand, parseMusicCommand, requesterAllowed, blockedRequest };
-if (typeof module !== 'undefined' && module.exports) module.exports = api;
-if (typeof window !== 'undefined') window.LuluMusicPolicy = api;
+const musicPolicyApi = { normalizeUsername, normalizeMusicCommand, parseMusicCommand, requesterAllowed, blockedRequest };
+if (typeof module !== 'undefined' && module.exports) module.exports = musicPolicyApi;
+if (typeof window !== 'undefined') window.LuluMusicPolicy = musicPolicyApi;

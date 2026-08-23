@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 const source = (name) => fs.readFileSync(path.join(root, 'src', name), 'utf8');
@@ -110,4 +111,8 @@ test('el renderer solo usa controles que existen en la pantalla', () => {
   const rendererIds = [...source('renderer.js').matchAll(/\$\('([^']+)'\)/g)].map((match) => match[1]);
   const missing = [...new Set(rendererIds)].filter((id) => !htmlIds.has(id));
   assert.deepEqual(missing, []);
+});
+
+test('los scripts del renderer pueden convivir en el mismo ámbito global', () => {
+  assert.doesNotThrow(() => new vm.Script(`${source('music-command-policy.js')}\n${source('renderer.js')}`));
 });
