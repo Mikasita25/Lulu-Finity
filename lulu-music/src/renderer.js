@@ -307,6 +307,7 @@ async function start() {
     showToast(`Nueva solicitud: ${request.query}`);
   });
   api.onNotice((notice) => showToast(notice?.message || notice));
+  api.rendererReady();
   try {
     renderState(await api.getState());
   } catch (error) {

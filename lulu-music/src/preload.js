@@ -12,6 +12,7 @@ const listen = (channel, callback) => {
 
 contextBridge.exposeInMainWorld('luluMusic', Object.freeze({
   getState: () => invoke('app:get-state'),
+  rendererReady: () => ipcRenderer.send('app:renderer-ready'),
   saveSettings: (settings) => invoke('settings:save', settings),
   connectLive: (username) => invoke('live:connect', { username }),
   disconnectLive: () => invoke('live:disconnect'),

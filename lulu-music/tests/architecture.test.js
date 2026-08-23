@@ -82,7 +82,7 @@ test('la aplicación ofrece únicamente Automático, Audius y YouTube', () => {
 
 test('preload expone solo operaciones musicales y de conexión', () => {
   const preload = source('preload.js');
-  ['getState','saveSettings','connectLive','disconnectLive','addSong','removeSong','moveSong','clearQueue','playerControl','showPlayer','reportAudiusState','onAudiusLoad','onAudiusCommand']
+  ['getState','rendererReady','saveSettings','connectLive','disconnectLive','addSong','removeSong','moveSong','clearQueue','playerControl','showPlayer','reportAudiusState','onAudiusLoad','onAudiusCommand']
     .forEach((name) => assert.match(preload, new RegExp(`\\b${name}\\b`)));
   assert.doesNotMatch(preload, /tts|voice|game|gift|automation|economy/i);
 });

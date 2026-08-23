@@ -45,6 +45,8 @@ let liveHasConnected = false;
 let liveStatus = { status:'offline', username:'', message:'Lista para conectarse a un LIVE.' };
 let shuttingDown = false;
 let powerBlockerId = null;
+let rendererReady = false;
+let rendererReadyWaiters = [];
 
 function clamp(number, minimum, maximum, fallback) {
   const value = Number(number);
@@ -113,6 +115,26 @@ function broadcastState() {
 }
 
 function notice(message) { send('app:notice', { message:String(message || '') }); }
+
+function markRendererReady(event) {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  rendererReady = true;
+  const waiters = rendererReadyWaiters;
+  rendererReadyWaiters = [];
+  waiters.forEach((resolve) => resolve(true));
+}
+
+function waitForRendererReady(timeoutMs = 8_000) {
+  if (rendererReady) return Promise.resolve(true);
+  return new Promise((resolve, reject) => {
+    const ready = () => { clearTimeout(timer); resolve(true); };
+    const timer = setTimeout(() => {
+      rendererReadyWaiters = rendererReadyWaiters.filter((waiter) => waiter !== ready);
+      reject(new Error('El renderer musical no confirmó que estaba listo.'));
+    }, timeoutMs);
+    rendererReadyWaiters.push(ready);
+  });
+}
 
 function setLiveStatus(status, message, extra = {}) {
   liveStatus = { status, username:liveReconnectUsername || settings.creatorUsername, message, ...extra };
@@ -301,6 +323,7 @@ async function openAudius(item, nonce, options = {}) {
   item.audiusScore = Math.round(Number(resolved.score) || 0);
   playback.duration = Number(resolved.duration) || 0;
   await pauseYoutubePlayback({ release:true });
+  await waitForRendererReady();
   if (nonce !== playerNonce || playback.current?.id !== item.id) return;
   broadcastState();
   send('audius:load', {
@@ -604,6 +627,7 @@ async function disconnectLive() {
 }
 
 function registerIpc() {
+  ipcMain.on('app:renderer-ready',markRendererReady);
   ipcMain.on('audius:state',handleAudiusState);
   ipcMain.handle('app:get-state',()=>currentState());
   ipcMain.handle('settings:save',async(_event,input)=>{settings=sanitizeSettings(input);if(musicQueue.length>settings.queueLimit)musicQueue=musicQueue.slice(0,settings.queueLimit);await writeSettings();await setPlayerVolume(settings.volume).catch(()=>{});broadcastState();return currentState()});
@@ -678,6 +702,7 @@ async function youtubeSmokeDiagnostics() {
 }
 
 function createMainWindow() {
+  rendererReady=false;
   mainWindow=new BrowserWindow({
     width:1380,height:900,minWidth:920,minHeight:720,show:false,autoHideMenuBar:true,backgroundColor:'#090812',title:'Lulu Music',
     webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required',spellcheck:false}
@@ -688,6 +713,7 @@ function createMainWindow() {
   if(process.env.LULU_MUSIC_SMOKE_TEST==='1')mainWindow.webContents.once('did-finish-load',async()=>{
     const marker=String(process.env.LULU_MUSIC_SMOKE_MARKER||'');
     try{
+      await waitForRendererReady();
       const result=await mainWindow.webContents.executeJavaScript(`(() => ({title:document.title,panels:document.querySelectorAll('.panel').length,hasQueue:Boolean(document.getElementById('queueList')),hasPlayer:Boolean(document.getElementById('nowContent')),hasSettings:Boolean(document.getElementById('musicCommand')),hasSidebar:Boolean(document.querySelector('nav,.sidebar')),hasIframe:Boolean(document.querySelector('iframe'))}))()`,true);
       if(process.env.LULU_MUSIC_PLAYER_SMOKE_TEST==='1'){
         Object.assign(result,await audiusSmokeDiagnostics());
