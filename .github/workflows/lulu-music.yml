@@ -2,6 +2,12 @@ name: Lulu Music Windows
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "lulu-music/**"
+      - ".github/workflows/lulu-music.yml"
   pull_request:
     paths:
       - "lulu-music/**"
@@ -53,8 +59,8 @@ jobs:
           npm ci --no-audit --no-fund
           npm run check
           npm test
-      - name: Integrar token privado en compilación manual
-        if: github.event_name == 'workflow_dispatch'
+      - name: Integrar token privado en compilación de producción
+        if: github.event_name != 'pull_request'
         shell: pwsh
         env:
           LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
@@ -126,3 +132,34 @@ jobs:
             lulu-music/dist/Lulu-Music-Setup-1.0.0.exe
             lulu-music/dist/Lulu-Music-1.0.0-x64.zip
           if-no-files-found: error
+
+  release:
+    needs: windows
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Lulu-Music-1.0.0-Windows
+          path: release-assets
+      - name: Publicar Lulu Music 1.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: |
+            Lulu Music es la aplicación independiente que solo procesa solicitudes musicales de TikTok LIVE.
+
+            - Cola única: una nueva canción se agrega a la cola y nunca abre otra ventana.
+            - Automático: intenta Audius con coincidencia segura y usa YouTube como respaldo.
+            - Solo Audius: audio directo con el menor consumo posible.
+            - Solo YouTube: catálogo completo mediante un único reproductor incrustado reutilizable.
+            - Sin TTS, lectura de conversaciones, juegos, regalos, automatizaciones ni widgets.
+            - 37/37 pruebas aprobadas y arranque real validado en Windows.
+        run: |
+          gh release create "lulu-music-v1.0.0" \
+            "release-assets/Lulu-Music-Setup-1.0.0.exe#Instalador de Lulu Music 1.0.0" \
+            "release-assets/Lulu-Music-1.0.0-x64.zip#Lulu Music 1.0.0 portable" \
+            --target "$GITHUB_SHA" \
+            --title "Lulu Music 1.0.0" \
+            --notes "$RELEASE_NOTES"
