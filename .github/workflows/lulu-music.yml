@@ -147,6 +147,7 @@ jobs:
       - name: Publicar Lulu Music 1.0.0
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_NOTES: |
             Lulu Music es la aplicación independiente que solo procesa solicitudes musicales de TikTok LIVE.
 
