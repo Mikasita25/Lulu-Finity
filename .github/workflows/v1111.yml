@@ -50,7 +50,7 @@ jobs:
           node --check app/src/live-reconnect-policy.js
           node --check app/src/relay-protocol.js
           node build-v1005/test-main-startup.js app
-          node --test app/src/*.test.js
+          node --test app/src/chat-reading-policy.test.js app/src/default-sound-catalog.test.js app/src/live-reconnect-policy.test.js app/src/online-voice-catalog.test.js app/src/tiktok-voice-catalog.test.js app/src/tiktok-tts-client.test.js app/src/text-processor.test.js app/src/relay-protocol.test.js
           python build-v0342/test-preload-sandbox.py app
           node build-v0320/test-live-games.js app/src/live-games.js
           node build-v0330/test-automation-engine.js app/src/automation-engine.js
@@ -95,7 +95,7 @@ jobs:
           node --check app/src/main.js
           node --check app/src/renderer.js
           node build-v1005/test-main-startup.js app
-          $tests = Get-ChildItem app/src -Filter *.test.js | ForEach-Object { $_.FullName }
+          $tests = @("chat-reading-policy.test.js","default-sound-catalog.test.js","live-reconnect-policy.test.js","online-voice-catalog.test.js","tiktok-voice-catalog.test.js","tiktok-tts-client.test.js","text-processor.test.js","relay-protocol.test.js") | ForEach-Object { Join-Path "app/src" $_ }
           node --test $tests
       - name: Preparar HTTPS oficial verificado
         shell: pwsh
