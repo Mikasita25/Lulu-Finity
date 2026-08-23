@@ -106,6 +106,7 @@ jobs:
             if (!$result.lightweightPlayer -or !$result.playerWindowReused -or !$result.playerWebContentsReused -or $result.appWindowCount -ne 2 -or $result.playerUrl -notmatch '^https://www\.youtube\.com/embed/' -or $result.workingSetMb -ge 750) {
               throw "El reproductor ligero no reutilizó su proceso o excedió 750 MB: $($result | ConvertTo-Json -Compress)"
             }
+            Write-Host "LULU_MUSIC_PLAYER_METRICS:$($result | ConvertTo-Json -Compress)"
           }
           finally {
             Stop-Process -Name "Lulu Music" -Force -ErrorAction SilentlyContinue
