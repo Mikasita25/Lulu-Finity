@@ -26,9 +26,11 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm test
+      - name: Probar búsqueda ligera real de YouTube
+        run: node scripts/smoke-youtube-light.js
       - name: Auditar dependencias de producción
         run: |
-          npm ls tiktok-live-connector ws @ghostery/adblocker-electron --depth=0
+          npm ls tiktok-live-connector ws --depth=0
           npm audit --omit=dev --audit-level=high
 
   windows:
@@ -87,6 +89,7 @@ jobs:
           New-Item -ItemType Directory $profile -Force | Out-Null
           Remove-Item $marker -Force -ErrorAction SilentlyContinue
           $env:LULU_MUSIC_SMOKE_TEST = "1"
+          $env:LULU_MUSIC_PLAYER_SMOKE_TEST = "1"
           $env:LULU_MUSIC_SMOKE_MARKER = $marker
           $process = Start-Process -FilePath "dist/win-unpacked/Lulu Music.exe" -ArgumentList "--user-data-dir=$profile" -PassThru
           try {
@@ -100,10 +103,14 @@ jobs:
             if ($result.title -ne "Lulu Music" -or !$result.hasQueue -or !$result.hasPlayer -or !$result.hasSettings -or $result.hasSidebar -or $result.hasIframe -or $result.panels -lt 4) {
               throw "La pantalla única no pasó la prueba: $($result | ConvertTo-Json -Compress)"
             }
+            if (!$result.lightweightPlayer -or !$result.playerWindowReused -or !$result.playerWebContentsReused -or $result.appWindowCount -ne 2 -or $result.playerUrl -notmatch '^https://www\.youtube\.com/embed/' -or $result.workingSetMb -ge 750) {
+              throw "El reproductor ligero no reutilizó su proceso o excedió 750 MB: $($result | ConvertTo-Json -Compress)"
+            }
           }
           finally {
             Stop-Process -Name "Lulu Music" -Force -ErrorAction SilentlyContinue
             Remove-Item Env:LULU_MUSIC_SMOKE_TEST -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_MUSIC_PLAYER_SMOKE_TEST -ErrorAction SilentlyContinue
             Remove-Item Env:LULU_MUSIC_SMOKE_MARKER -ErrorAction SilentlyContinue
           }
       - uses: actions/upload-artifact@v4

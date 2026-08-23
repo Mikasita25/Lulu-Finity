@@ -1,6 +1,7 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, shell, session, powerSaveBlocker } = require('electron');
+const electron = process.env.LULU_MUSIC_UNIT_TEST === '1' ? {} : require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, powerSaveBlocker } = electron;
 const { EventEmitter } = require('events');
 const { randomUUID } = require('crypto');
 const path = require('path');
@@ -9,6 +10,7 @@ const WebSocket = require('ws');
 const { MAX_RELAY_FRAME_BYTES, RelayProtocolError, parseRelayFrame } = require('./relay-protocol');
 const { LIVE_RECONNECT_DELAYS_MS, shouldReconnectLive, liveReconnectDelay } = require('./live-reconnect-policy');
 const { normalizeUsername, normalizeMusicCommand, parseMusicCommand, requesterAllowed, blockedRequest } = require('./music-command-policy');
+const { youtubeEmbedUrl, isYoutubeEmbedUrl, resolveYoutubeRequest } = require('./youtube-light-engine');
 
 const fsp = fs.promises;
 const RELAY_URL = 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live';
@@ -31,9 +33,8 @@ let settings = { ...DEFAULT_SETTINGS };
 let musicQueue = [];
 let playback = { current:null, loading:false, paused:true, currentTime:0, duration:0 };
 let playerNonce = 0;
-let youtubeBlockerInstalled = false;
-let youtubeAdvancedBlocker = null;
-let youtubeAdvancedBlockerPromise = null;
+let youtubeRequestIdentityInstalled = false;
+let youtubeRecentIds = [];
 let liveConnection = null;
 let connectorModule = null;
 let liveNonce = 0;
@@ -185,12 +186,14 @@ function processLiveChat(data = {}) {
 
 function advanceQueue({ natural = false } = {}) {
   const previous = playback.current;
-  if (natural && !musicQueue.length && settings.continueRecommended && previous?.provider === 'youtube' && youtubeWindow && !youtubeWindow.isDestroyed()) {
-    playback = { ...playback, loading:true, paused:false, currentTime:0, duration:0,
-      current:{ ...previous, id:randomUUID(), query:'Recomendación de YouTube', requestedBy:'Lulu Music' } };
+  if (natural && !musicQueue.length && settings.continueRecommended && previous?.provider === 'youtube') {
+    const recommendationQuery = [previous.artist, previous.resolvedTitle || previous.query].filter(Boolean).join(' ').trim();
+    playback = { current:{
+      id:randomUUID(), query:recommendationQuery || previous.query, requestedBy:'Lulu Music', username:'', provider:'youtube',
+      createdAt:Date.now(), recommendation:true
+    }, loading:true, paused:false, currentTime:0, duration:0 };
     broadcastState();
-    void youtubeWindow.webContents.executeJavaScript(`(() => { const next=document.querySelector('a.ytp-next-button[href*="/watch"]'); if(next?.href){location.href=next.href;return true} return false })()`, true)
-      .then((ok) => { if (!ok) advanceQueue(); }).catch(() => advanceQueue());
+    void startCurrentSong();
     return;
   }
   playerNonce += 1;
@@ -209,7 +212,7 @@ async function startCurrentSong() {
   broadcastState();
   try {
     if (item.provider === 'spotify') await openSpotify(item.query, nonce);
-    else await openYoutube(item.query, nonce);
+    else await openYoutube(item, nonce);
   } catch (error) {
     if (nonce !== playerNonce || playback.current?.id !== item.id) return;
     notice(`No se pudo abrir “${item.query}”: ${error.message || error}`);
@@ -234,77 +237,36 @@ function moveSong(id, direction) {
   return currentState();
 }
 
-function isYoutubeUrl(value) {
-  try { const host = new URL(String(value)).hostname.replace(/^www\./, '').toLowerCase(); return host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be'; }
-  catch { return false; }
-}
-
-function youtubeTarget(query) {
-  const clean = String(query || '').trim();
-  if (isYoutubeUrl(clean)) return clean;
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(clean)}`;
-}
-
-function youtubeKind(value) {
-  try { const url = new URL(value); if (url.hostname.includes('youtu.be') || url.pathname === '/watch') return 'watch'; if (url.pathname === '/results') return 'search'; return 'other'; }
-  catch { return 'other'; }
-}
-
-function youtubeAutoplay(value) {
-  try {
-    const url = new URL(value);
-    if (url.hostname.replace(/^www\./, '') === 'youtu.be') return `https://www.youtube.com/watch?v=${encodeURIComponent(url.pathname.slice(1).split('/')[0])}&autoplay=1`;
-    if (url.pathname === '/watch') url.searchParams.set('autoplay','1');
-    return url.href;
-  } catch { return value; }
-}
-
-function installYoutubeBlocking() {
-  if (youtubeBlockerInstalled) return;
-  youtubeBlockerInstalled = true;
-  session.fromPartition(YOUTUBE_PARTITION).webRequest.onBeforeRequest({ urls:[
-    '*://*.doubleclick.net/*','*://*.googlesyndication.com/*','*://*.googleadservices.com/*',
-    '*://*.googletagservices.com/*','*://*.adservice.google.com/*','*://*.imasdk.googleapis.com/*','*://*.2mdn.net/*'
-  ] }, (_details, callback) => callback({ cancel:true }));
-}
-
-async function ensureYoutubeBlocking() {
-  installYoutubeBlocking();
-  if (youtubeAdvancedBlocker) return youtubeAdvancedBlocker;
-  if (!youtubeAdvancedBlockerPromise) youtubeAdvancedBlockerPromise = (async () => {
-    try {
-      const module = await import('@ghostery/adblocker-electron');
-      const ElectronBlocker = module.ElectronBlocker || module.default?.ElectronBlocker;
-      const cache = path.join(app.getPath('userData'),'adblock','youtube.bin');
-      await fsp.mkdir(path.dirname(cache), { recursive:true });
-      const blocker = await ElectronBlocker.fromPrebuiltAdsOnly(fetch, {
-        path:cache, read:(file) => fsp.readFile(file), write:(file,data) => fsp.writeFile(file,data)
-      });
-      blocker.enableBlockingInSession(session.fromPartition(YOUTUBE_PARTITION));
-      youtubeAdvancedBlocker = blocker;
-      return blocker;
-    } catch (error) {
-      console.warn('Se mantiene el bloqueo integrado de YouTube:', error?.message || error);
-      return null;
-    }
-  })();
-  return youtubeAdvancedBlockerPromise;
+function installYoutubeRequestIdentity() {
+  if (youtubeRequestIdentityInstalled) return;
+  youtubeRequestIdentityInstalled = true;
+  session.fromPartition(YOUTUBE_PARTITION).webRequest.onBeforeSendHeaders({ urls:['https://www.youtube.com/embed/*'] }, (details, callback) => {
+    const requestHeaders = { ...details.requestHeaders, Referer:'https://github.com/Mikasita25/Lulu-Finity/' };
+    callback({ requestHeaders });
+  });
 }
 
 function createYoutubeWindow() {
   if (youtubeWindow && !youtubeWindow.isDestroyed()) return youtubeWindow;
-  installYoutubeBlocking();
+  installYoutubeRequestIdentity();
   youtubeWindow = new BrowserWindow({
-    width:1240,height:820,minWidth:850,minHeight:580,show:false,skipTaskbar:true,autoHideMenuBar:true,
-    title:'YouTube — Lulu Music',backgroundColor:'#0f0f0f',
-    webPreferences:{ contextIsolation:true,nodeIntegration:false,sandbox:true,autoplayPolicy:'no-user-gesture-required',partition:YOUTUBE_PARTITION }
+    width:854,height:480,minWidth:480,minHeight:270,show:false,skipTaskbar:true,autoHideMenuBar:true,
+    title:'Reproductor ligero — Lulu Music',backgroundColor:'#000000',
+    webPreferences:{
+      contextIsolation:true,nodeIntegration:false,sandbox:true,autoplayPolicy:'no-user-gesture-required',
+      backgroundThrottling:false,partition:YOUTUBE_PARTITION
+    }
   });
-  youtubeWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (isYoutubeUrl(url)) void youtubeWindow.loadURL(url); else if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
-    return { action:'deny' };
+  youtubeWindow.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
+  youtubeWindow.webContents.on('will-navigate', (event, url) => { if (!isYoutubeEmbedUrl(url)) event.preventDefault(); });
+  youtubeWindow.webContents.on('did-finish-load', () => {
+    if (isYoutubeEmbedUrl(youtubeWindow.webContents.getURL())) void installYoutubeWatcher(playerNonce, 0);
   });
-  youtubeWindow.webContents.on('did-finish-load', () => handleYoutubePage(youtubeWindow.webContents.getURL(), playerNonce));
-  youtubeWindow.webContents.on('did-navigate-in-page', (_event, url, isMainFrame) => { if (isMainFrame) handleYoutubePage(url, playerNonce); });
+  youtubeWindow.webContents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
+    if (!isMainFrame || code === -3 || !playback.current || playback.current.provider !== 'youtube') return;
+    notice(`El reproductor ligero de YouTube no cargó: ${description || code}.`);
+    advanceQueue();
+  });
   youtubeWindow.webContents.on('console-message', (_event, details, legacyMessage) => {
     const message = String(details && typeof details === 'object' ? details.message : (legacyMessage || details) || '');
     const match = message.match(/^__LULU_MUSIC_PLAYER__:(\d+):(.*)$/);
@@ -312,8 +274,8 @@ function createYoutubeWindow() {
       try {
         const data = JSON.parse(decodeURIComponent(match[2]));
         if (!playback.current || playback.current.provider !== 'youtube') return;
-        playback.current.resolvedTitle = data.title || playback.current.resolvedTitle || playback.current.query;
-        playback.current.artist = data.artist || '';
+        if (data.title) playback.current.resolvedTitle = data.title;
+        if (data.artist) playback.current.artist = data.artist;
         playback.loading = false; playback.paused = Boolean(data.paused);
         playback.currentTime = Number(data.currentTime) || 0; playback.duration = Number(data.duration) || 0;
         broadcastState();
@@ -323,47 +285,25 @@ function createYoutubeWindow() {
     const ended = message.match(/^__LULU_MUSIC_ENDED__:(\d+)$/);
     if (ended && Number(ended[1]) === playerNonce) advanceQueue({ natural:true });
   });
+  youtubeWindow.on('close', (event) => { if (!shuttingDown) { event.preventDefault(); youtubeWindow.hide(); } });
   youtubeWindow.on('closed', () => { youtubeWindow = null; });
   return youtubeWindow;
 }
 
-async function openYoutube(query, nonce) {
-  await ensureYoutubeBlocking();
+async function openYoutube(item, nonce) {
+  const resolved = await resolveYoutubeRequest(item.query, {
+    excludeVideoIds:item.recommendation ? youtubeRecentIds : []
+  });
+  if (nonce !== playerNonce || playback.current?.id !== item.id) return;
+  item.videoId = resolved.videoId;
+  item.resolvedTitle = resolved.title || item.resolvedTitle || item.query;
+  item.artist = resolved.artist || item.artist || '';
+  youtubeRecentIds = [...youtubeRecentIds.filter((id) => id !== resolved.videoId), resolved.videoId].slice(-20);
+  broadcastState();
   const win = createYoutubeWindow();
-  const raw = youtubeTarget(query);
-  await win.loadURL(youtubeKind(raw) === 'watch' ? youtubeAutoplay(raw) : raw);
+  await win.loadURL(youtubeEmbedUrl(resolved.videoId), { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
   if (nonce !== playerNonce) return;
   await setPlayerVolume(settings.volume).catch(() => {});
-}
-
-function handleYoutubePage(url, nonce) {
-  if (nonce !== playerNonce) return;
-  if (youtubeKind(url) === 'search') void selectYoutubeResult(nonce, 0);
-  if (youtubeKind(url) === 'watch') void installYoutubeWatcher(nonce, 0);
-}
-
-async function selectYoutubeResult(nonce, attempt) {
-  if (nonce !== playerNonce || !youtubeWindow || youtubeWindow.isDestroyed()) return;
-  try {
-    const result = await youtubeWindow.webContents.executeJavaScript(`(() => {
-      const ads='ytd-promoted-video-renderer,ytd-display-ad-renderer,ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,[is-ad],[data-is-ad="true"]';
-      for(const row of document.querySelectorAll('ytd-search ytd-video-renderer,ytd-video-renderer')){
-        if(row.closest(ads)||row.querySelector(ads))continue;
-        const link=row.querySelector('a#thumbnail[href*="/watch"],a.ytd-thumbnail[href*="/watch"]');
-        if(!link?.href)continue;
-        return {url:link.href,title:(row.querySelector('#video-title')?.textContent||'').trim(),artist:(row.querySelector('ytd-channel-name a')?.textContent||'').trim()};
-      }
-      return null;
-    })()`, true);
-    if (nonce !== playerNonce) return;
-    if (result?.url) {
-      if (playback.current) { playback.current.resolvedTitle = result.title || playback.current.query; playback.current.artist = result.artist || ''; broadcastState(); }
-      await youtubeWindow.loadURL(youtubeAutoplay(result.url));
-      return;
-    }
-  } catch {}
-  if (attempt < 24) setTimeout(() => void selectYoutubeResult(nonce, attempt + 1), 500);
-  else if (nonce === playerNonce) { notice('YouTube no encontró un resultado normal; se omitió la solicitud.'); advanceQueue(); }
 }
 
 async function installYoutubeWatcher(nonce, attempt) {
@@ -371,18 +311,15 @@ async function installYoutubeWatcher(nonce, attempt) {
   try {
     const installed = await youtubeWindow.webContents.executeJavaScript(`(() => {
       window.__luluMusicCleanup?.();
-      const video=document.querySelector('video.html5-main-video')||document.querySelector('video');
+      const video=document.querySelector('video');
       if(!video)return false;
       let ended=false;
       const report=()=>{
         const ad=Boolean(document.querySelector('.html5-video-player.ad-showing,.html5-video-player.ad-interrupting'));
-        for(const button of document.querySelectorAll('.ytp-ad-skip-button,.ytp-skip-ad-button,.ytp-ad-skip-button-modern,button[class*="ytp-ad-skip"]'))if(!button.disabled)button.click();
-        if(ad){video.muted=true;if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=Math.max(video.currentTime,video.duration-.2)}
-        else{video.muted=false;video.volume=${JSON.stringify(settings.volume)}}
-        const toggle=document.querySelector('.ytp-autonav-toggle-button[aria-checked="true"]');if(toggle)toggle.click();
-        const payload={title:(document.querySelector('h1.ytd-watch-metadata yt-formatted-string,h1.title yt-formatted-string')?.textContent||document.title.replace(/ - YouTube$/,'')).trim(),artist:(document.querySelector('ytd-watch-metadata ytd-channel-name a,#owner-name a')?.textContent||'').trim(),currentTime:video.currentTime,duration:video.duration,paused:video.paused};
+        video.volume=${JSON.stringify(settings.volume)};video.muted=false;
+        const payload={currentTime:video.currentTime,duration:video.duration,paused:video.paused};
         console.info('__LULU_MUSIC_PLAYER__:${nonce}:'+encodeURIComponent(JSON.stringify(payload)));
-        if(video.ended&&!ended){ended=true;console.info('__LULU_MUSIC_ENDED__:${nonce}')}
+        if(!ad&&video.ended&&!ended){ended=true;console.info('__LULU_MUSIC_ENDED__:${nonce}')}
       };
       const timer=setInterval(report,650);video.play().catch(()=>{});report();
       window.__luluMusicCleanup=()=>{clearInterval(timer);delete window.__luluMusicCleanup};
@@ -391,7 +328,7 @@ async function installYoutubeWatcher(nonce, attempt) {
     if (installed) return;
   } catch {}
   if (attempt < 24) setTimeout(() => void installYoutubeWatcher(nonce, attempt + 1), 300);
-  else if (nonce === playerNonce) { notice('YouTube no pudo iniciar el reproductor.'); advanceQueue(); }
+  else if (nonce === playerNonce) { notice('El reproductor ligero de YouTube no pudo iniciar esta canción.'); advanceQueue(); }
 }
 
 function isSpotifyUrl(value) {
@@ -439,6 +376,7 @@ function createSpotifyWindow() {
     const ended = message.match(/^__LULU_SPOTIFY_ENDED__:(\d+)$/);
     if (ended && Number(ended[1]) === playerNonce) advanceQueue({ natural:true });
   });
+  spotifyWindow.on('close', (event) => { if (!shuttingDown) { event.preventDefault(); spotifyWindow.hide(); } });
   spotifyWindow.on('closed', () => { spotifyWindow = null; });
   return spotifyWindow;
 }
@@ -531,8 +469,11 @@ async function playerControl(action, value) {
 }
 
 function showPlayer() {
-  const win = activePlayerWindow() || (settings.provider === 'spotify' ? createSpotifyWindow() : createYoutubeWindow());
-  if (!win.webContents.getURL()) void win.loadURL(settings.provider === 'spotify' ? 'https://open.spotify.com/' : 'https://www.youtube.com/');
+  const win = activePlayerWindow();
+  if (!playback.current || !win || win.isDestroyed() || !win.webContents.getURL()) {
+    notice(playback.loading ? 'La canción todavía se está buscando.' : 'Agrega una canción para abrir el reproductor.');
+    return { ok:false };
+  }
   win.show(); win.focus();
   return { ok:true };
 }
@@ -648,6 +589,28 @@ function registerIpc() {
   ipcMain.handle('player:show',()=>showPlayer());
 }
 
+async function youtubeSmokeDiagnostics() {
+  const firstUrl = `${youtubeEmbedUrl('M7lc1UVf-VE')}&start=0`;
+  const secondUrl = `${youtubeEmbedUrl('M7lc1UVf-VE')}&start=1`;
+  const win = createYoutubeWindow();
+  const firstWindowId = win.id;
+  const firstWebContentsId = win.webContents.id;
+  await win.loadURL(firstUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
+  await win.loadURL(secondUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
+  const workingSetKb = app.getAppMetrics().reduce((total, metric) => total + (Number(metric.memory?.workingSetSize) || 0), 0);
+  return {
+    lightweightPlayer:true,
+    playerWindowReused:firstWindowId === win.id,
+    playerWebContentsReused:firstWebContentsId === win.webContents.id,
+    playerWindowId:win.id,
+    playerWebContentsId:win.webContents.id,
+    appWindowCount:BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed()).length,
+    playerUrl:win.webContents.getURL(),
+    workingSetMb:Math.round(workingSetKb / 1024)
+  };
+}
+
 function createMainWindow() {
   mainWindow=new BrowserWindow({
     width:1380,height:900,minWidth:920,minHeight:720,show:false,autoHideMenuBar:true,backgroundColor:'#090812',title:'Lulu Music',
@@ -659,13 +622,14 @@ function createMainWindow() {
   if(process.env.LULU_MUSIC_SMOKE_TEST==='1')mainWindow.webContents.once('did-finish-load',async()=>{
     try{
       const result=await mainWindow.webContents.executeJavaScript(`(() => ({title:document.title,panels:document.querySelectorAll('.panel').length,hasQueue:Boolean(document.getElementById('queueList')),hasPlayer:Boolean(document.getElementById('nowContent')),hasSettings:Boolean(document.getElementById('musicCommand')),hasSidebar:Boolean(document.querySelector('nav,.sidebar')),hasIframe:Boolean(document.querySelector('iframe'))}))()`,true);
+      if(process.env.LULU_MUSIC_PLAYER_SMOKE_TEST==='1')Object.assign(result,await youtubeSmokeDiagnostics());
       console.log(`LULU_MUSIC_SMOKE_OK:${JSON.stringify(result)}`);
       const marker=String(process.env.LULU_MUSIC_SMOKE_MARKER||'');
       if(marker)await fsp.writeFile(marker,JSON.stringify(result),'utf8');
     }catch(error){console.error('LULU_MUSIC_SMOKE_FAIL:',error?.message||error);process.exitCode=1}
     setTimeout(()=>app.quit(),300);
   });
-  mainWindow.on('closed',()=>{mainWindow=null});
+  mainWindow.on('closed',()=>{mainWindow=null;if(!shuttingDown)app.quit()});
   void mainWindow.loadFile(path.join(__dirname,'index.html'));
 }
 

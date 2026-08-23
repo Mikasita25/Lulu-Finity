@@ -39,10 +39,21 @@ test('no se empaquetan motores de voz ni categorías de Lulu Finity', () => {
 test('las únicas dependencias de ejecución son musicales y de conexión', () => {
   const packageJson = JSON.parse(source('../package.json'));
   assert.deepEqual(Object.keys(packageJson.dependencies).sort(), [
-    '@ghostery/adblocker-electron', 'tiktok-live-connector', 'ws'
+    'tiktok-live-connector', 'ws'
   ]);
   assert.equal(packageJson.dependencies['electron-updater'], undefined);
   assert.match(packageJson.scripts['build:win'], /create-portable\.ps1/);
+});
+
+test('YouTube usa una sola ventana ligera y nunca carga la página completa', () => {
+  const main = source('main.js');
+  const engine = source('youtube-light-engine.js');
+  assert.match(main, /if \(youtubeWindow && !youtubeWindow\.isDestroyed\(\)\) return youtubeWindow/);
+  assert.match(main, /youtubeEmbedUrl\(resolved\.videoId\)/);
+  assert.match(main, /setWindowOpenHandler\(\(\) => \(\{ action:'deny' \}\)\)/);
+  assert.match(engine, /https:\/\/www\.youtube\.com\/embed\//);
+  assert.doesNotMatch(main, /youtube\.com\/results|youtube\.com\/watch|ytd-video-renderer|@ghostery/);
+  assert.doesNotMatch(source('../package.json'), /@ghostery/);
 });
 
 test('preload expone solo operaciones musicales y de conexión', () => {

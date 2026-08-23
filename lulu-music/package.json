@@ -14,7 +14,6 @@
     "build:dir": "electron-builder --dir --win --x64"
   },
   "dependencies": {
-    "@ghostery/adblocker-electron": "2.18.1",
     "tiktok-live-connector": "2.4.3",
     "ws": "8.21.3"
   },

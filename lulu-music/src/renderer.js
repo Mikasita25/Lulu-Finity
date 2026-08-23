@@ -40,6 +40,7 @@ function renderLive(live = {}) {
 
 function renderNow(playback = {}) {
   const current = playback.current;
+  for (const id of ['playPauseBtn','restartBtn','skipBtn','showPlayerBtn']) $(id).disabled = !current;
   $('nowEmpty').classList.toggle('hidden', Boolean(current));
   $('nowContent').classList.toggle('hidden', !current);
   $('providerBadge').textContent = String((current?.provider || appState?.settings?.provider || 'youtube')).toUpperCase();
