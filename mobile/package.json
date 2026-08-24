@@ -1,12 +1,13 @@
 {
   "name": "lulu-finity-mobile",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "test:realtime": "node --no-warnings --experimental-strip-types tests/realtime.test.mjs",
+    "test:tts-direct": "node --no-warnings --experimental-strip-types tests/microsoft-edge-direct.test.mjs",
     "test:ui": "node tests/ui-contract.test.mjs",
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",

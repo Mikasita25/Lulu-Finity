@@ -132,14 +132,21 @@ assert.match(playbackHost, /setInterval\(tick, 1000\)/);
 const ttsRuntime = read('src/services/tts.ts');
 assert.match(ttsRuntime, /MAX_PENDING_AGE_MS/);
 assert.match(ttsRuntime, /queuedAt/);
-assert.match(ttsRuntime, /\/v1\/tts\/microsoft/);
 assert.match(ttsRuntime, /MICROSOFT_VOICES/);
-assert.match(ttsRuntime, /expo\/fetch/);
+assert.match(ttsRuntime, /synthesizeMicrosoftSpeechDirect/);
+assert.doesNotMatch(ttsRuntime, /\/v1\/tts\/microsoft|expo\/fetch/);
 assert.doesNotMatch(ttsRuntime, /expo-speech|Speech\.speak/);
+
+const directTts = read('src/services/microsoftEdgeDirect.ts');
+assert.match(directTts, /speech\.platform\.bing\.com/);
+assert.match(directTts, /new WebSocket\(url\)/);
+assert.match(directTts, /audio-24khz-48kbitrate-mono-mp3/);
 
 const ttsScreen = read('src/screens/TtsScreen.tsx');
 assert.match(ttsScreen, /Voces neuronales de Microsoft/);
 assert.match(ttsScreen, /ya no depende del motor de voz del celular/);
+assert.match(ttsScreen, /directamente con Microsoft/);
+assert.match(ttsScreen, /No se pudo reproducir la voz/);
 assert.doesNotMatch(ttsScreen, /Predeterminada del sistema|voces instaladas/);
 
 const liveRuntime = read('src/services/liveRuntime.ts');

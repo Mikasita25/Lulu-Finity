@@ -80,7 +80,7 @@ npm run android
 
 Mientras el LIVE está conectado, Lulú conserva una sesión multimedia de Android con la notificación **TTS Bot activo**. Esa sesión mantiene el proceso en primer plano para que el WebSocket y la cola TTS continúen trabajando con la pantalla apagada o con otra app abierta. Si Android llegara a suspender el proceso de todos modos, los comentarios atrasados caducan y no se leen en bloque al regresar.
 
-Android no utiliza `expo-speech` ni el motor TTS instalado en el teléfono. Envía como máximo 240 caracteres al endpoint autenticado `POST /v1/tts/microsoft`; el relay genera un MP3 con la voz Microsoft elegida y el teléfono solo lo reproduce. Esto requiere internet y evita competir por CPU con el motor local mientras hay un juego abierto.
+Android no utiliza `expo-speech` ni el motor TTS instalado en el teléfono. Envía como máximo 240 caracteres directamente al servicio en línea Microsoft Edge TTS mediante WebSocket, recibe el MP3 y lo elimina de la caché después de reproducirlo. Railway se conserva para los eventos del LIVE, pero ya no participa en la generación de voz. Esto requiere internet y evita competir por CPU con el motor local mientras hay un juego abierto.
 
 Desconectar el LIVE libera la sesión. Forzar la detención de Lulú desde Ajustes siempre finaliza el TTS y la conexión.
 
