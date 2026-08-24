@@ -14,6 +14,11 @@ test('no cierra un LIVE tranquilo después de 300 segundos', () => {
   assert.match(serverSource, /client\.on\('pong'/);
 });
 
+test('el relay de producción incluye Microsoft TTS', () => {
+  assert.match(serverSource, /\/v1\/tts\/microsoft/);
+  assert.match(serverSource, /MAX_TTS_CONCURRENT/);
+});
+
 test('rota la conexión del proveedor ante inactividad o duración máxima', () => {
   assert.equal(classifyUpstreamFailure(4006, 'inactive websocket'), 'transient');
   assert.equal(classifyUpstreamFailure(4555, 'maximum duration reached'), 'temporary-limit');
