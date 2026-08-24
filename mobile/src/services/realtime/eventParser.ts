@@ -3,7 +3,13 @@ import type { LiveEvent, RelayState } from '@/types/live';
 export type ParsedRealtimeMessage =
   | { kind: 'event'; event: LiveEvent }
   | { kind: 'stats'; viewers?: number; likes?: number }
-  | { kind: 'relay'; state: RelayState; message?: string };
+  | {
+      kind: 'relay';
+      state: RelayState;
+      message?: string;
+      attempt?: number;
+      transportReconnect?: boolean;
+    };
 
 const alias: Record<string, LiveEvent['type'] | undefined> = {
   chat: 'comment',
@@ -244,6 +250,7 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
                     ? 'idle'
                     : 'connecting',
         message: text(payload?.message),
+        attempt: Math.max(1, number(payload?.attempt, 1)),
       },
     ];
   }

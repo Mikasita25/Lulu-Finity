@@ -11,7 +11,6 @@ const CLIENT_TOKEN = process.env.EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN || '';
 type Listener = (message: ParsedRealtimeMessage) => void;
 
 const terminalClose: Record<number, { state: 'idle' | 'offline' | 'error'; message: string }> = {
-  1000: { state: 'idle', message: 'La conexión terminó.' },
   1008: { state: 'error', message: 'El relay rechazó la conexión por seguridad.' },
   4005: { state: 'idle', message: 'El LIVE terminó.' },
   4400: { state: 'error', message: 'La configuración del LIVE no es válida.' },
@@ -20,6 +19,8 @@ const terminalClose: Record<number, { state: 'idle' | 'offline' | 'error'; messa
   4404: { state: 'offline', message: 'TikTok no detecta un LIVE activo para esta cuenta.' },
   4429: { state: 'error', message: 'Se alcanzó el límite de conexiones. Intenta más tarde.' },
 };
+
+const reconnectDelays = [1_000, 2_500, 5_000, 10_000, 20_000, 30_000, 60_000, 120_000] as const;
 
 export class LiveSocket {
   private socket: WebSocket | null = null;
@@ -44,6 +45,7 @@ export class LiveSocket {
     }
     this.disconnect();
     this.manuallyClosed = false;
+    this.retryCount = 0;
     this.messageChain = Promise.resolve();
     this.username = clean;
     this.open();
@@ -51,7 +53,14 @@ export class LiveSocket {
 
   private open() {
     const url = `${RELAY_URL}?uniqueId=${encodeURIComponent(this.username)}`;
-    this.listener({ kind: 'relay', state: 'connecting', message: 'Conectando con TikTok LIVE…' });
+    this.listener({
+      kind: 'relay',
+      state: 'connecting',
+      message: this.retryCount
+        ? 'Recuperando la conexión con TikTok LIVE…'
+        : 'Conectando con TikTok LIVE…',
+      transportReconnect: this.retryCount > 0,
+    });
 
     // React Native acepta headers en el tercer argumento de WebSocket. El cast evita
     // depender de los tipos DOM, que solo describen la firma estándar del navegador.
@@ -100,7 +109,10 @@ export class LiveSocket {
     };
 
     socket.onclose = (event) => {
-      if (this.socket === socket) this.socket = null;
+      // A close callback from a replaced socket must never schedule another
+      // reconnect over the new connection.
+      if (this.socket !== socket) return;
+      this.socket = null;
       if (this.manuallyClosed) {
         this.listener({ kind: 'relay', state: 'idle', message: 'LIVE desconectado' });
         return;
@@ -123,7 +135,15 @@ export class LiveSocket {
   private scheduleReconnect() {
     if (this.manuallyClosed || this.retryTimer) return;
     this.retryCount += 1;
-    const delay = Math.min(15_000, 900 * 2 ** Math.min(4, this.retryCount));
+    if (this.retryCount > reconnectDelays.length) {
+      this.listener({
+        kind: 'relay',
+        state: 'error',
+        message: 'No se pudo recuperar el LIVE después de varios intentos. Pulsa Conectar para volver a intentar.',
+      });
+      return;
+    }
+    const delay = reconnectDelays[this.retryCount - 1] ?? reconnectDelays[reconnectDelays.length - 1]!;
     this.listener({
       kind: 'relay',
       state: 'rotating',
@@ -143,5 +163,6 @@ export class LiveSocket {
     const socket = this.socket;
     this.socket = null;
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'user disconnect');
+    this.listener({ kind: 'relay', state: 'idle', message: 'LIVE desconectado' });
   }
 }

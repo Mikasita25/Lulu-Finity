@@ -122,6 +122,23 @@ assert.match(playbackHost, /addEventListener\('ended'/);
 assert.match(playbackHost, /playNextSong\(\)/);
 assert.match(playbackHost, /ytp-skip-ad-button/);
 assert.match(playbackHost, /currentSong\.id/);
+assert.match(playbackHost, /TTS Bot activo/);
+assert.match(playbackHost, /liveOnlyKeeper/);
+
+const ttsRuntime = read('src/services/tts.ts');
+assert.match(ttsRuntime, /MAX_PENDING_AGE_MS/);
+assert.match(ttsRuntime, /queuedAt/);
+
+const liveRuntime = read('src/services/liveRuntime.ts');
+assert.match(liveRuntime, /LiveFreshnessGate/);
+assert.match(liveRuntime, /freshness\.beginReconnect/);
+assert.match(liveRuntime, /freshness\.accept/);
+
+const liveSocket = read('src/services/realtime/LiveSocket.ts');
+assert.match(liveSocket, /const reconnectDelays = \[/);
+assert.match(liveSocket, /transportReconnect: this\.retryCount > 0/);
+assert.match(liveSocket, /if \(this\.socket !== socket\) return/);
+assert.doesNotMatch(liveSocket, /1000: \{ state:/);
 
 const musicRuntime = read('src/services/music.ts');
 assert.match(musicRuntime, /parseSongRequest/);
@@ -131,7 +148,6 @@ assert.match(musicRuntime, /const wasIdle = !state\.currentSong/);
 assert.match(musicRuntime, /playSong\(result\.song\)/);
 assert.match(musicRuntime, /https:\/\/m\.youtube\.com\/results/);
 
-const liveRuntime = read('src/services/liveRuntime.ts');
 assert.match(liveRuntime, /handleMusicEvent\(message\.event\)/);
 assert.match(liveRuntime, /clearMusicCooldowns/);
 

@@ -76,9 +76,11 @@ npm run android
 
 `.github/workflows/mobile-android.yml` valida TypeScript y Expo Doctor, genera Android y compila un APK Release ARM64 autocontenido. Debe existir el secreto `LULU_RELAY_CLIENT_TOKEN`.
 
-## Notificaciones en segundo plano
+## TTS y LIVE en segundo plano
 
-Las notificaciones heads-up locales funcionan mientras el proceso conserva la sesión WebSocket. Android puede suspender o matar el proceso; recepción push garantizada con la app cerrada requeriría envío FCM/Expo desde servidor.
+Mientras el LIVE está conectado, Lulú conserva una sesión multimedia de Android con la notificación **TTS Bot activo**. Esa sesión mantiene el proceso en primer plano para que el WebSocket y la cola TTS continúen trabajando con la pantalla apagada o con otra app abierta. Si Android llegara a suspender el proceso de todos modos, los comentarios atrasados caducan y no se leen en bloque al regresar.
+
+Desconectar el LIVE libera la sesión. Forzar la detención de Lulú desde Ajustes siempre finaliza el TTS y la conexión.
 
 ## Diseño responsive
 

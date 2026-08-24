@@ -3,7 +3,9 @@ import type { LiveEvent } from '@/types/live';
 import { useTtsStore } from '@/store/useTtsStore';
 
 const MAX_QUEUE = 8;
-const pending: string[] = [];
+const MAX_PENDING_AGE_MS = 15_000;
+type PendingSpeech = { text: string; queuedAt: number };
+const pending: PendingSpeech[] = [];
 let speaking = false;
 let generation = 0;
 let watchdog: ReturnType<typeof setTimeout> | null = null;
@@ -31,8 +33,10 @@ function clearWatchdog() {
 
 function runNext() {
   if (speaking) return;
-  const text = pending.shift();
-  if (!text) return;
+  let item = pending.shift();
+  while (item && Date.now() - item.queuedAt > MAX_PENDING_AGE_MS) item = pending.shift();
+  if (!item) return;
+  const { text } = item;
 
   const settings = useTtsStore.getState();
   const currentGeneration = generation;
@@ -102,7 +106,7 @@ function speak(text: string) {
     if (!pending.length) return false;
     pending.shift();
   }
-  pending.push(value);
+  pending.push({ text: value, queuedAt: Date.now() });
   runNext();
   return true;
 }

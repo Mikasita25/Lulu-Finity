@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { AppState, View } from 'react-native';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { WebView } from 'react-native-webview';
+import { useAppStore } from '@/store/useAppStore';
 import { useMobileControlStore } from '@/store/useMobileControlStore';
 import { youtubeSearchUrl } from '@/services/music';
 
@@ -155,6 +156,8 @@ function playerAutomation(volume: number, paused: boolean) {
 }
 
 export function MusicPlaybackHost() {
+  const relayState = useAppStore((state) => state.relayState);
+  const username = useAppStore((state) => state.username);
   const music = useMobileControlStore((state) => state.music);
   const currentSong = useMobileControlStore((state) => state.currentSong);
   const playbackPaused = useMobileControlStore((state) => state.playbackPaused);
@@ -165,6 +168,9 @@ export function MusicPlaybackHost() {
   const remotePauseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const keeper = useAudioPlayer(BACKGROUND_KEEPER_URI, { updateInterval: 400 });
   const keeperStatus = useAudioPlayerStatus(keeper);
+  const liveActive = relayState === 'connecting' || relayState === 'rotating' || relayState === 'connected';
+  const musicActive = music.enabled && Boolean(currentSong);
+  const liveOnlyKeeper = liveActive && (!musicActive || playbackPaused);
 
   const sourceUrl = currentSong ? youtubeSearchUrl(currentSong.query) : '';
   const automation = useMemo(
@@ -189,7 +195,7 @@ export function MusicPlaybackHost() {
     clearTimeout(remotePauseTimer.current);
     keeperHasPlayed.current = false;
 
-    if (!music.enabled || !currentSong) {
+    if (!musicActive && !liveOnlyKeeper) {
       keeper.pause();
       keeper.clearLockScreenControls();
       return;
@@ -197,31 +203,45 @@ export function MusicPlaybackHost() {
 
     keeper.setActiveForLockScreen(
       true,
-      {
-        title: currentSong.query,
-        artist: `Pedido por @${currentSong.requestedBy}`,
-        albumTitle: 'Lulú Finity',
-      },
+      currentSong
+        ? {
+            title: currentSong.query,
+            artist: `Pedido por @${currentSong.requestedBy}`,
+            albumTitle: 'Lulú Finity',
+          }
+        : {
+            title: 'TTS Bot activo',
+            artist: username ? `Escuchando @${username}` : 'Escuchando el LIVE',
+            albumTitle: 'Lulú Finity',
+          },
       { showSeekBackward: false, showSeekForward: false },
     );
 
-    if (!playbackPaused) keeper.play();
-  }, [currentSong?.id, keeper, music.enabled]);
+    if (liveOnlyKeeper || !playbackPaused) keeper.play();
+  }, [currentSong?.id, keeper, liveOnlyKeeper, musicActive, playbackPaused, username]);
 
   useEffect(() => {
     if (!music.enabled || !currentSong) return;
 
     webRef.current?.injectJavaScript(automation);
     if (playbackPaused) {
-      keeper.pause();
+      if (liveOnlyKeeper) keeper.play();
+      else keeper.pause();
     } else {
       keeper.play();
     }
-  }, [automation, currentSong?.id, keeper, music.enabled, playbackPaused]);
+  }, [automation, currentSong?.id, keeper, liveOnlyKeeper, music.enabled, playbackPaused]);
 
   useEffect(() => {
     clearTimeout(remotePauseTimer.current);
     if (!music.enabled || !currentSong || !keeperStatus.isLoaded) return;
+
+    // A paused song must not turn off the LIVE foreground session. The silent
+    // keeper continues, while the WebView remains paused.
+    if (liveOnlyKeeper) {
+      if (!keeperStatus.playing) keeper.play();
+      return;
+    }
 
     if (keeperStatus.playing) {
       keeperHasPlayed.current = true;
@@ -241,10 +261,16 @@ export function MusicPlaybackHost() {
     }, 600);
 
     return () => clearTimeout(remotePauseTimer.current);
-  }, [currentSong?.id, keeper, keeperStatus.isLoaded, keeperStatus.playing, music.enabled, playbackPaused, setPlaybackPaused]);
+  }, [currentSong?.id, keeper, keeperStatus.isLoaded, keeperStatus.playing, liveOnlyKeeper, music.enabled, playbackPaused, setPlaybackPaused]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
+      if (liveOnlyKeeper) {
+        if (nextState === 'background' || nextState === 'inactive' || nextState === 'active') {
+          keeper.play();
+        }
+        return;
+      }
       if (!music.enabled || !currentSong || playbackPaused) return;
       if (nextState === 'background' || nextState === 'inactive' || nextState === 'active') {
         keeper.play();
@@ -252,7 +278,7 @@ export function MusicPlaybackHost() {
       }
     });
     return () => subscription.remove();
-  }, [currentSong?.id, keeper, music.enabled, music.volume, playbackPaused]);
+  }, [currentSong?.id, keeper, liveOnlyKeeper, music.enabled, music.volume, playbackPaused]);
 
   useEffect(
     () => () => {
