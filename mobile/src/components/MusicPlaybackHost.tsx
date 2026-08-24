@@ -28,7 +28,7 @@ function playerAutomation(volume: number, paused: boolean) {
         }
         if (window.__luluPlaybackPaused) {
           media.pause();
-        } else if (media.tagName === 'VIDEO') {
+        } else if (media.tagName === 'VIDEO' && media.paused && !media.ended) {
           const promise = media.play();
           if (promise && typeof promise.catch === 'function') promise.catch(() => {});
         }
@@ -131,12 +131,14 @@ function playerAutomation(volume: number, paused: boolean) {
       return true;
     }
 
-    try {
-      const promise = video.play();
-      if (promise && typeof promise.catch === 'function') {
-        promise.catch(() => send({ type: 'autoplay-retry' }));
-      }
-    } catch (_) {}
+    if (video.paused && !video.ended) {
+      try {
+        const promise = video.play();
+        if (promise && typeof promise.catch === 'function') {
+          promise.catch(() => send({ type: 'autoplay-retry' }));
+        }
+      } catch (_) {}
+    }
     return true;
   };
 
@@ -148,7 +150,7 @@ function playerAutomation(volume: number, paused: boolean) {
 
   const observer = new MutationObserver(tick);
   if (document.documentElement) observer.observe(document.documentElement, { childList: true, subtree: true });
-  setInterval(tick, 500);
+  setInterval(tick, 1000);
   tick();
   true;
 })();
@@ -166,7 +168,7 @@ export function MusicPlaybackHost() {
   const webRef = useRef<WebView>(null);
   const keeperHasPlayed = useRef(false);
   const remotePauseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const keeper = useAudioPlayer(BACKGROUND_KEEPER_URI, { updateInterval: 400 });
+  const keeper = useAudioPlayer(BACKGROUND_KEEPER_URI, { updateInterval: 1000 });
   const keeperStatus = useAudioPlayerStatus(keeper);
   const liveActive = relayState === 'connecting' || relayState === 'rotating' || relayState === 'connected';
   const musicActive = music.enabled && Boolean(currentSong);
@@ -182,6 +184,8 @@ export function MusicPlaybackHost() {
     void setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: true,
+      // Expo exige foco exclusivo cuando se habilitan controles de pantalla de
+      // bloqueo; esa MediaSession es la que mantiene el LIVE vivo en Android.
       interruptionMode: 'doNotMix',
     }).catch((error) => console.warn('[LuluFinity] background audio mode failed', error));
   }, []);

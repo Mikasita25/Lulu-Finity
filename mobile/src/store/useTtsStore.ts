@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { defaultMicrosoftVoice, normalizeMicrosoftVoice } from '@/services/microsoftVoices';
 
 export type TtsSettings = {
   enabled: boolean;
@@ -24,7 +25,7 @@ const defaults: TtsSettings = {
   announceUsername: true,
   skipCommands: true,
   language: 'es-MX',
-  voice: '',
+  voice: defaultMicrosoftVoice('es-MX'),
   rate: 1,
   pitch: 1,
   volume: 1,
@@ -52,6 +53,16 @@ export const useTtsStore = create<TtsState>()(
         volume: state.volume,
         maxChars: state.maxChars,
       }),
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<TtsSettings>;
+        const language = saved.language || current.language;
+        return {
+          ...current,
+          ...saved,
+          language,
+          voice: normalizeMicrosoftVoice(saved.voice, language),
+        };
+      },
     },
   ),
 );

@@ -10,13 +10,13 @@ Versión Android, mobile-first, de Lulú Finity. Vive junto a la aplicación de 
 - NativeWind 4
 - Reanimated 4
 - WebSocket nativo hacia el relay actual de Lulú Finity
-- Expo Notifications, Haptics, Audio, Video, Speech, Application, Document Picker y Sharing
+- Expo Notifications, Haptics, Audio, Video, File System, Application, Document Picker y Sharing
 
 ## Funciones principales
 
 - Splash con video local centrado, onboarding y conexión por usuario de TikTok LIVE
 - Dashboard y Vista en Vivo
-- TTS Bot para comentarios
+- TTS Bot con voces neuronales Microsoft generadas por el relay
 - Metas animadas
 - Top Fans / rankings, incluido **Fan Stickers**
 - Historial persistente con nombre/ID de Fan Stickers
@@ -79,6 +79,8 @@ npm run android
 ## TTS y LIVE en segundo plano
 
 Mientras el LIVE está conectado, Lulú conserva una sesión multimedia de Android con la notificación **TTS Bot activo**. Esa sesión mantiene el proceso en primer plano para que el WebSocket y la cola TTS continúen trabajando con la pantalla apagada o con otra app abierta. Si Android llegara a suspender el proceso de todos modos, los comentarios atrasados caducan y no se leen en bloque al regresar.
+
+Android no utiliza `expo-speech` ni el motor TTS instalado en el teléfono. Envía como máximo 240 caracteres al endpoint autenticado `POST /v1/tts/microsoft`; el relay genera un MP3 con la voz Microsoft elegida y el teléfono solo lo reproduce. Esto requiere internet y evita competir por CPU con el motor local mientras hay un juego abierto.
 
 Desconectar el LIVE libera la sesión. Forzar la detención de Lulú desde Ajustes siempre finaliza el TTS y la conexión.
 

@@ -8,6 +8,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { Button } from '@/components/Button';
 import { useTtsStore } from '@/store/useTtsStore';
 import { getTtsVoices, previewTts, stopTts } from '@/services/tts';
+import { defaultMicrosoftVoice } from '@/services/microsoftVoices';
 import { useAppStore } from '@/store/useAppStore';
 import { accentByTheme } from '@/theme/palette';
 
@@ -96,17 +97,22 @@ export function TtsScreen() {
 
   const matchingVoices = useMemo(() => {
     const prefix = (settings.language.split('-')[0] ?? 'es').toLowerCase();
-    const preferred = voices.filter((voice) =>
-      voice.language.toLowerCase().startsWith(prefix),
+    const exact = voices.filter(
+      (voice) => voice.language.toLowerCase() === settings.language.toLowerCase(),
     );
-    return (preferred.length ? preferred : voices).slice(0, 10);
+    const related = voices.filter(
+      (voice) =>
+        voice.language.toLowerCase().startsWith(prefix) &&
+        voice.language.toLowerCase() !== settings.language.toLowerCase(),
+    );
+    return [...exact, ...related].slice(0, 12);
   }, [voices, settings.language]);
 
   return (
     <Screen>
       <AppHeader
         title="TTS Bot"
-        subtitle="La voz de tus comentarios de TikTok LIVE, directamente en Android."
+        subtitle="Voces neuronales de Microsoft para tus comentarios de TikTok LIVE."
       />
 
       <GlassCard>
@@ -151,7 +157,7 @@ export function TtsScreen() {
 
       <SectionTitle
         title="Idioma"
-        subtitle="Android usará una voz instalada compatible con el idioma elegido."
+        subtitle="Elige la región de las voces Microsoft que quieres escuchar."
       />
       <View className="flex-row flex-wrap gap-2">
         {LANGUAGE_CHOICES.map(([value, label]) => (
@@ -160,36 +166,19 @@ export function TtsScreen() {
             label={label}
             active={settings.language === value}
             accent={accent}
-            onPress={() => settings.updateTts({ language: value, voice: '' })}
+            onPress={() =>
+              settings.updateTts({ language: value, voice: defaultMicrosoftVoice(value) })
+            }
           />
         ))}
       </View>
 
       <SectionTitle
         title="Voz"
-        subtitle="Las opciones dependen de las voces instaladas en tu teléfono."
+        subtitle="Se genera en línea; ya no depende del motor de voz del celular."
       />
       <GlassCard>
         <View className="p-4">
-          <Pressable
-            onPress={() => settings.updateTts({ voice: '' })}
-            style={
-              !settings.voice
-                ? { borderColor: accent, backgroundColor: `${accent}18` }
-                : undefined
-            }
-            className={`mb-2 rounded-2xl border p-4 ${settings.voice ? 'border-white/10 bg-white/[0.035]' : ''}`}
-          >
-            <Text
-              style={!settings.voice ? { color: accent } : undefined}
-              className={settings.voice ? 'text-sm font-black text-white' : 'text-sm font-black'}
-            >
-              Predeterminada del sistema
-            </Text>
-            <Text className="mt-1 text-xs text-white/35">
-              Android elige automáticamente la mejor voz.
-            </Text>
-          </Pressable>
           {matchingVoices.map((voice) => {
             const active = settings.voice === voice.identifier;
             return (
@@ -214,7 +203,7 @@ export function TtsScreen() {
             );
           })}
           {!voices.length ? (
-            <Text className="p-3 text-xs text-white/35">Cargando voces instaladas…</Text>
+            <Text className="p-3 text-xs text-white/35">Cargando voces Microsoft…</Text>
           ) : null}
         </View>
       </GlassCard>
@@ -260,7 +249,7 @@ export function TtsScreen() {
             value={preview}
             onChangeText={setPreview}
             multiline
-            maxLength={400}
+            maxLength={240}
             placeholder="Escribe algo para probar la voz"
             placeholderTextColor="#6D626C"
             className="min-h-[100px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-5 text-white"
@@ -290,7 +279,7 @@ export function TtsScreen() {
       </GlassCard>
 
       <Text className="mt-5 text-center text-[10px] leading-5 text-white/25">
-        TTS local de Android · los comentarios no se envían a un servicio de voz externo.
+        Requiere internet · el texto se envía por el relay seguro de Lulú para generar la voz con Microsoft.
       </Text>
     </Screen>
   );

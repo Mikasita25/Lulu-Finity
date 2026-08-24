@@ -7,19 +7,27 @@ const { WebSocketServer } = WebSocket;
 const { KeyPool, parseList } = require('./key-pool');
 const { classifyUpstreamFailure } = require('./failure-classifier');
 const { DailyUsageMeter } = require('./usage-meter');
+const { MICROSOFT_VOICES, synthesizeMicrosoftSpeech } = require('./microsoft-tts');
 
 const PORT = Math.max(1, Number(process.env.PORT || 3000));
 const UPSTREAM_WS_URL = String(process.env.UPSTREAM_WS_URL || 'wss://ws.eulerstream.com').trim();
 const CLIENT_TOKENS = new Set(parseList(process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN));
+const TTS_CLIENT_TOKENS = new Set(parseList(
+  process.env.TTS_CLIENT_TOKENS || process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN
+));
 const MAX_CLIENTS = Math.max(1, Number(process.env.MAX_CLIENTS || 50));
 const MAX_ATTEMPTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_CONNECTION_ATTEMPTS_PER_MINUTE || 30));
+const MAX_TTS_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_TTS_REQUESTS_PER_MINUTE || 90));
+const MAX_TTS_CONCURRENT = Math.max(1, Number(process.env.MAX_TTS_CONCURRENT || 4));
 const UPSTREAM_OPEN_TIMEOUT_MS = Math.max(3000, Number(process.env.UPSTREAM_OPEN_TIMEOUT_MS || 18000));
 const DAILY_USAGE_LIMIT = Math.max(1, Number(process.env.DAILY_USAGE_LIMIT || 7500));
 const USAGE_PER_CONNECTION = Math.max(0.1, Number(process.env.USAGE_PER_CONNECTION || 2));
+const USER_DAILY_CONNECTION_LIMIT = Math.max(1, Number(process.env.USER_DAILY_CONNECTION_LIMIT || 600));
 const USAGE_STATE_FILE = String(process.env.USAGE_STATE_FILE || '').trim();
 const usageMeter = new DailyUsageMeter({
   limit: DAILY_USAGE_LIMIT,
   perConnection: USAGE_PER_CONNECTION,
+  userLimit: USER_DAILY_CONNECTION_LIMIT,
   stateFile: USAGE_STATE_FILE || undefined
 });
 const keyPool = new KeyPool(parseList(process.env.EULER_API_KEYS), {
@@ -34,8 +42,10 @@ if (!keyPool.size) {
 }
 
 let activeClients = 0;
+let activeTtsRequests = 0;
 let shuttingDown = false;
 const attemptsByIp = new Map();
+const ttsAttemptsByIp = new Map();
 const sessions = new Set();
 
 function cleanUsername(value) {
@@ -55,6 +65,14 @@ function rateLimitAllows(ip, now = Date.now()) {
   return current.length <= MAX_ATTEMPTS_PER_MINUTE;
 }
 
+function ttsRateLimitAllows(ip, now = Date.now()) {
+  const windowStart = now - 60_000;
+  const current = (ttsAttemptsByIp.get(ip) || []).filter((time) => time >= windowStart);
+  current.push(now);
+  ttsAttemptsByIp.set(ip, current);
+  return current.length <= MAX_TTS_REQUESTS_PER_MINUTE;
+}
+
 function suppliedToken(request) {
   const authorization = String(request.headers.authorization || '');
   if (/^Bearer\s+/i.test(authorization)) return authorization.replace(/^Bearer\s+/i, '').trim();
@@ -64,6 +82,42 @@ function suppliedToken(request) {
 function authorized(request) {
   if (!CLIENT_TOKENS.size) return true;
   return CLIENT_TOKENS.has(suppliedToken(request));
+}
+
+function authorizedTts(request) {
+  if (!TTS_CLIENT_TOKENS.size) return true;
+  return TTS_CLIENT_TOKENS.has(suppliedToken(request));
+}
+
+function readJsonBody(request, maxBytes = 4096) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let rejected = false;
+    request.on('data', (chunk) => {
+      if (rejected) return;
+      size += chunk.length;
+      if (size > maxBytes) {
+        rejected = true;
+        const error = new Error('La solicitud es demasiado grande.');
+        error.statusCode = 413;
+        reject(error);
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on('end', () => {
+      if (rejected) return;
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
+      } catch {
+        const error = new Error('El cuerpo debe ser JSON válido.');
+        error.statusCode = 400;
+        reject(error);
+      }
+    });
+    request.on('error', reject);
+  });
 }
 
 function sendJson(socket, payload) {
@@ -209,12 +263,19 @@ function jsonHeaders() {
   return {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
-    'access-control-allow-origin': '*'
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': 'authorization, content-type, x-lulu-client-token',
+    'access-control-allow-methods': 'GET, POST, OPTIONS'
   };
 }
 
-const server = http.createServer((request, response) => {
+async function handleHttpRequest(request, response) {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
+  if (request.method === 'OPTIONS') {
+    response.writeHead(204, jsonHeaders());
+    response.end();
+    return;
+  }
   if (request.method === 'GET' && url.pathname === '/health') {
     const snapshot = keyPool.snapshot();
     const usage = usageMeter.snapshot();
@@ -224,6 +285,7 @@ const server = http.createServer((request, response) => {
       service: 'lulu-finity-railway-relay',
       uptimeSeconds: Math.round(process.uptime()),
       clients: activeClients,
+      tts: { provider: 'microsoft-edge', activeRequests: activeTtsRequests, voices: MICROSOFT_VOICES.length },
       keys: { total: snapshot.total, available: snapshot.available, activeConnections: snapshot.activeConnections },
       usage: { used: usage.used, limit: usage.limit, percent: usage.percent, resetAt: usage.resetAt }
     }));
@@ -231,11 +293,69 @@ const server = http.createServer((request, response) => {
   }
   if (request.method === 'GET' && url.pathname === '/usage') {
     response.writeHead(200, jsonHeaders());
-    response.end(JSON.stringify({ ok: true, ...usageMeter.snapshot() }));
+    const uniqueId = cleanUsername(url.searchParams.get('uniqueId'));
+    response.end(JSON.stringify({ ok: true, ...usageMeter.snapshot(), user: uniqueId ? usageMeter.userSnapshot(uniqueId) : null }));
+    return;
+  }
+  if (request.method === 'GET' && url.pathname === '/v1/tts/voices') {
+    response.writeHead(200, jsonHeaders());
+    response.end(JSON.stringify({ ok: true, provider: 'microsoft-edge', voices: MICROSOFT_VOICES }));
+    return;
+  }
+  if (request.method === 'POST' && url.pathname === '/v1/tts/microsoft') {
+    if (!authorizedTts(request)) {
+      response.writeHead(401, jsonHeaders());
+      response.end(JSON.stringify({ ok: false, error: 'No autorizado.' }));
+      return;
+    }
+    if (!ttsRateLimitAllows(requestIp(request))) {
+      response.writeHead(429, { ...jsonHeaders(), 'retry-after': '60' });
+      response.end(JSON.stringify({ ok: false, error: 'Demasiadas solicitudes de voz. Intenta en un minuto.' }));
+      return;
+    }
+    if (activeTtsRequests >= MAX_TTS_CONCURRENT) {
+      response.writeHead(503, { ...jsonHeaders(), 'retry-after': '2' });
+      response.end(JSON.stringify({ ok: false, error: 'El servicio de voz está ocupado. Intenta de nuevo.' }));
+      return;
+    }
+
+    activeTtsRequests += 1;
+    try {
+      const body = await readJsonBody(request);
+      const result = await synthesizeMicrosoftSpeech(body);
+      response.writeHead(200, {
+        'content-type': 'audio/mpeg',
+        'content-length': result.audio.length,
+        'cache-control': 'no-store',
+        'access-control-allow-origin': '*',
+        'x-lulu-tts-voice': result.voice,
+        'x-lulu-tts-cache': result.cacheHit ? 'hit' : 'miss'
+      });
+      response.end(result.audio);
+    } catch (error) {
+      const statusCode = Number(error?.statusCode) || 502;
+      if (statusCode >= 500) console.error('[tts] Microsoft TTS falló:', error?.message || error);
+      response.writeHead(statusCode, jsonHeaders());
+      response.end(JSON.stringify({
+        ok: false,
+        error: statusCode >= 500 ? 'No se pudo generar la voz Microsoft.' : String(error.message || error)
+      }));
+    } finally {
+      activeTtsRequests = Math.max(0, activeTtsRequests - 1);
+    }
     return;
   }
   response.writeHead(404, jsonHeaders());
   response.end(JSON.stringify({ ok: false, error: 'Not found' }));
+}
+
+const server = http.createServer((request, response) => {
+  void handleHttpRequest(request, response).catch((error) => {
+    console.error('[http] Solicitud fallida:', error?.message || error);
+    if (response.headersSent) return response.end();
+    response.writeHead(500, jsonHeaders());
+    response.end(JSON.stringify({ ok: false, error: 'Error interno.' }));
+  });
 });
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024 });
@@ -265,9 +385,16 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (client, request, uniqueId) => {
+  const before = usageMeter.userSnapshot(uniqueId);
+  if (before.remaining <= 0) {
+    const message = `Esta cuenta ya utilizó sus ${before.limit} conexiones diarias de Lulu Finity. Vuelve a intentarlo después del reinicio diario.`;
+    sendJson(client, { type: 'lulu.relay.error', data: { message, classification: 'user-daily-limit', usage: before } });
+    try { client.close(4429, message.slice(0, 120)); } catch {}
+    return;
+  }
   activeClients += 1;
-  const usage = usageMeter.recordConnection();
-  console.info(`[usage] ${usage.used}/${usage.limit} usos diarios (${usage.percent}%).`);
+  const usage = usageMeter.recordConnection(1, uniqueId);
+  console.info(`[usage] ${usage.used}/${usage.limit} usos globales; usuario ${usage.user.used}/${usage.user.limit} conexiones.`);
   const session = new RelaySession(client, request, uniqueId);
   sessions.add(session);
   let alive = true;
