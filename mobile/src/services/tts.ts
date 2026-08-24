@@ -1,23 +1,21 @@
 import { createAudioPlayer } from 'expo-audio';
-import { fetch as expoFetch } from 'expo/fetch';
 import { File, Paths } from 'expo-file-system';
 import type { LiveEvent } from '@/types/live';
 import { useTtsStore } from '@/store/useTtsStore';
 import { MICROSOFT_VOICES, normalizeMicrosoftVoice } from './microsoftVoices';
+import { synthesizeMicrosoftSpeechDirect } from './microsoftEdgeDirect';
 
 const MAX_QUEUE = 5;
 const MAX_PENDING_AGE_MS = 10_000;
 const MAX_SPEECH_CHARS = 240;
-const SYNTHESIS_TIMEOUT_MS = 12_000;
-const RELAY_LIVE_URL =
-  process.env.EXPO_PUBLIC_LULU_RELAY_URL ||
-  'wss://lulu-finity-production.up.railway.app/v1/tiktok/live';
-const RELAY_TTS_URL = `${RELAY_LIVE_URL
-  .replace(/^ws/i, 'http')
-  .replace(/\/v1\/tiktok\/live.*$/i, '')}/v1/tts/microsoft`;
-const CLIENT_TOKEN = process.env.EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN || '';
+const SYNTHESIS_TIMEOUT_MS = 15_000;
 
-type PendingSpeech = { text: string; queuedAt: number };
+type PendingSpeech = {
+  text: string;
+  queuedAt: number;
+  resolve?: () => void;
+  reject?: (error: Error) => void;
+};
 type Player = ReturnType<typeof createAudioPlayer>;
 type Subscription = { remove: () => void };
 
@@ -57,35 +55,17 @@ async function synthesizeMicrosoftAudio(text: string, currentGeneration: number)
   const timeout = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
 
   try {
-    const headers: Record<string, string> = {
-      Accept: 'audio/mpeg',
-      'Content-Type': 'application/json',
-    };
-    if (CLIENT_TOKEN) {
-      headers.Authorization = `Bearer ${CLIENT_TOKEN}`;
-      headers['x-lulu-client-token'] = CLIENT_TOKEN;
-    }
-
-    const response = await expoFetch(RELAY_TTS_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        text,
-        voice: normalizeMicrosoftVoice(settings.voice, settings.language),
-        rate: Math.max(0.6, Math.min(1.5, settings.rate)),
-        pitch: Math.max(0.7, Math.min(1.3, settings.pitch)),
-      }),
+    const bytes = await synthesizeMicrosoftSpeechDirect({
+      text,
+      voice: normalizeMicrosoftVoice(settings.voice, settings.language),
+      rate: Math.max(0.6, Math.min(1.5, settings.rate)),
+      pitch: Math.max(0.7, Math.min(1.3, settings.pitch)),
       signal: controller.signal,
+      timeoutMs: SYNTHESIS_TIMEOUT_MS,
     });
-
-    if (!response.ok) throw new Error(`Microsoft TTS respondió ${response.status}`);
-    const bytes = await response.bytes();
     if (!bytes.length || currentGeneration !== generation) throw new Error('Audio TTS descartado');
 
-    const file = new File(
-      Paths.cache,
-      `lulu-microsoft-tts-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`,
-    );
+    const file = new File(Paths.cache, `lulu-microsoft-tts-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`);
     file.write(bytes);
     return file;
   } finally {
@@ -144,10 +124,12 @@ async function processNext(item: PendingSpeech) {
     }
     const { volume } = useTtsStore.getState();
     await playAudioFile(file, volume, currentGeneration);
+    item.resolve?.();
   } catch (error) {
     if (currentGeneration === generation) {
       console.warn('[LuluFinity] Microsoft TTS no pudo generar el audio', error);
     }
+    item.reject?.(error instanceof Error ? error : new Error('Microsoft TTS no pudo generar el audio.'));
   } finally {
     if (currentGeneration === generation) {
       speaking = false;
@@ -159,11 +141,14 @@ async function processNext(item: PendingSpeech) {
 function runNext() {
   if (speaking) return;
   let item = pending.shift();
-  while (item && Date.now() - item.queuedAt > MAX_PENDING_AGE_MS) item = pending.shift();
+  while (item && Date.now() - item.queuedAt > MAX_PENDING_AGE_MS) {
+    item.reject?.(new Error('La prueba caducó antes de reproducirse.'));
+    item = pending.shift();
+  }
   if (item) void processNext(item);
 }
 
-function speak(text: string) {
+function speak(text: string, completion?: Pick<PendingSpeech, 'resolve' | 'reject'>) {
   const value = text.slice(0, MAX_SPEECH_CHARS).trim();
   if (!value) return false;
 
@@ -171,9 +156,9 @@ function speak(text: string) {
     // El chat nuevo reemplaza al pendiente más antiguo para que el audio nunca
     // quede varios minutos detrás del LIVE.
     if (!pending.length) return false;
-    pending.shift();
+    pending.shift()?.reject?.(new Error('La prueba fue reemplazada por un comentario más reciente.'));
   }
-  pending.push({ text: value, queuedAt: Date.now() });
+  pending.push({ text: value, queuedAt: Date.now(), ...completion });
   runNext();
   return true;
 }
@@ -202,12 +187,19 @@ export function speakTtsText(text: string) {
 
 export async function previewTts(text: string) {
   await stopTts();
-  return speakTtsText(text);
+  const value = cleanText(text);
+  return new Promise<void>((resolve, reject) => {
+    if (!speak(value, { resolve, reject })) {
+      reject(new Error('Escribe un texto para probar la voz.'));
+    }
+  });
 }
 
 export async function stopTts() {
   generation += 1;
-  pending.length = 0;
+  for (const item of pending.splice(0)) {
+    item.reject?.(new Error('La lectura TTS fue detenida.'));
+  }
   speaking = false;
   synthesisController?.abort();
   synthesisController = null;

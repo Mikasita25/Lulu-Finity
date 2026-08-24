@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
 import { AudioLines, Bot, MessageCircle, RotateCcw, Square } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { AppHeader } from '@/components/AppHeader';
@@ -79,9 +79,8 @@ export function TtsScreen() {
   const accentTheme = useAppStore((state) => state.accentTheme);
   const accent = accentByTheme[accentTheme];
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [preview, setPreview] = useState(
-    'Hola, soy el TTS de Lulú Finity. Ya puedo leer los comentarios del LIVE.',
-  );
+  const [preview, setPreview] = useState('Hola, soy el TTS de Lulú Finity. Ya puedo leer los comentarios del LIVE.');
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -97,9 +96,7 @@ export function TtsScreen() {
 
   const matchingVoices = useMemo(() => {
     const prefix = (settings.language.split('-')[0] ?? 'es').toLowerCase();
-    const exact = voices.filter(
-      (voice) => voice.language.toLowerCase() === settings.language.toLowerCase(),
-    );
+    const exact = voices.filter((voice) => voice.language.toLowerCase() === settings.language.toLowerCase());
     const related = voices.filter(
       (voice) =>
         voice.language.toLowerCase().startsWith(prefix) &&
@@ -110,10 +107,7 @@ export function TtsScreen() {
 
   return (
     <Screen>
-      <AppHeader
-        title="TTS Bot"
-        subtitle="Voces neuronales de Microsoft para tus comentarios de TikTok LIVE."
-      />
+      <AppHeader title="TTS Bot" subtitle="Voces neuronales de Microsoft para tus comentarios de TikTok LIVE." />
 
       <GlassCard>
         <View className="p-5">
@@ -155,10 +149,7 @@ export function TtsScreen() {
         </View>
       </GlassCard>
 
-      <SectionTitle
-        title="Idioma"
-        subtitle="Elige la región de las voces Microsoft que quieres escuchar."
-      />
+      <SectionTitle title="Idioma" subtitle="Elige la región de las voces Microsoft que quieres escuchar." />
       <View className="flex-row flex-wrap gap-2">
         {LANGUAGE_CHOICES.map(([value, label]) => (
           <Choice
@@ -167,16 +158,16 @@ export function TtsScreen() {
             active={settings.language === value}
             accent={accent}
             onPress={() =>
-              settings.updateTts({ language: value, voice: defaultMicrosoftVoice(value) })
+              settings.updateTts({
+                language: value,
+                voice: defaultMicrosoftVoice(value),
+              })
             }
           />
         ))}
       </View>
 
-      <SectionTitle
-        title="Voz"
-        subtitle="Se genera en línea; ya no depende del motor de voz del celular."
-      />
+      <SectionTitle title="Voz" subtitle="Se genera en línea; ya no depende del motor de voz del celular." />
       <GlassCard>
         <View className="p-4">
           {matchingVoices.map((voice) => {
@@ -185,7 +176,10 @@ export function TtsScreen() {
               <Pressable
                 key={voice.identifier}
                 onPress={() =>
-                  settings.updateTts({ voice: voice.identifier, language: voice.language })
+                  settings.updateTts({
+                    voice: voice.identifier,
+                    language: voice.language,
+                  })
                 }
                 style={active ? { borderColor: accent, backgroundColor: `${accent}18` } : undefined}
                 className={`mb-2 rounded-2xl border p-4 ${active ? '' : 'border-white/10 bg-white/[0.035]'}`}
@@ -202,16 +196,12 @@ export function TtsScreen() {
               </Pressable>
             );
           })}
-          {!voices.length ? (
-            <Text className="p-3 text-xs text-white/35">Cargando voces Microsoft…</Text>
-          ) : null}
+          {!voices.length ? <Text className="p-3 text-xs text-white/35">Cargando voces Microsoft…</Text> : null}
         </View>
       </GlassCard>
 
       <SectionTitle title="Ritmo" />
-      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">
-        Velocidad
-      </Text>
+      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">Velocidad</Text>
       <View className="mb-4 flex-row flex-wrap gap-2">
         {[0.8, 1, 1.15, 1.3].map((rate) => (
           <Choice
@@ -223,9 +213,7 @@ export function TtsScreen() {
           />
         ))}
       </View>
-      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">
-        Tono
-      </Text>
+      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">Tono</Text>
       <View className="flex-row flex-wrap gap-2">
         {[0.85, 1, 1.15, 1.3].map((pitch) => (
           <Choice
@@ -256,9 +244,20 @@ export function TtsScreen() {
           />
           <View className="mt-4 gap-3">
             <Button
-              label="Probar TTS"
+              label={previewing ? 'Generando voz…' : 'Probar TTS'}
+              disabled={previewing}
               onPress={async () => {
-                await previewTts(preview);
+                setPreviewing(true);
+                try {
+                  await previewTts(preview);
+                } catch (error) {
+                  Alert.alert(
+                    'No se pudo reproducir la voz',
+                    error instanceof Error ? error.message : 'Comprueba tu conexión a internet e inténtalo de nuevo.',
+                  );
+                } finally {
+                  setPreviewing(false);
+                }
               }}
               icon={<AudioLines size={17} color="white" />}
             />
@@ -279,7 +278,7 @@ export function TtsScreen() {
       </GlassCard>
 
       <Text className="mt-5 text-center text-[10px] leading-5 text-white/25">
-        Requiere internet · el texto se envía por el relay seguro de Lulú para generar la voz con Microsoft.
+        Requiere internet · la voz se genera directamente con Microsoft, sin usar el motor del celular.
       </Text>
     </Screen>
   );

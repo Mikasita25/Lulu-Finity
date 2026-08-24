@@ -1,5 +1,14 @@
 # Lulú Finity Mobile
 
+## 1.2.6
+
+- Genera las voces Microsoft directamente desde Android mediante la conexión en línea de Microsoft Edge TTS; el audio ya no depende de que Railway publique una ruta TTS.
+- Mantiene Railway únicamente para recibir los eventos del TikTok LIVE; los comentarios pasan del teléfono a Microsoft para producir el MP3 y se eliminan de la caché después de reproducirse.
+- Conserva las 13 voces neuronales, la cola corta, la caducidad de mensajes antiguos y la reproducción de fondo sin volver a usar el motor TTS instalado en el celular.
+- Corrige el botón **Probar TTS**: ahora espera a que termine la generación y reproducción, se bloquea mientras trabaja y muestra el error real si Microsoft no entrega audio.
+- Añade pruebas del protocolo directo: firma SHA-256, nombre SSML de voz y extracción del MP3 desde las tramas binarias de Microsoft.
+- Actualiza Android a `versionCode` 15 para instalarse encima de la compilación 1.2.5.
+
 ## 1.2.5
 
 - Sustituye por completo el motor TTS del celular por 13 voces neuronales Microsoft de México, España, Estados Unidos y Argentina; las preferencias antiguas de Android migran automáticamente a Dalia.
