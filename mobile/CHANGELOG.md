@@ -1,5 +1,21 @@
 # Lulú Finity Mobile
 
+## 1.2.5
+
+- Sustituye por completo el motor TTS del celular por 13 voces neuronales Microsoft de México, España, Estados Unidos y Argentina; las preferencias antiguas de Android migran automáticamente a Dalia.
+- Genera la voz en el relay y reproduce un MP3 temporal en Android, con solicitudes autenticadas, límite de 240 caracteres, cola corta y archivos de caché eliminados después de reproducirse.
+- Corrige los trabones de música: evita repetir `video.play()` cuando YouTube ya está reproduciendo y reduce el sondeo del WebView a una vez por segundo, sin sacrificar la MediaSession necesaria para el segundo plano.
+- Mantiene activa la sesión multimedia de Android mientras el LIVE esté conectado, incluso cuando no hay una canción reproduciéndose, para que el WebSocket y el TTS no dependan de que la pantalla de Lulú permanezca abierta.
+- Muestra una notificación persistente **TTS Bot activo** durante esa sesión; al desconectar el LIVE, la sesión y sus controles se liberan automáticamente.
+- Elimina del relay el cierre por inactividad de 300 segundos que desconectaba un LIVE tranquilo aunque la conexión siguiera siendo válida.
+- Recupera automáticamente cortes temporales y cierres normales del transporte con ocho intentos y esperas progresivas de hasta dos minutos.
+- Detiene y limpia la voz pendiente al comenzar una reconexión para que no sobreviva una cola perteneciente a la conexión anterior.
+- Añade una compuerta de frescura: descarta eventos demasiado antiguos, IDs repetidos y el pequeño paquete de puesta al día que puede entregar el proveedor justo después de reconectar.
+- Los elementos de la cola TTS caducan después de 10 segundos; un comentario que ya perdió actualidad no se reproduce varios minutos después.
+- Evita que el cierre tardío de un socket reemplazado programe otra reconexión encima de la conexión nueva.
+- Añade pruebas de regresión para backlog antiguo, duplicados, drenaje de reconexión, cola TTS con caducidad y sesión de Android activa sin música.
+- Actualiza Android a `versionCode` 14 para instalarse encima de la compilación 1.2.4.
+
 ## 1.2.3
 
 - Añade reproducción de música persistente en segundo plano mediante la sesión multimedia/foreground service de Android configurada con `expo-audio`.

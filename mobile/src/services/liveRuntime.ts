@@ -4,6 +4,7 @@ import { runEventEffects } from './effects';
 import { handleTtsEvent, stopTts } from './tts';
 import { clearInteractionCooldowns, runInteractionRules } from './interactions';
 import { clearMusicCooldowns, handleMusicEvent } from './music';
+import { LiveFreshnessGate } from './realtime/liveFreshness';
 
 function top3Snapshot() {
   return Object.values(useAppStore.getState().leaderboard)
@@ -12,10 +13,24 @@ function top3Snapshot() {
     .map((entry) => entry.uniqueId.toLowerCase());
 }
 
+const freshness = new LiveFreshnessGate();
+
 const socket = new LiveSocket((message) => {
   const store = useAppStore.getState();
 
   if (message.kind === 'relay') {
+    const reconnecting =
+      message.transportReconnect === true ||
+      message.state === 'rotating' ||
+      (message.attempt ?? 1) > 1;
+    if (reconnecting && (message.state === 'connecting' || message.state === 'rotating')) {
+      freshness.beginReconnect();
+      stopTts().catch(() => {});
+    } else if (message.state === 'connected') {
+      freshness.markConnected(Date.now(), reconnecting);
+    } else if (message.state === 'idle' || message.state === 'offline' || message.state === 'error') {
+      stopTts().catch(() => {});
+    }
     store.setRelay(message.state, message.message);
     return;
   }
@@ -25,6 +40,8 @@ const socket = new LiveSocket((message) => {
     if (Number.isFinite(message.likes)) store.setTotalLikes(message.likes ?? 0);
     return;
   }
+
+  if (!freshness.accept(message.event)) return;
 
   const previousTop3 = top3Snapshot();
   store.ingestEvent(message.event);
@@ -43,6 +60,7 @@ export function connectLive(username?: string) {
   const target = (username || state.username).trim().replace(/^@/, '');
   if (!target) throw new Error('Escribe un usuario de TikTok.');
   stopTts().catch(() => {});
+  freshness.startSession();
   clearInteractionCooldowns();
   clearMusicCooldowns();
   state.resetSession();
@@ -53,5 +71,6 @@ export function disconnectLive() {
   stopTts().catch(() => {});
   clearInteractionCooldowns();
   clearMusicCooldowns();
+  freshness.stop();
   socket.disconnect();
 }

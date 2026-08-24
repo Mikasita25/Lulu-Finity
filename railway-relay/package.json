@@ -7,13 +7,14 @@
   "main": "src/public-server.js",
   "scripts": {
     "start": "node src/public-server.js",
-    "check": "node --check src/public-server.js && node --check src/server-v027-loader.js && node --check src/usage-meter.js && node --check src/key-pool.js && node --check src/failure-classifier.js",
+    "check": "node --check src/public-server.js && node --check src/server-v027-loader.js && node --check src/microsoft-tts.js && node --check src/usage-meter.js && node --check src/key-pool.js && node --check src/failure-classifier.js",
     "test": "node --test src/*.test.js"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
+    "edge-tts-universal": "1.4.0",
     "ws": "8.18.2"
   }
 }

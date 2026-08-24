@@ -52,6 +52,7 @@ assert.ok(
 const packageJson = JSON.parse(read('package.json'));
 assert.equal(packageJson.dependencies['react-native-webview'], '13.16.1');
 assert.ok(packageJson.dependencies['expo-audio']);
+assert.equal(packageJson.dependencies['expo-speech'], undefined, 'Android ya no debe usar el motor TTS local.');
 
 const navigator = read('src/navigation/AppNavigator.tsx');
 assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main'/);
@@ -122,6 +123,35 @@ assert.match(playbackHost, /addEventListener\('ended'/);
 assert.match(playbackHost, /playNextSong\(\)/);
 assert.match(playbackHost, /ytp-skip-ad-button/);
 assert.match(playbackHost, /currentSong\.id/);
+assert.match(playbackHost, /TTS Bot activo/);
+assert.match(playbackHost, /liveOnlyKeeper/);
+assert.match(playbackHost, /interruptionMode: 'doNotMix'/);
+assert.match(playbackHost, /video\.paused && !video\.ended/);
+assert.match(playbackHost, /setInterval\(tick, 1000\)/);
+
+const ttsRuntime = read('src/services/tts.ts');
+assert.match(ttsRuntime, /MAX_PENDING_AGE_MS/);
+assert.match(ttsRuntime, /queuedAt/);
+assert.match(ttsRuntime, /\/v1\/tts\/microsoft/);
+assert.match(ttsRuntime, /MICROSOFT_VOICES/);
+assert.match(ttsRuntime, /expo\/fetch/);
+assert.doesNotMatch(ttsRuntime, /expo-speech|Speech\.speak/);
+
+const ttsScreen = read('src/screens/TtsScreen.tsx');
+assert.match(ttsScreen, /Voces neuronales de Microsoft/);
+assert.match(ttsScreen, /ya no depende del motor de voz del celular/);
+assert.doesNotMatch(ttsScreen, /Predeterminada del sistema|voces instaladas/);
+
+const liveRuntime = read('src/services/liveRuntime.ts');
+assert.match(liveRuntime, /LiveFreshnessGate/);
+assert.match(liveRuntime, /freshness\.beginReconnect/);
+assert.match(liveRuntime, /freshness\.accept/);
+
+const liveSocket = read('src/services/realtime/LiveSocket.ts');
+assert.match(liveSocket, /const reconnectDelays = \[/);
+assert.match(liveSocket, /transportReconnect: this\.retryCount > 0/);
+assert.match(liveSocket, /if \(this\.socket !== socket\) return/);
+assert.doesNotMatch(liveSocket, /1000: \{ state:/);
 
 const musicRuntime = read('src/services/music.ts');
 assert.match(musicRuntime, /parseSongRequest/);
@@ -131,7 +161,6 @@ assert.match(musicRuntime, /const wasIdle = !state\.currentSong/);
 assert.match(musicRuntime, /playSong\(result\.song\)/);
 assert.match(musicRuntime, /https:\/\/m\.youtube\.com\/results/);
 
-const liveRuntime = read('src/services/liveRuntime.ts');
 assert.match(liveRuntime, /handleMusicEvent\(message\.event\)/);
 assert.match(liveRuntime, /clearMusicCooldowns/);
 

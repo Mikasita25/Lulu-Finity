@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { parseRealtimePayload } from '../src/services/realtime/eventParser.ts';
 import { socketPayloadToText } from '../src/services/realtime/socketPayload.ts';
+import { LiveFreshnessGate, RECONNECT_DRAIN_MS } from '../src/services/realtime/liveFreshness.ts';
 
 const bundle = JSON.stringify({
   timestamp: 1_786_790_000_000,
@@ -56,9 +57,9 @@ const roomInfo = parseRealtimePayload(
 assert.deepEqual(roomInfo, [{ kind: 'stats', viewers: 321, likes: 999 }]);
 
 const relayStatus = parseRealtimePayload(
-  JSON.stringify({ type: 'lulu.relay.status', data: { state: 'connected' } }),
+  JSON.stringify({ type: 'lulu.relay.status', data: { state: 'connected', attempt: 2 } }),
 );
-assert.deepEqual(relayStatus, [{ kind: 'relay', state: 'connected', message: '' }]);
+assert.deepEqual(relayStatus, [{ kind: 'relay', state: 'connected', message: '', attempt: 2 }]);
 
 assert.deepEqual(parseRealtimePayload('no es json'), []);
 
@@ -69,4 +70,33 @@ assert.equal(
   'paquete blob',
 );
 
-console.log('Realtime móvil: 7 regresiones verificadas.');
+const freshness = new LiveFreshnessGate();
+const now = 1_800_000_000_000;
+const event = (id, timestamp) => ({
+  id,
+  type: 'comment',
+  timestamp,
+  uniqueId: 'lulu_fan',
+  nickname: 'Lulu Fan',
+  comment: id,
+});
+
+freshness.startSession(now);
+assert.equal(freshness.accept(event('nuevo', now - 500), now), true, 'acepta actividad actual');
+assert.equal(freshness.accept(event('nuevo', now), now), false, 'descarta IDs repetidos');
+assert.equal(freshness.accept(event('antiguo', now - 30_000), now), false, 'descarta backlog viejo');
+
+freshness.beginReconnect(now + 1_000);
+assert.equal(
+  freshness.accept(event('durante-reconexion', now + 1_200), now + 1_200),
+  false,
+  'drena el paquete inicial de una reconexión',
+);
+freshness.markConnected(now + 1_500, true);
+assert.equal(
+  freshness.accept(event('despues-reconexion', now + 5_000), now + 1_500 + RECONNECT_DRAIN_MS),
+  true,
+  'acepta mensajes nuevos después de drenar la reconexión',
+);
+
+console.log('Realtime móvil: 12 regresiones verificadas.');

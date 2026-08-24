@@ -7,7 +7,7 @@ La conexión puede dejar de funcionar temporalmente si TikTok cambia su servicio
 Las canciones que agregues permanecen de forma local en la carpeta de datos de la aplicación. Debes contar con permiso para utilizar y retransmitir el audio que reproduzcas.
 ## Voces neuronales online
 
-Las voces neuronales opcionales utilizan `edge-tts-universal`, un proyecto no oficial que se conecta al servicio de lectura en voz alta de Microsoft Edge. Cuando seleccionas una voz online, el texto del comentario se envía por internet al servicio para generar el audio. Lulu Finity vuelve automáticamente a una voz local de Windows si el servicio no responde.
+Las voces neuronales utilizan `edge-tts-universal`, un proyecto no oficial que se conecta al servicio de lectura en voz alta de Microsoft Edge. Cuando seleccionas una voz online, el texto del comentario se envía por internet al servicio para generar el audio. Windows puede volver a una voz local si el servicio no responde; Android usa exclusivamente las voces Microsoft solicitadas mediante el relay de Lulu Finity.
 
 ## Actualizaciones
 
