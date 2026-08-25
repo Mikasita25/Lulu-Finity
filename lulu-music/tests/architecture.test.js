@@ -12,10 +12,24 @@ const source = (name) => fs.readFileSync(path.join(root, 'src', name), 'utf8');
 test('el paquete contiene una sola pantalla dedicada a música', () => {
   const html = source('index.html');
   assert.match(html, /<title>Lulu Music<\/title>/);
+  assert.match(html, /class="brand-mark"[^>]*><span>LM<\/span>/);
   assert.doesNotMatch(html, /data-page=|sidebar|nav-item/i);
   assert.match(html, /Cola musical/);
   assert.match(html, /Abrir reproductor/);
   assert.doesNotMatch(html, /widget|iframe/i);
+});
+
+test('la interfaz usa textos directos y no conserva la presentación promocional', () => {
+  const html = source('index.html');
+  assert.match(html, /<h2>Conecta tu LIVE<\/h2>/);
+  assert.match(html, /<h2>Ajustes<\/h2>/);
+  [
+    'Solo solicitudes musicales del LIVE',
+    'Solo entra a la app',
+    'Tu chat elige. Lulu pone la música.',
+    'Un solo comando, bajo tu control',
+    'Una app, una función: música.'
+  ].forEach((copy) => assert.equal(html.includes(copy), false, `No debe aparecer: ${copy}`));
 });
 
 test('el proceso principal descarta el chat antes de la interfaz', () => {

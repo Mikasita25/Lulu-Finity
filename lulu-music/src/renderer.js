@@ -139,7 +139,7 @@ function renderState(next) {
   if (!next) return;
   const first = !appState;
   appState = next;
-  $('appVersion').textContent = next.version || '1.0.0';
+  $('appVersion').textContent = next.version || '1.0.1';
   renderLive(next.live);
   renderNow(next.playback);
   renderQueue(next.queue || []);
