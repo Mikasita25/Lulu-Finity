@@ -110,15 +110,11 @@ assert.match(music, /if \(wasIdle\) playSong\(result\.song\)/);
 assert.doesNotMatch(music, /Linking\.openURL/);
 
 const youtubeBrowser = read('src/screens/YouTubeBrowserScreen.tsx');
-assert.match(youtubeBrowser, /react-native-webview/);
-assert.match(youtubeBrowser, /YOUTUBE_AD_CLEANUP/);
-assert.match(youtubeBrowser, /ytp-skip-ad-button/);
-assert.match(youtubeBrowser, /fastForwardVideoAd/);
-assert.match(youtubeBrowser, /MutationObserver/);
-assert.match(youtubeBrowser, /setSupportMultipleWindows=\{false\}/);
-assert.match(youtubeBrowser, /javaScriptCanOpenWindowsAutomatically=\{false\}/);
-assert.match(youtubeBrowser, /Bloqueo activo/);
+assert.match(youtubeBrowser, /Un solo reproductor/);
+assert.match(youtubeBrowser, /Reintentar canción/);
+assert.match(youtubeBrowser, /playbackStatus/);
 assert.match(youtubeBrowser, /skipCurrentSong/);
+assert.doesNotMatch(youtubeBrowser, /react-native-webview/);
 
 const playbackHost = read('src/components/MusicPlaybackHost.tsx');
 assert.match(playbackHost, /setAudioModeAsync/);
@@ -140,12 +136,17 @@ assert.match(playbackHost, /liveOnlyKeeper/);
 assert.match(playbackHost, /interruptionMode: 'doNotMix'/);
 assert.match(playbackHost, /video\.paused && !video\.ended/);
 assert.match(playbackHost, /setInterval\(tick, 1000\)/);
+assert.match(playbackHost, /subscribeTtsPlayback/);
+assert.match(playbackHost, /setPlaybackStatus\('playing'/);
+assert.doesNotMatch(playbackHost, /remotePauseTimer|setPlaybackPaused/);
 
 const ttsRuntime = read('src/services/tts.ts');
 assert.match(ttsRuntime, /MAX_PENDING_AGE_MS/);
 assert.match(ttsRuntime, /queuedAt/);
 assert.match(ttsRuntime, /MICROSOFT_VOICES/);
 assert.match(ttsRuntime, /synthesizeMicrosoftSpeechDirect/);
+assert.match(ttsRuntime, /setTtsPlaybackActive\(true\)/);
+assert.match(ttsRuntime, /status\.isLoaded/);
 assert.doesNotMatch(ttsRuntime, /\/v1\/tts\/microsoft|expo\/fetch/);
 assert.doesNotMatch(ttsRuntime, /expo-speech|Speech\.speak/);
 

@@ -27,6 +27,8 @@ export type MusicSettings = {
   volume: number;
 };
 
+export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+
 type MobileControlState = {
   recentFilters: RecentFilterMap;
   recentMaxItems: number;
@@ -35,6 +37,8 @@ type MobileControlState = {
   currentSong?: SongRequest;
   musicPaused: boolean;
   playbackPaused: boolean;
+  playbackStatus: PlaybackStatus;
+  playbackMessage: string;
 
   setRecentFilter: (type: LiveEventType, enabled: boolean) => void;
   setAllRecentFilters: (enabled: boolean) => void;
@@ -48,6 +52,8 @@ type MobileControlState = {
   clearSongQueue: () => void;
   setMusicPaused: (paused: boolean) => void;
   setPlaybackPaused: (paused: boolean) => void;
+  setPlaybackStatus: (status: PlaybackStatus, message?: string) => void;
+  retryCurrentSong: () => void;
 };
 
 const defaultRecentFilters: RecentFilterMap = {
@@ -87,6 +93,8 @@ export const useMobileControlStore = create<MobileControlState>()(
       currentSong: undefined,
       musicPaused: false,
       playbackPaused: false,
+      playbackStatus: 'idle',
+      playbackMessage: 'Agrega una canción para comenzar.',
 
       setRecentFilter: (type, enabled) =>
         set((state) => ({ recentFilters: { ...state.recentFilters, [type]: enabled } })),
@@ -155,12 +163,14 @@ export const useMobileControlStore = create<MobileControlState>()(
           songQueue: state.songQueue.filter((item) => item.id !== song.id),
           musicPaused: false,
           playbackPaused: false,
+          playbackStatus: 'loading',
+          playbackMessage: 'Buscando la canción…',
         })),
       playNextSong: () => {
         const state = get();
         const next = state.songQueue[0];
         if (!next) {
-          set({ currentSong: undefined, musicPaused: false, playbackPaused: false });
+          set({ currentSong: undefined, musicPaused: false, playbackPaused: false, playbackStatus: 'idle', playbackMessage: 'La cola terminó.' });
           return undefined;
         }
         set({
@@ -168,6 +178,8 @@ export const useMobileControlStore = create<MobileControlState>()(
           songQueue: state.songQueue.slice(1),
           musicPaused: false,
           playbackPaused: false,
+          playbackStatus: 'loading',
+          playbackMessage: 'Buscando la canción…',
         });
         return next;
       },
@@ -179,13 +191,29 @@ export const useMobileControlStore = create<MobileControlState>()(
           songQueue: next ? state.songQueue.slice(1) : [],
           musicPaused: false,
           playbackPaused: false,
+          playbackStatus: next ? 'loading' : 'idle',
+          playbackMessage: next ? 'Buscando la canción…' : 'La cola terminó.',
         });
         return next;
       },
       removeSong: (id) => set((state) => ({ songQueue: state.songQueue.filter((song) => song.id !== id) })),
       clearSongQueue: () => set({ songQueue: [] }),
       setMusicPaused: (musicPaused) => set({ musicPaused }),
-      setPlaybackPaused: (playbackPaused) => set({ playbackPaused }),
+      setPlaybackPaused: (playbackPaused) => set({
+        playbackPaused,
+        playbackStatus: playbackPaused ? 'paused' : get().currentSong ? 'loading' : 'idle',
+        playbackMessage: playbackPaused ? 'Música en pausa.' : get().currentSong ? 'Reanudando…' : 'Agrega una canción para comenzar.',
+      }),
+      setPlaybackStatus: (playbackStatus, playbackMessage) => set({
+        playbackStatus,
+        playbackMessage: playbackMessage ?? get().playbackMessage,
+      }),
+      retryCurrentSong: () => set((state) => state.currentSong ? ({
+        currentSong: { ...state.currentSong, id: `${state.currentSong.id}-retry-${Date.now()}` },
+        playbackPaused: false,
+        playbackStatus: 'loading',
+        playbackMessage: 'Volviendo a cargar la canción…',
+      }) : state),
     }),
     {
       name: 'lulu-finity-mobile-controls-v2',
@@ -207,6 +235,8 @@ export const useMobileControlStore = create<MobileControlState>()(
           music: { ...defaultMusic, ...(saved.music ?? {}) },
           songQueue: Array.isArray(saved.songQueue) ? saved.songQueue : [],
           playbackPaused: false,
+          playbackStatus: saved.currentSong ? 'loading' : 'idle',
+          playbackMessage: saved.currentSong ? 'Recuperando la canción…' : 'Agrega una canción para comenzar.',
         };
       },
     },
