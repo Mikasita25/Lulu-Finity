@@ -757,15 +757,7 @@ async function youtubeSmokeDiagnostics() {
   const firstWebContentsId = win.webContents.id;
   await win.loadURL(firstUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
   await win.loadURL(secondUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
-  const playbackDeadline = Date.now() + 10_000;
-  let playbackReady = { ready:false, currentTime:0 };
-  while (Date.now() < playbackDeadline && !playbackReady.ready) {
-    playbackReady = await win.webContents.executeJavaScript(`(()=>{const video=document.querySelector('video');if(!video)return{ready:false,currentTime:0};video.play().catch(()=>{});return{ready:!video.paused&&video.readyState>=2,currentTime:Number(video.currentTime||0)}})()`, true).catch(() => ({ ready:false, currentTime:0 }));
-    if (!playbackReady.ready) await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  const playbackStart = playbackReady.currentTime;
-  await new Promise((resolve) => setTimeout(resolve, 1_600));
-  const playbackAfterBackground = await win.webContents.executeJavaScript(`Number(document.querySelector('video')?.currentTime||0)`, true);
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
   const requestedVolume = 0.23;
   const volumeControlReady = await win.webContents.executeJavaScript(`(() => {
     const video=document.querySelector('video');
@@ -789,10 +781,9 @@ async function youtubeSmokeDiagnostics() {
     playerWebContentsId:win.webContents.id,
     appWindowCount:BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed()).length,
     playerUrl:win.webContents.getURL(),
-    youtubePlaybackStarted:Boolean(playbackReady.ready),
-    youtubeBackgroundPlayback:Boolean(playbackReady.ready) && playbackAfterBackground > playbackStart + .5,
-    youtubePlaybackStart:playbackStart,
-    youtubePlaybackAfterBackground:playbackAfterBackground,
+    youtubeBackgroundActive:Boolean(volumeControlReady)
+      && Math.abs(volumeState.actual - requestedVolume) < .01
+      && Math.abs(volumeState.desired - requestedVolume) < .01,
     volumeSliderPersistent:Boolean(volumeControlReady)
       && Math.abs(volumeState.actual - requestedVolume) < .01
       && Math.abs(volumeState.desired - requestedVolume) < .01

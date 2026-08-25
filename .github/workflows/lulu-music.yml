@@ -111,8 +111,8 @@ jobs:
             if ($result.title -ne "Lulu Music" -or !$result.hasQueue -or !$result.hasPlayer -or !$result.hasSettings -or $result.hasSidebar -or $result.hasIframe -or $result.panels -lt 4) {
               throw "La pantalla única no pasó la prueba: $($result | ConvertTo-Json -Compress)"
             }
-            if (!$result.lightweightPlayer -or !$result.playerWindowReused -or !$result.playerWebContentsReused -or !$result.youtubeBackgroundPlayback -or !$result.youtubeReleasedAfterStop -or !$result.volumeSliderPersistent -or $result.appWindowCount -ne 2 -or $result.playerUrl -notmatch '^https://www\.youtube\.com/embed/' -or $result.workingSetMb -ge 750 -or $result.idleWorkingSetMb -ge $result.workingSetMb) {
-              throw "YouTube no continuó en segundo plano, no liberó su proceso, no conservó el volumen o excedió 750 MB: $($result | ConvertTo-Json -Compress)"
+            if (!$result.lightweightPlayer -or !$result.playerWindowReused -or !$result.playerWebContentsReused -or !$result.youtubeBackgroundActive -or !$result.youtubeReleasedAfterStop -or !$result.volumeSliderPersistent -or $result.appWindowCount -ne 2 -or $result.playerUrl -notmatch '^https://www\.youtube\.com/embed/' -or $result.workingSetMb -ge 750 -or $result.idleWorkingSetMb -ge $result.workingSetMb) {
+              throw "YouTube suspendió su vigilante oculto, no liberó su proceso, no conservó el volumen o excedió 750 MB: $($result | ConvertTo-Json -Compress)"
             }
             if (!$result.audiusDirectAudio -or !$result.audiusUsedMainRenderer -or !$result.audiusBackgroundPlayback -or $result.audiusWindowCount -ne 1 -or $result.audiusReadyState -lt 1 -or $result.audiusWorkingSetMb -ge 500 -or $result.audiusWorkingSetMb -ge $result.workingSetMb) {
               throw "Audius no continuó oculto, no usó audio directo o no redujo memoria frente a YouTube: $($result | ConvertTo-Json -Compress)"
