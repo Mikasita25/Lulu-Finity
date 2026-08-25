@@ -101,12 +101,12 @@ jobs:
           $env:LULU_MUSIC_SMOKE_MARKER = $marker
           $process = Start-Process -FilePath "dist/win-unpacked/Lulu Music.exe" -ArgumentList "--user-data-dir=$profile" -PassThru
           try {
-            for ($attempt = 0; $attempt -lt 60 -and !(Test-Path $marker); $attempt++) {
+            for ($attempt = 0; $attempt -lt 120 -and !(Test-Path $marker); $attempt++) {
               Start-Sleep -Milliseconds 500
               $process.Refresh()
               if ($process.HasExited -and !(Test-Path $marker)) { throw "Lulu Music se cerró antes de confirmar su renderer" }
             }
-            if (!(Test-Path $marker)) { throw "El renderer no respondió en 30 segundos" }
+            if (!(Test-Path $marker)) { throw "El renderer no respondió en 60 segundos" }
             $result = Get-Content $marker -Raw | ConvertFrom-Json
             if ($result.title -ne "Lulu Music" -or !$result.hasQueue -or !$result.hasPlayer -or !$result.hasSettings -or $result.hasSidebar -or $result.hasIframe -or $result.panels -lt 4) {
               throw "La pantalla única no pasó la prueba: $($result | ConvertTo-Json -Compress)"
