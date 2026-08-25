@@ -19,6 +19,7 @@ const MAX_CLIENTS = Math.max(1, Number(process.env.MAX_CLIENTS || 50));
 const MAX_ATTEMPTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_CONNECTION_ATTEMPTS_PER_MINUTE || 30));
 const MAX_TTS_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_TTS_REQUESTS_PER_MINUTE || 90));
 const MAX_TTS_CONCURRENT = Math.max(1, Number(process.env.MAX_TTS_CONCURRENT || 4));
+const RELAY_BUILD = 'microsoft-tts-node-v1';
 const UPSTREAM_OPEN_TIMEOUT_MS = Math.max(3000, Number(process.env.UPSTREAM_OPEN_TIMEOUT_MS || 18000));
 const DAILY_USAGE_LIMIT = Math.max(1, Number(process.env.DAILY_USAGE_LIMIT || 7500));
 const USAGE_PER_CONNECTION = Math.max(0.1, Number(process.env.USAGE_PER_CONNECTION || 2));
@@ -283,6 +284,7 @@ async function handleHttpRequest(request, response) {
     response.end(JSON.stringify({
       ok: true,
       service: 'lulu-finity-railway-relay',
+      build: RELAY_BUILD,
       uptimeSeconds: Math.round(process.uptime()),
       clients: activeClients,
       tts: { provider: 'microsoft-edge', activeRequests: activeTtsRequests, voices: MICROSOFT_VOICES.length },
