@@ -71,6 +71,19 @@ test('YouTube usa una sola ventana ligera y nunca carga la página completa', ()
   assert.doesNotMatch(source('../package.json'), /@ghostery/);
 });
 
+test('la barra de Lulu conserva el control del volumen de YouTube y Audius', () => {
+  const main = source('main.js');
+  const renderer = source('renderer.js');
+  assert.match(main, /window\.__luluMusicVolume=desired/);
+  assert.match(main, /const applyVolume=\(\)=>/);
+  assert.match(main, /if\(Math\.abs\(video\.volume-desired\)>\.001\)video\.volume=desired/);
+  assert.match(main, /win\.webContents\.setAudioMuted\(false\)/);
+  assert.doesNotMatch(main, /video\.volume=\$\{JSON\.stringify\(settings\.volume\)\};video\.muted=false/);
+  assert.doesNotMatch(main, /action === 'volume'\) \{ await setPlayerVolume\(value\); await writeSettings\(\)/);
+  assert.match(renderer, /function volumePercent\(value\)/);
+  assert.doesNotMatch(renderer, /Number\(settings\.volume\) \|\| 0\.8/);
+});
+
 test('Audius usa audio directo en el renderer existente y automático conserva fallback a YouTube', () => {
   const main = source('main.js');
   const renderer = source('renderer.js');

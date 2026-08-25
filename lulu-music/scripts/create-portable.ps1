@@ -3,7 +3,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 
 $project = Split-Path $PSScriptRoot -Parent
 $source = Join-Path $project "dist/win-unpacked"
-$target = Join-Path $project "dist/Lulu-Music-1.0.1-x64.zip"
+$target = Join-Path $project "dist/Lulu-Music-1.0.2-x64.zip"
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ("lulu-music-portable-" + [Guid]::NewGuid().ToString("N"))
 
 foreach ($required in @(
