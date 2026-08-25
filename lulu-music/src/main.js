@@ -408,6 +408,7 @@ function createYoutubeWindow() {
     }
   });
   youtubeWindow = win;
+  win.webContents.setAudioMuted(false);
   win.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
   win.webContents.on('will-navigate', (event, url) => { if (!isYoutubeEmbedUrl(url)) event.preventDefault(); });
   win.webContents.on('did-finish-load', () => {
@@ -465,10 +466,20 @@ async function installYoutubeWatcher(nonce, attempt) {
       window.__luluMusicCleanup?.();
       const video=document.querySelector('video');
       if(!video)return false;
+      const initialVolume=${JSON.stringify(settings.volume)};
+      const normalizeVolume=(value)=>Math.max(0,Math.min(1,Number(value)));
+      window.__luluMusicVolume=Number.isFinite(Number(window.__luluMusicVolume))
+        ? normalizeVolume(window.__luluMusicVolume)
+        : initialVolume;
+      const applyVolume=()=>{
+        const desired=normalizeVolume(window.__luluMusicVolume);
+        if(Math.abs(video.volume-desired)>.001)video.volume=desired;
+        if(video.muted)video.muted=false;
+      };
       let ended=false;
       const report=()=>{
         const ad=Boolean(document.querySelector('.html5-video-player.ad-showing,.html5-video-player.ad-interrupting'));
-        video.volume=${JSON.stringify(settings.volume)};video.muted=false;
+        applyVolume();
         const payload={currentTime:video.currentTime,duration:video.duration,paused:video.paused};
         console.info('__LULU_MUSIC_PLAYER__:${nonce}:'+encodeURIComponent(JSON.stringify(payload)));
         if(!ad&&video.ended&&!ended){ended=true;console.info('__LULU_MUSIC_ENDED__:${nonce}')}
@@ -493,7 +504,16 @@ async function setPlayerVolume(value) {
   }
   const win = activePlayerWindow();
   if (!win || win.isDestroyed()) return { ok:true, deferred:true };
-  return win.webContents.executeJavaScript(`(() => {const video=document.querySelector('video');if(!video)return{ok:false};video.volume=${JSON.stringify(settings.volume)};video.muted=false;return{ok:true}})()`, true);
+  win.webContents.setAudioMuted(false);
+  return win.webContents.executeJavaScript(`(() => {
+    const desired=${JSON.stringify(settings.volume)};
+    window.__luluMusicVolume=desired;
+    const video=document.querySelector('video');
+    if(!video)return{ok:false,deferred:true,volume:desired};
+    video.volume=desired;
+    video.muted=false;
+    return{ok:true,volume:video.volume,muted:video.muted};
+  })()`, true);
 }
 
 async function playerControl(action, value) {
@@ -505,7 +525,7 @@ async function playerControl(action, value) {
     }
     advanceQueue(); return currentState();
   }
-  if (action === 'volume') { await setPlayerVolume(value); await writeSettings(); broadcastState(); return currentState(); }
+  if (action === 'volume') { await setPlayerVolume(value); broadcastState(); return currentState(); }
   if (playback.current?.provider === 'audius') {
     if (!playback.current) throw new Error('No hay una canción activa.');
     send('audius:command', { action, nonce:playerNonce });
@@ -693,6 +713,20 @@ async function youtubeSmokeDiagnostics() {
   await win.loadURL(firstUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
   await win.loadURL(secondUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
   await new Promise((resolve) => setTimeout(resolve, 2_000));
+  const requestedVolume = 0.23;
+  const volumeControlReady = await win.webContents.executeJavaScript(`(() => {
+    const video=document.querySelector('video');
+    if(!video||typeof window.__luluMusicCleanup!=='function')return false;
+    window.__luluMusicVolume=${requestedVolume};
+    video.volume=${requestedVolume};
+    video.muted=false;
+    return true;
+  })()`, true).catch(() => false);
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  const volumeState = await win.webContents.executeJavaScript(`(() => {
+    const video=document.querySelector('video');
+    return{actual:Number(video?.volume),desired:Number(window.__luluMusicVolume),muted:Boolean(video?.muted)};
+  })()`, true).catch(() => ({ actual:NaN, desired:NaN, muted:true }));
   const workingSetKb = app.getAppMetrics().reduce((total, metric) => total + (Number(metric.memory?.workingSetSize) || 0), 0);
   return {
     lightweightPlayer:true,
@@ -702,6 +736,11 @@ async function youtubeSmokeDiagnostics() {
     playerWebContentsId:win.webContents.id,
     appWindowCount:BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed()).length,
     playerUrl:win.webContents.getURL(),
+    volumeSliderPersistent:Boolean(volumeControlReady)
+      && Math.abs(volumeState.actual - requestedVolume) < .01
+      && Math.abs(volumeState.desired - requestedVolume) < .01
+      && !volumeState.muted,
+    measuredYoutubeVolume:volumeState.actual,
     workingSetMb:Math.round(workingSetKb / 1024)
   };
 }

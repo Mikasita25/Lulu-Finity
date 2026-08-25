@@ -1,4 +1,4 @@
-Lulu Music 1.0.1
+Lulu Music 1.0.2
 
 Copyright (C) 2026 Mikasita25.
 Licensed under GNU AGPL-3.0-or-later.

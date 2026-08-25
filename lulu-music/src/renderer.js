@@ -28,6 +28,12 @@ function formatTime(seconds) {
   return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
 }
 
+function volumePercent(value) {
+  const number = Number(value);
+  const volume = Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0.8;
+  return Math.round(volume * 100);
+}
+
 function showToast(message) {
   const toast = $('toast');
   toast.textContent = String(message || '');
@@ -130,7 +136,7 @@ function renderSettings(settings = {}) {
   $('continueRecommended').checked = Boolean(settings.continueRecommended);
   $('continueRecommended').disabled = settings.provider === 'audius';
   $('continueRecommended').closest('.toggle-card').classList.toggle('is-disabled', settings.provider === 'audius');
-  $('volumeRange').value = String(Math.round((Number(settings.volume) || 0.8) * 100));
+  $('volumeRange').value = String(volumePercent(settings.volume));
   $('volumeValue').textContent = `${$('volumeRange').value}%`;
   $('selectedUsersField').classList.toggle('hidden-field', settings.permission !== 'selected');
 }
@@ -139,7 +145,7 @@ function renderState(next) {
   if (!next) return;
   const first = !appState;
   appState = next;
-  $('appVersion').textContent = next.version || '1.0.1';
+  $('appVersion').textContent = next.version || '1.0.2';
   renderLive(next.live);
   renderNow(next.playback);
   renderQueue(next.queue || []);
