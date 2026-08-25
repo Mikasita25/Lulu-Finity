@@ -1,5 +1,11 @@
 # Cambios
 
+## 1.3.1
+
+- Corrige la conexión directa con Microsoft Edge TTS usando los encabezados actuales del servicio y una cookie MUID nueva en cada intento.
+- Reintenta una vez la apertura del canal cuando Microsoft rechaza temporalmente la primera sesión.
+- Mantiene la coordinación de audio de la versión 1.3.0 para que la voz y la música no se cancelen entre sí.
+
 ## 1.3.0
 
 - Interfaz móvil reorganizada con nombres simples y descripciones más claras.
