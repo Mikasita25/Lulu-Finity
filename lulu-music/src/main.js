@@ -1,12 +1,11 @@
 'use strict';
 
 const electron = process.env.LULU_MUSIC_UNIT_TEST === '1' ? {} : require('electron');
-const { app, BrowserWindow, ipcMain, shell, session, powerSaveBlocker } = electron;
+const { app, BrowserWindow, ipcMain, Menu, shell, session, powerSaveBlocker } = electron;
 const { EventEmitter } = require('events');
 const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
-const WebSocket = require('ws');
 const { MAX_RELAY_FRAME_BYTES, RelayProtocolError, parseRelayFrame } = require('./relay-protocol');
 const { LIVE_RECONNECT_DELAYS_MS, shouldReconnectLive, liveReconnectDelay } = require('./live-reconnect-policy');
 const { normalizeUsername, normalizeMusicCommand, parseMusicCommand, requesterAllowed, blockedRequest } = require('./music-command-policy');
@@ -17,6 +16,7 @@ const fsp = fs.promises;
 const RELAY_URL = 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live';
 const RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';
 const YOUTUBE_PARTITION = 'persist:lulu-music-youtube';
+const YOUTUBE_REPORT_INTERVAL_MS = 1_500;
 const PROVIDERS = new Set(['auto','audius','youtube']);
 const PERMISSIONS = new Set(['all','followers','subscribers','selected']);
 
@@ -36,6 +36,7 @@ let youtubeRequestIdentityInstalled = false;
 let youtubeRecentIds = [];
 let liveConnection = null;
 let connectorModule = null;
+let webSocketConstructor = null;
 let liveNonce = 0;
 let liveReconnectTimer = null;
 let liveReconnectAttempt = 0;
@@ -157,6 +158,19 @@ function refreshPowerBlocker() {
   }
 }
 
+function appMemorySnapshot() {
+  const processes = app.getAppMetrics().map((metric) => ({
+    type:String(metric.type || 'Unknown'),
+    workingSetMb:Math.round((Number(metric.memory?.workingSetSize) || 0) / 1024),
+    privateMb:Math.round((Number(metric.memory?.privateBytes) || 0) / 1024)
+  }));
+  return {
+    workingSetMb:processes.reduce((total, metric) => total + metric.workingSetMb, 0),
+    privateMb:processes.reduce((total, metric) => total + metric.privateMb, 0),
+    processes
+  };
+}
+
 function requesterLabel(user) {
   return String(user?.nickname || user?.displayName || user?.uniqueId || '').trim().slice(0, 80);
 }
@@ -223,9 +237,9 @@ function advanceQueue({ natural = false } = {}) {
     return;
   }
   stopAudiusPlayback();
-  void pauseYoutubePlayback();
   playerNonce += 1;
   const next = musicQueue.shift() || null;
+  void pauseYoutubePlayback({ release:!next });
   playback = { current:next, loading:Boolean(next), paused:!next, currentTime:0, duration:0 };
   broadcastState();
   if (next) void startCurrentSong();
@@ -400,11 +414,11 @@ function createYoutubeWindow() {
   if (youtubeWindow && !youtubeWindow.isDestroyed()) return youtubeWindow;
   installYoutubeRequestIdentity();
   const win = new BrowserWindow({
-    width:854,height:480,minWidth:480,minHeight:270,show:false,skipTaskbar:true,autoHideMenuBar:true,
+    width:854,height:480,minWidth:480,minHeight:270,show:false,paintWhenInitiallyHidden:false,skipTaskbar:true,autoHideMenuBar:true,
     title:'Reproductor ligero — Lulu Music',backgroundColor:'#000000',
     webPreferences:{
       contextIsolation:true,nodeIntegration:false,sandbox:true,autoplayPolicy:'no-user-gesture-required',
-      backgroundThrottling:false,partition:YOUTUBE_PARTITION
+      backgroundThrottling:true,partition:YOUTUBE_PARTITION
     }
   });
   youtubeWindow = win;
@@ -484,8 +498,10 @@ async function installYoutubeWatcher(nonce, attempt) {
         console.info('__LULU_MUSIC_PLAYER__:${nonce}:'+encodeURIComponent(JSON.stringify(payload)));
         if(!ad&&video.ended&&!ended){ended=true;console.info('__LULU_MUSIC_ENDED__:${nonce}')}
       };
-      const timer=setInterval(report,650);video.play().catch(()=>{});report();
-      window.__luluMusicCleanup=()=>{clearInterval(timer);delete window.__luluMusicCleanup};
+      const onEnded=()=>{if(ended)return;ended=true;console.info('__LULU_MUSIC_ENDED__:${nonce}')};
+      video.addEventListener('ended',onEnded);
+      const timer=setInterval(report,${YOUTUBE_REPORT_INTERVAL_MS});video.play().catch(()=>{});report();
+      window.__luluMusicCleanup=()=>{clearInterval(timer);video.removeEventListener('ended',onEnded);delete window.__luluMusicCleanup};
       return true;
     })()`, true);
     if (installed) return;
@@ -560,6 +576,11 @@ function cleanRelayUrl(value) {
   return url.toString();
 }
 
+function relayWebSocket() {
+  if (!webSocketConstructor) webSocketConstructor = require('ws');
+  return webSocketConstructor;
+}
+
 class MusicRelayConnection extends EventEmitter {
   constructor(username, events) {
     super(); this.uniqueId=normalizeUsername(username); this.events=events; this.socket=null; this.roomId='relay'; this.isConnected=false; this.violations=0; this.rateStarted=0; this.rateCount=0;
@@ -581,7 +602,8 @@ class MusicRelayConnection extends EventEmitter {
       let settled=false;let opened=false;const ready=()=>{if(settled||!opened)return;settled=true;clearTimeout(timer);this.isConnected=true;resolve({roomId:this.roomId,isConnected:true})};
       const fail=(error)=>{if(settled)return;settled=true;clearTimeout(timer);reject(error instanceof Error?error:new Error(String(error)))};
       const timer=setTimeout(()=>fail(new Error('El relay no respondió en 24 segundos.')),24000);
-      this.socket=new WebSocket(url,{headers:{Authorization:`Bearer ${RELAY_CLIENT_TOKEN}`,'User-Agent':`Lulu-Music/${app.getVersion()}`},handshakeTimeout:16000,maxPayload:MAX_RELAY_FRAME_BYTES,perMessageDeflate:false,followRedirects:false});
+      const RelayWebSocket=relayWebSocket();
+      this.socket=new RelayWebSocket(url,{headers:{Authorization:`Bearer ${RELAY_CLIENT_TOKEN}`,'User-Agent':`Lulu-Music/${app.getVersion()}`},handshakeTimeout:16000,maxPayload:MAX_RELAY_FRAME_BYTES,perMessageDeflate:false,followRedirects:false});
       this.socket.on('open',()=>{opened=true;this.emit(this.events.ControlEvent.WEBSOCKET_CONNECTED);setTimeout(ready,1800)});
       this.socket.on('message',(raw,isBinary)=>{try{if(isBinary)throw new RelayProtocolError('binary_frame','Paquete binario rechazado.');const messages=parseRelayFrame(raw);const now=Date.now();if(!this.rateStarted||now-this.rateStarted>=1000){this.rateStarted=now;this.rateCount=0}this.rateCount+=messages.length;if(this.rateCount>500)throw new RelayProtocolError('rate_limit','Demasiados eventos.');let valid=false;for(const message of messages)valid=this.emitMessage(message)||valid;if(valid)ready()}catch(error){this.violations+=1;if(this.violations>=3)this.socket?.close(1008,'Protocolo rechazado')}});
       this.socket.on('error',(error)=>{this.emit(this.events.ControlEvent.ERROR,error);fail(error)});
@@ -682,25 +704,33 @@ async function audiusSmokeDiagnostics() {
     while (Date.now() < deadline && playback.current?.id === item.id && playback.loading) {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    const rendererAudio = await mainWindow.webContents.executeJavaScript(`(() => {const audio=document.getElementById('audiusPlayer');const clean=(value)=>{try{const url=new URL(value);return url.origin+url.pathname}catch{return''}};return{exists:Boolean(audio),readyState:Number(audio?.readyState||0),networkState:Number(audio?.networkState||0),errorCode:Number(audio?.error?.code||0),errorMessage:String(audio?.error?.message||''),paused:Boolean(audio?.paused),source:clean(audio?.currentSrc||audio?.src),hasSource:Boolean(audio?.currentSrc||audio?.src)}})()`, true);
+    const rendererAudio = await mainWindow.webContents.executeJavaScript(`(() => {const audio=document.getElementById('audiusPlayer');const clean=(value)=>{try{const url=new URL(value);return url.origin+url.pathname}catch{return''}};return{exists:Boolean(audio),readyState:Number(audio?.readyState||0),networkState:Number(audio?.networkState||0),errorCode:Number(audio?.error?.code||0),errorMessage:String(audio?.error?.message||''),paused:Boolean(audio?.paused),currentTime:Number(audio?.currentTime||0),source:clean(audio?.currentSrc||audio?.src),hasSource:Boolean(audio?.currentSrc||audio?.src)}})()`, true);
     if (playback.current?.id !== item.id || playback.current?.provider !== 'audius' || playback.loading) {
       throw new Error(`El audio directo de Audius no confirmó su carga: ${JSON.stringify(rendererAudio)}`);
     }
     if (!rendererAudio.exists || rendererAudio.readyState < 1 || !rendererAudio.hasSource) throw new Error('El elemento de audio de Audius no quedó activo.');
-    const workingSetKb = app.getAppMetrics().reduce((total, metric) => total + (Number(metric.memory?.workingSetSize) || 0), 0);
+    mainWindow.hide();
+    await new Promise((resolve) => setTimeout(resolve, 1_600));
+    const hiddenCurrentTime = await mainWindow.webContents.executeJavaScript(`Number(document.getElementById('audiusPlayer')?.currentTime||0)`, true);
+    mainWindow.show();
+    const memory = appMemorySnapshot();
     return {
       audiusDirectAudio:true,
       audiusUsedMainRenderer:true,
       audiusWindowCount:BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed()).length,
       audiusTrackId:resolved.trackId,
       audiusReadyState:rendererAudio.readyState,
-      audiusWorkingSetMb:Math.round(workingSetKb / 1024)
+      audiusBackgroundPlayback:hiddenCurrentTime > rendererAudio.currentTime + .5,
+      audiusWorkingSetMb:memory.workingSetMb,
+      audiusPrivateMb:memory.privateMb,
+      audiusProcessMemory:memory.processes
     };
   } finally {
     stopAudiusPlayback();
     playerNonce += 1;
     playback = { current:null, loading:false, paused:true, currentTime:0, duration:0 };
     settings.volume = previousVolume;
+    refreshPowerBlocker();
   }
 }
 
@@ -708,27 +738,32 @@ async function youtubeSmokeDiagnostics() {
   const firstUrl = `${youtubeEmbedUrl('M7lc1UVf-VE')}&start=0`;
   const secondUrl = `${youtubeEmbedUrl('M7lc1UVf-VE')}&start=1`;
   const win = createYoutubeWindow();
+  playback = { current:{ id:randomUUID(), query:'Prueba de YouTube', provider:'youtube', requestedProvider:'youtube' }, loading:false, paused:false, currentTime:0, duration:0 };
+  refreshPowerBlocker();
   const firstWindowId = win.id;
   const firstWebContentsId = win.webContents.id;
   await win.loadURL(firstUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
   await win.loadURL(secondUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
   await new Promise((resolve) => setTimeout(resolve, 2_000));
+  const playbackStart = await win.webContents.executeJavaScript(`Number(document.querySelector('video')?.currentTime||0)`, true);
+  await new Promise((resolve) => setTimeout(resolve, 1_600));
+  const playbackAfterBackground = await win.webContents.executeJavaScript(`Number(document.querySelector('video')?.currentTime||0)`, true);
   const requestedVolume = 0.23;
   const volumeControlReady = await win.webContents.executeJavaScript(`(() => {
     const video=document.querySelector('video');
     if(!video||typeof window.__luluMusicCleanup!=='function')return false;
     window.__luluMusicVolume=${requestedVolume};
-    video.volume=${requestedVolume};
+    video.volume=.77;
     video.muted=false;
     return true;
   })()`, true).catch(() => false);
-  await new Promise((resolve) => setTimeout(resolve, 900));
+  await new Promise((resolve) => setTimeout(resolve, YOUTUBE_REPORT_INTERVAL_MS + 300));
   const volumeState = await win.webContents.executeJavaScript(`(() => {
     const video=document.querySelector('video');
     return{actual:Number(video?.volume),desired:Number(window.__luluMusicVolume),muted:Boolean(video?.muted)};
   })()`, true).catch(() => ({ actual:NaN, desired:NaN, muted:true }));
-  const workingSetKb = app.getAppMetrics().reduce((total, metric) => total + (Number(metric.memory?.workingSetSize) || 0), 0);
-  return {
+  const memory = appMemorySnapshot();
+  const result = {
     lightweightPlayer:true,
     playerWindowReused:firstWindowId === win.id,
     playerWebContentsReused:firstWebContentsId === win.webContents.id,
@@ -736,20 +771,33 @@ async function youtubeSmokeDiagnostics() {
     playerWebContentsId:win.webContents.id,
     appWindowCount:BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed()).length,
     playerUrl:win.webContents.getURL(),
+    youtubeBackgroundPlayback:playbackAfterBackground > playbackStart + .5,
     volumeSliderPersistent:Boolean(volumeControlReady)
       && Math.abs(volumeState.actual - requestedVolume) < .01
       && Math.abs(volumeState.desired - requestedVolume) < .01
       && !volumeState.muted,
     measuredYoutubeVolume:volumeState.actual,
-    workingSetMb:Math.round(workingSetKb / 1024)
+    workingSetMb:memory.workingSetMb,
+    youtubePrivateMb:memory.privateMb,
+    youtubeProcessMemory:memory.processes
   };
+  await pauseYoutubePlayback({ release:true });
+  playback = { current:null, loading:false, paused:true, currentTime:0, duration:0 };
+  refreshPowerBlocker();
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
+  const idleMemory = appMemorySnapshot();
+  result.youtubeReleasedAfterStop = !youtubeWindow && BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed()).length === 1;
+  result.idleWorkingSetMb = idleMemory.workingSetMb;
+  result.idlePrivateMb = idleMemory.privateMb;
+  result.idleProcessMemory = idleMemory.processes;
+  return result;
 }
 
 function createMainWindow() {
   rendererReady=false;
   mainWindow=new BrowserWindow({
     width:1380,height:900,minWidth:920,minHeight:720,show:false,autoHideMenuBar:true,backgroundColor:'#090812',title:'Lulu Music',
-    webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required',spellcheck:false}
+    webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:true,autoplayPolicy:'no-user-gesture-required',spellcheck:false,imageAnimationPolicy:'noAnimation'}
   });
   mainWindow.webContents.setWindowOpenHandler(({url})=>{/^https?:\/\//i.test(url)&&void shell.openExternal(url);return{action:'deny'}});
   mainWindow.webContents.on('will-navigate',(event,url)=>{if(url!==mainWindow.webContents.getURL())event.preventDefault()});
@@ -790,6 +838,7 @@ if(process.env.LULU_MUSIC_UNIT_TEST!=='1'){
   else{
     app.on('second-instance',()=>{if(mainWindow){if(mainWindow.isMinimized())mainWindow.restore();mainWindow.show();mainWindow.focus()}});
     app.whenReady().then(async()=>{
+      Menu.setApplicationMenu(null);
       session.defaultSession.setPermissionRequestHandler((_webContents,_permission,callback)=>callback(false));
       await loadSettings();registerIpc();createMainWindow();
     }).catch((error)=>{console.error(error);app.quit()});

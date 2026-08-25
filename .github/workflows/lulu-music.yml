@@ -80,7 +80,7 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $exe = "dist/win-unpacked/Lulu Music.exe"
           $asar = "dist/win-unpacked/resources/app.asar"
-          foreach ($file in @($exe,$asar,"dist/Lulu-Music-Setup-1.0.2.exe","dist/Lulu-Music-1.0.2-x64.zip")) {
+          foreach ($file in @($exe,$asar,"dist/Lulu-Music-Setup-1.0.3.exe","dist/Lulu-Music-1.0.3-x64.zip")) {
             if (!(Test-Path $file)) { throw "No se generó $file" }
           }
           $listing = & node_modules/.bin/asar list $asar
@@ -111,11 +111,11 @@ jobs:
             if ($result.title -ne "Lulu Music" -or !$result.hasQueue -or !$result.hasPlayer -or !$result.hasSettings -or $result.hasSidebar -or $result.hasIframe -or $result.panels -lt 4) {
               throw "La pantalla única no pasó la prueba: $($result | ConvertTo-Json -Compress)"
             }
-            if (!$result.lightweightPlayer -or !$result.playerWindowReused -or !$result.playerWebContentsReused -or !$result.volumeSliderPersistent -or $result.appWindowCount -ne 2 -or $result.playerUrl -notmatch '^https://www\.youtube\.com/embed/' -or $result.workingSetMb -ge 750) {
-              throw "El reproductor ligero no reutilizó su proceso, no conservó el volumen o excedió 750 MB: $($result | ConvertTo-Json -Compress)"
+            if (!$result.lightweightPlayer -or !$result.playerWindowReused -or !$result.playerWebContentsReused -or !$result.youtubeBackgroundPlayback -or !$result.youtubeReleasedAfterStop -or !$result.volumeSliderPersistent -or $result.appWindowCount -ne 2 -or $result.playerUrl -notmatch '^https://www\.youtube\.com/embed/' -or $result.workingSetMb -ge 750 -or $result.idleWorkingSetMb -ge $result.workingSetMb) {
+              throw "YouTube no continuó en segundo plano, no liberó su proceso, no conservó el volumen o excedió 750 MB: $($result | ConvertTo-Json -Compress)"
             }
-            if (!$result.audiusDirectAudio -or !$result.audiusUsedMainRenderer -or $result.audiusWindowCount -ne 1 -or $result.audiusReadyState -lt 1 -or $result.audiusWorkingSetMb -ge 500 -or $result.audiusWorkingSetMb -ge $result.workingSetMb) {
-              throw "Audius no usó audio directo o no redujo memoria frente a YouTube: $($result | ConvertTo-Json -Compress)"
+            if (!$result.audiusDirectAudio -or !$result.audiusUsedMainRenderer -or !$result.audiusBackgroundPlayback -or $result.audiusWindowCount -ne 1 -or $result.audiusReadyState -lt 1 -or $result.audiusWorkingSetMb -ge 500 -or $result.audiusWorkingSetMb -ge $result.workingSetMb) {
+              throw "Audius no continuó oculto, no usó audio directo o no redujo memoria frente a YouTube: $($result | ConvertTo-Json -Compress)"
             }
             Write-Host "LULU_MUSIC_PLAYER_METRICS:$($result | ConvertTo-Json -Compress)"
           }
@@ -127,10 +127,10 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: Lulu-Music-1.0.2-Windows
+          name: Lulu-Music-1.0.3-Windows
           path: |
-            lulu-music/dist/Lulu-Music-Setup-1.0.2.exe
-            lulu-music/dist/Lulu-Music-1.0.2-x64.zip
+            lulu-music/dist/Lulu-Music-Setup-1.0.3.exe
+            lulu-music/dist/Lulu-Music-1.0.3-x64.zip
           if-no-files-found: error
 
   release:
@@ -142,20 +142,20 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: Lulu-Music-1.0.2-Windows
+          name: Lulu-Music-1.0.3-Windows
           path: release-assets
-      - name: Publicar Lulu Music 1.0.2
+      - name: Publicar Lulu Music 1.0.3
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_NOTES: |
-            - La barra de Lulu controla de forma permanente el volumen de YouTube y Audius.
-            - El reproductor ya no restaura el volumen anterior después de mover la barra.
-            - El volumen en 0% se conserva correctamente al reiniciar.
+            - Libera por completo el proceso de YouTube cuando termina la cola.
+            - Reduce los redibujados y actualizaciones repetidas de la interfaz.
+            - Mantiene el LIVE y la música activos aunque la ventana esté oculta o minimizada.
         run: |
-          gh release create "lulu-music-v1.0.2" \
-            "release-assets/Lulu-Music-Setup-1.0.2.exe#Instalador de Lulu Music 1.0.2" \
-            "release-assets/Lulu-Music-1.0.2-x64.zip#Lulu Music 1.0.2 portable" \
+          gh release create "lulu-music-v1.0.3" \
+            "release-assets/Lulu-Music-Setup-1.0.3.exe#Instalador de Lulu Music 1.0.3" \
+            "release-assets/Lulu-Music-1.0.3-x64.zip#Lulu Music 1.0.3 portable" \
             --target "$GITHUB_SHA" \
-            --title "Lulu Music 1.0.2" \
+            --title "Lulu Music 1.0.3" \
             --notes "$RELEASE_NOTES"
