@@ -39,12 +39,19 @@ jobs:
       - name: Probar endpoints de uso diario
         working-directory: railway-relay
         run: |
-          EULER_API_KEYS='["dummy-key"]' PORT=3210 USAGE_STATE_FILE=/tmp/lulu-usage-ci.json node src/public-server.js > /tmp/lulu-relay.log 2>&1 &
+          EULER_API_KEYS='["dummy-key"]' TTS_CLIENT_TOKENS='ci-tts-token' PORT=3210 USAGE_STATE_FILE=/tmp/lulu-usage-ci.json node src/public-server.js > /tmp/lulu-relay.log 2>&1 &
           RELAY_PID=$!
           trap 'kill $RELAY_PID 2>/dev/null || true' EXIT
           for i in {1..30}; do curl --fail --silent http://127.0.0.1:3210/health > /tmp/health.json && break; sleep 0.2; done
           curl --fail --silent http://127.0.0.1:3210/usage > /tmp/usage.json
+          curl --fail --silent http://127.0.0.1:3210/v1/tts/voices > /tmp/voices.json
+          TTS_STATUS=$(curl --silent --output /tmp/tts-unauthorized.json --write-out "%{http_code}" \
+            --request POST http://127.0.0.1:3210/v1/tts/microsoft \
+            --header "content-type: application/json" \
+            --data '{"text":"Prueba","voice":"es-MX-DaliaNeural"}')
           node -e "const u=require('/tmp/usage.json');if(!u.ok||u.limit!==7500||u.perConnection!==2)process.exit(1)"
+          node -e "const v=require('/tmp/voices.json');if(!v.ok||v.provider!=='microsoft-edge'||v.voices.length<10)process.exit(1)"
+          test "$TTS_STATUS" = "401"
 
       - name: Reconstruir parches 0.21 y 0.22
         run: |

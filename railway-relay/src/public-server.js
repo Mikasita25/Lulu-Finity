@@ -8,5 +8,5 @@ process.env.TTS_CLIENT_TOKENS =
 process.env.CLIENT_TOKENS = '';
 process.env.CLIENT_TOKEN = '';
 
-console.warn('[startup] Relay en modo público para clientes Lulu Finity; autenticación por token desactivada.');
+console.warn('[startup] Relay público Lulu Finity con Microsoft TTS ejecutándose en Node.');
 require('./server');
