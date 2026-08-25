@@ -78,7 +78,7 @@ export function MusicScreen({ navigation }: any) {
 
   return (
     <Screen>
-      <AppHeader title="Música" subtitle="Solicitudes automáticas, segundo plano y control de reproducción." />
+      <AppHeader title="Música" subtitle="Reproduce canciones y recibe solicitudes del chat." />
 
       <GlassCard>
         <View className="p-5">
@@ -87,7 +87,7 @@ export function MusicScreen({ navigation }: any) {
               <ListMusic size={20} color="#FF9DDA" />
             </View>
             <View className="flex-1">
-              <Text className="text-sm font-black text-white">Solicitudes del chat</Text>
+              <Text className="text-sm font-black text-white">Permitir solicitudes del chat</Text>
               <Text className="mt-1 text-xs leading-5 text-white/40">{commands}</Text>
             </View>
             <Switch
@@ -116,9 +116,9 @@ export function MusicScreen({ navigation }: any) {
           <ShieldCheck size={18} color="#86EFAC" />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-black text-white">Reproducción persistente</Text>
+          <Text className="text-sm font-black text-white">Sigue sonando en segundo plano</Text>
           <Text className="mt-1 text-xs leading-5 text-white/40">
-            Lulú mantiene una sesión multimedia de Android mientras hay música. Puedes minimizar la app o bloquear la pantalla sin desmontar el reproductor.
+            Puedes cambiar de app o bloquear la pantalla mientras hay una canción activa.
           </Text>
         </View>
       </View>
@@ -133,7 +133,7 @@ export function MusicScreen({ navigation }: any) {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Comando principal" />
+      <SectionTitle title="Comando para pedir canciones" />
       <GlassCard>
         <View className="p-5">
           <TextInput
@@ -151,7 +151,7 @@ export function MusicScreen({ navigation }: any) {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Agregar manualmente" />
+      <SectionTitle title="Agregar una canción" />
       <GlassCard>
         <View className="p-5">
           <TextInput

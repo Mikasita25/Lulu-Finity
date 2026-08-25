@@ -1,6 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View, type ViewStyle } from 'react-native';
 
 type Props = PropsWithChildren<{
   className?: string;
@@ -10,10 +9,9 @@ type Props = PropsWithChildren<{
 export function GlassCard({ children, className = '', style }: Props) {
   return (
     <View
-      className={`overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] ${className}`}
-      style={style}
+      className={`overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#17121B] ${className}`}
+      style={[{ shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 3 }, style]}
     >
-      <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
       <View>{children}</View>
     </View>
   );

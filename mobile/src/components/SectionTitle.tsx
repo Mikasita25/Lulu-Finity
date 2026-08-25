@@ -11,10 +11,10 @@ export function SectionTitle({
   right?: ReactNode;
 }) {
   return (
-    <View className="mb-3 mt-6 flex-row items-end justify-between gap-3">
+    <View className="mb-3 mt-7 flex-row items-end justify-between gap-3 px-0.5">
       <View className="flex-1">
-        <Text className="text-lg font-black text-white">{title}</Text>
-        {subtitle ? <Text className="mt-1 text-xs leading-5 text-white/50">{subtitle}</Text> : null}
+        <Text className="text-base font-black text-white">{title}</Text>
+        {subtitle ? <Text className="mt-1 text-xs leading-5 text-white/45">{subtitle}</Text> : null}
       </View>
       {right}
     </View>

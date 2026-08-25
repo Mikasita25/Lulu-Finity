@@ -23,10 +23,10 @@ type Draft = {
 
 const triggerOptions: { id: InteractionTriggerType; label: string; needsValue: boolean }[] = [
   { id: 'command', label: 'Comando', needsValue: true },
-  { id: 'fanSticker', label: 'Fan Sticker', needsValue: true },
+  { id: 'fanSticker', label: 'Sticker de fan', needsValue: true },
   { id: 'gift', label: 'Regalo', needsValue: true },
-  { id: 'follow', label: 'Follow', needsValue: false },
-  { id: 'share', label: 'Share', needsValue: false },
+  { id: 'follow', label: 'Nuevo seguidor', needsValue: false },
+  { id: 'share', label: 'Compartir', needsValue: false },
   { id: 'subscribe', label: 'Suscripción', needsValue: false },
   { id: 'member', label: 'Entrada', needsValue: false },
 ];
@@ -142,14 +142,14 @@ export function InteractionsScreen() {
 
   return (
     <Screen>
-      <AppHeader title="Automatizaciones" subtitle="Comandos, Fan Stickers y eventos del LIVE." />
+      <AppHeader title="Respuestas automáticas" subtitle="Elige qué debe hacer Lulú cuando ocurre algo en el LIVE." />
       <GlassCard className="mb-4">
         <View className="p-5">
           <View className="flex-row items-start gap-3">
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-lulu-500/20"><Zap size={20} color="#FF9DDA" /></View>
             <View className="flex-1">
-              <Text className="text-sm font-black text-white">Actions & Events móvil</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/45">Crea comandos como !hola o haz que un Fan Sticker específico reproduzca un audio, diga un TTS o haga ambas cosas.</Text>
+              <Text className="text-sm font-black text-white">Crea una reacción</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/45">Por ejemplo: al recibir un regalo, reproduce un sonido y di “Gracias”.</Text>
             </View>
           </View>
           <View className="mt-4 rounded-2xl bg-white/[0.045] p-4">

@@ -17,20 +17,20 @@ export function LiveBadge({ state }: { state: RelayState }) {
     state === 'connected'
       ? 'LIVE'
       : state === 'connecting'
-        ? 'CONECTANDO'
+          ? 'CONECTANDO'
         : state === 'rotating'
           ? 'RECONECTANDO'
           : state === 'offline'
-            ? 'OFFLINE'
+            ? 'SIN LIVE'
             : state === 'error'
-              ? 'ERROR'
-              : 'SIN CONEXIÓN';
+              ? 'REVISAR'
+              : 'SIN LIVE';
 
   return (
-    <View className="flex-row items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-2">
+    <View className={`flex-row items-center gap-2 rounded-full border px-3 py-2 ${connected ? 'border-emerald-400/20 bg-emerald-500/10' : 'border-white/[0.08] bg-white/[0.04]'}`}>
       <Animated.View
         style={dotStyle}
-        className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-red-500' : 'bg-white/30'}`}
+        className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-white/30'}`}
       />
       <Text className="text-[10px] font-black tracking-[1.5px] text-white/80">{label}</Text>
     </View>

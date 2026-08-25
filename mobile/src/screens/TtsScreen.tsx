@@ -107,7 +107,7 @@ export function TtsScreen() {
 
   return (
     <Screen>
-      <AppHeader title="TTS Bot" subtitle="Voces neuronales de Microsoft para tus comentarios de TikTok LIVE." />
+      <AppHeader title="Voz del chat" subtitle="Haz que Lulú lea los comentarios con voces de Microsoft." />
 
       <GlassCard>
         <View className="p-5">
@@ -116,9 +116,9 @@ export function TtsScreen() {
               <Bot size={22} color={accent} />
             </View>
             <View className="flex-1">
-              <Text className="text-base font-black text-white">Bot de comentarios</Text>
+              <Text className="text-base font-black text-white">Leer comentarios en voz alta</Text>
               <Text className="mt-1 text-xs leading-5 text-white/40">
-                Los comentarios se agregan a una cola corta para mantener la voz cerca del chat en tiempo real.
+                Mantiene una cola corta para no leer mensajes viejos ni quedarse atrás.
               </Text>
             </View>
             <Switch
@@ -131,7 +131,7 @@ export function TtsScreen() {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Qué debe leer" />
+      <SectionTitle title="Qué quieres escuchar" />
       <GlassCard>
         <View className="px-5">
           <ToggleRow
@@ -167,7 +167,7 @@ export function TtsScreen() {
         ))}
       </View>
 
-      <SectionTitle title="Voz" subtitle="Se genera en línea; ya no depende del motor de voz del celular." />
+      <SectionTitle title="Elige una voz" subtitle="Estas voces se reproducen directamente desde Microsoft." />
       <GlassCard>
         <View className="p-4">
           {matchingVoices.map((voice) => {
@@ -200,7 +200,7 @@ export function TtsScreen() {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Ritmo" />
+      <SectionTitle title="Cómo debe hablar" />
       <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">Velocidad</Text>
       <View className="mb-4 flex-row flex-wrap gap-2">
         {[0.8, 1, 1.15, 1.3].map((rate) => (
@@ -226,7 +226,7 @@ export function TtsScreen() {
         ))}
       </View>
 
-      <SectionTitle title="Prueba" />
+      <SectionTitle title="Escuchar una prueba" />
       <GlassCard>
         <View className="p-5">
           <View className="mb-4 flex-row items-center gap-2">
@@ -244,7 +244,7 @@ export function TtsScreen() {
           />
           <View className="mt-4 gap-3">
             <Button
-              label={previewing ? 'Generando voz…' : 'Probar TTS'}
+              label={previewing ? 'Preparando voz…' : 'Escuchar prueba'}
               disabled={previewing}
               onPress={async () => {
                 setPreviewing(true);
