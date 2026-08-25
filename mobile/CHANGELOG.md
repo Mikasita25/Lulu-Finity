@@ -1,5 +1,12 @@
 # Lulú Finity Mobile
 
+## 1.3.1
+
+- Actualiza la conexión directa de Microsoft Edge TTS con los encabezados de WebSocket que el servicio exige actualmente.
+- Genera una cookie MUID independiente para cada conexión y reintenta una vez si Microsoft rechaza temporalmente la sesión.
+- Conserva las voces Microsoft y la coordinación entre TTS y música, sin volver al motor de voz del celular.
+- Actualiza Android a `versionCode` 17 para instalarse encima de la compilación 1.3.0.
+
 ## 1.2.6
 
 - Genera las voces Microsoft directamente desde Android mediante la conexión en línea de Microsoft Edge TTS; el audio ya no depende de que Railway publique una ruta TTS.

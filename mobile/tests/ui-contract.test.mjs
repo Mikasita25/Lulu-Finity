@@ -152,8 +152,12 @@ assert.doesNotMatch(ttsRuntime, /expo-speech|Speech\.speak/);
 
 const directTts = read('src/services/microsoftEdgeDirect.ts');
 assert.match(directTts, /speech\.platform\.bing\.com/);
-assert.match(directTts, /new WebSocket\(url\)/);
+assert.match(directTts, /new NativeWebSocket\(url, null, \{ headers: edgeWebSocketHeaders\(\) \}\)/);
 assert.match(directTts, /audio-24khz-48kbitrate-mono-mp3/);
+assert.match(directTts, /chrome-extension:\/\/jdiccldimpdaibmpdkjnbmckianbfold/);
+assert.match(directTts, /'Sec-WebSocket-Version': '13'/);
+assert.match(directTts, /Cookie: `muid=/);
+assert.match(directTts, /attempt < 2/);
 
 const ttsScreen = read('src/screens/TtsScreen.tsx');
 assert.match(ttsScreen, /voces de Microsoft/);

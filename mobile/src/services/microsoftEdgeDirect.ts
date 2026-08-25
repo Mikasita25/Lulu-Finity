@@ -3,6 +3,9 @@ const EDGE_WSS_URL = 'wss://speech.platform.bing.com/consumer/speech/synthesize/
 const EDGE_CHROMIUM_VERSION = '143.0.3650.75';
 const EDGE_GEC_VERSION = `1-${EDGE_CHROMIUM_VERSION}`;
 const WINDOWS_EPOCH_SECONDS = 11_644_473_600;
+const EDGE_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0';
 
 type DirectSpeechOptions = {
   text: string;
@@ -12,6 +15,12 @@ type DirectSpeechOptions = {
   timeoutMs?: number;
   signal?: AbortSignal;
 };
+
+type NativeWebSocketConstructor = new (
+  url: string,
+  protocols?: string | string[] | null,
+  options?: { headers: Record<string, string> } | null,
+) => WebSocket;
 
 const SHA256_CONSTANTS = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98,
@@ -139,6 +148,19 @@ function randomHex32() {
   return value;
 }
 
+function edgeWebSocketHeaders() {
+  return {
+    Pragma: 'no-cache',
+    'Cache-Control': 'no-cache',
+    Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
+    'Sec-WebSocket-Version': '13',
+    'User-Agent': EDGE_USER_AGENT,
+    'Accept-Encoding': 'gzip, deflate, br, zstd',
+    'Accept-Language': 'en-US,en;q=0.9',
+    Cookie: `muid=${randomHex32().toUpperCase()};`,
+  };
+}
+
 function escapeXml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -244,7 +266,7 @@ function abortError() {
   return error;
 }
 
-export function synthesizeMicrosoftSpeechDirect({
+function synthesizeMicrosoftSpeechOnce({
   text,
   voice,
   rate,
@@ -258,7 +280,8 @@ export function synthesizeMicrosoftSpeechDirect({
   const url = `${EDGE_WSS_URL}?TrustedClientToken=${EDGE_TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${generateSecMsGec()}&Sec-MS-GEC-Version=${EDGE_GEC_VERSION}&ConnectionId=${connectionId}`;
 
   return new Promise<Uint8Array>((resolve, reject) => {
-    const socket = new WebSocket(url);
+    const NativeWebSocket = WebSocket as unknown as NativeWebSocketConstructor;
+    const socket = new NativeWebSocket(url, null, { headers: edgeWebSocketHeaders() });
     socket.binaryType = 'arraybuffer';
     const chunks: Uint8Array[] = [];
     let settled = false;
@@ -344,7 +367,7 @@ export function synthesizeMicrosoftSpeechDirect({
     };
 
     socket.onerror = () => {
-      fail(new Error('No se pudo conectar directamente con Microsoft TTS.'));
+      fail(new Error('Microsoft rechazó la conexión de voz.'));
     };
 
     socket.onclose = () => {
@@ -352,4 +375,18 @@ export function synthesizeMicrosoftSpeechDirect({
       finishIfReady();
     };
   });
+}
+
+export async function synthesizeMicrosoftSpeechDirect(options: DirectSpeechOptions) {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await synthesizeMicrosoftSpeechOnce(options);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Microsoft TTS no respondió.');
+      if (options.signal?.aborted || lastError.name === 'AbortError') throw lastError;
+      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 450));
+    }
+  }
+  throw lastError ?? new Error('No se pudo conectar con Microsoft TTS.');
 }
