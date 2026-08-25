@@ -25,9 +25,14 @@ assert.doesNotMatch(splash, /videoFrame/);
 
 const dashboard = read('src/screens/DashboardScreen.tsx');
 assert.match(dashboard, /<LiveConnectionCard\s*\/>/);
-assert.match(dashboard, /Accesos rápidos/);
+assert.match(dashboard, /Centro de control/);
+assert.match(dashboard, /Lo esencial/);
 assert.match(dashboard, /Voz del chat/);
-assert.match(dashboard, /Resumen del LIVE/);
+assert.match(dashboard, /Antes de volver al juego/);
+assert.match(dashboard, /Diseñado para segundo plano/);
+assert.match(dashboard, /navigation\.navigate\('TTS'\)/);
+assert.match(dashboard, /navigation\.navigate\('Music'\)/);
+assert.doesNotMatch(dashboard, /Resumen del LIVE|Meta principal|Ranking|Top Fans/);
 
 const connection = read('src/components/LiveConnectionCard.tsx');
 assert.match(connection, /Conectar al LIVE/);
@@ -62,15 +67,26 @@ assert.equal(packageJson.dependencies['expo-speech'], undefined, 'Android ya no 
 const navigator = read('src/navigation/AppNavigator.tsx');
 assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main'/);
 assert.match(navigator, /name="Music"/);
+assert.match(navigator, /name="TTS"/);
+assert.match(navigator, /name="Interactions"/);
 assert.match(navigator, /name="YouTubeBrowser"/);
 assert.match(navigator, /name="RecentActivity"/);
-assert.match(navigator, /title: 'Control'/);
-assert.match(navigator, /title: 'Menú'/);
+assert.match(navigator, /title: 'Voz'/);
+assert.match(navigator, /title: 'Música'/);
+assert.match(navigator, /title: 'Automatiza'/);
+assert.match(navigator, /title: 'Ajustes'/);
+assert.doesNotMatch(navigator, /name="LiveView"|name="Goals"|name="Leaderboard"|title: 'Ranking'/);
 
 const menu = read('src/screens/MoreScreen.tsx');
-assert.match(menu, /Herramientas del LIVE/);
-assert.match(menu, /Tu app/);
-assert.match(menu, /Respuestas automáticas/);
+assert.match(menu, /Actividad y alertas/);
+assert.match(menu, /Aplicación/);
+assert.match(menu, /siempre visibles abajo/);
+assert.doesNotMatch(menu, /route: 'TTS'|route: 'Music'|route: 'Interactions'|ranking/i);
+
+const appearance = read('src/screens/AppearanceScreen.tsx');
+assert.match(appearance, /Color principal/);
+assert.match(appearance, /Tema oscuro/);
+assert.doesNotMatch(appearance, /Ranking|rankingRgb|rankingFont|Top Fans/);
 
 const liveView = read('src/screens/LiveViewScreen.tsx');
 assert.match(liveView, /Control del LIVE/);

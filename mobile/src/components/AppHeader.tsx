@@ -13,7 +13,7 @@ export function AppHeader({ title, subtitle }: { title: string; subtitle?: strin
   const relayState = useAppStore((state) => state.relayState);
   const accentTheme = useAppStore((state) => state.accentTheme);
   const accent = accentByTheme[accentTheme];
-  const mainRoutes = ['Dashboard', 'LiveView', 'Goals', 'Leaderboard', 'More'];
+  const mainRoutes = ['Dashboard', 'TTS', 'Music', 'Interactions', 'More'];
   const secondary = !mainRoutes.includes(route.name) && navigation.canGoBack();
   return (
     <View className="mb-5 mt-1">

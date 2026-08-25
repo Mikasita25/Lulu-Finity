@@ -1,5 +1,12 @@
 # Lulú Finity Mobile
 
+## 1.3.3
+
+- Sustituye las pestañas de Ranking, Metas y el panel recargado por accesos directos a Voz, Música y Automatizaciones.
+- Convierte Inicio en un centro de control simple con conexión, interruptores esenciales y una comprobación rápida antes de volver al juego.
+- Deja Ajustes únicamente para opciones poco frecuentes y elimina toda la personalización de rankings de la interfaz.
+- Conserva el TTS Microsoft mediante Railway, la cola corta de mensajes y la reproducción de música en segundo plano de la versión 1.3.2.
+
 ## 1.3.2
 
 - Replica el recorrido estable de PC: `edge-tts-universal` genera la voz Microsoft en Node y Android recibe un MP3 listo para reproducir.
