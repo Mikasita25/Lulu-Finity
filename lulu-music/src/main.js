@@ -760,7 +760,7 @@ async function youtubeSmokeDiagnostics() {
   const playbackDeadline = Date.now() + 10_000;
   let playbackReady = { ready:false, currentTime:0 };
   while (Date.now() < playbackDeadline && !playbackReady.ready) {
-    playbackReady = await win.webContents.executeJavaScript(`(async()=>{const video=document.querySelector('video');if(!video)return{ready:false,currentTime:0};try{await video.play()}catch{}return{ready:!video.paused&&video.readyState>=2,currentTime:Number(video.currentTime||0)}})()`, true).catch(() => ({ ready:false, currentTime:0 }));
+    playbackReady = await win.webContents.executeJavaScript(`(()=>{const video=document.querySelector('video');if(!video)return{ready:false,currentTime:0};video.play().catch(()=>{});return{ready:!video.paused&&video.readyState>=2,currentTime:Number(video.currentTime||0)}})()`, true).catch(() => ({ ready:false, currentTime:0 }));
     if (!playbackReady.ready) await new Promise((resolve) => setTimeout(resolve, 250));
   }
   const playbackStart = playbackReady.currentTime;
