@@ -1,15 +1,25 @@
 import { createAudioPlayer } from 'expo-audio';
+import { fetch as expoFetch } from 'expo/fetch';
 import { File, Paths } from 'expo-file-system';
 import type { LiveEvent } from '@/types/live';
 import { useTtsStore } from '@/store/useTtsStore';
 import { MICROSOFT_VOICES, normalizeMicrosoftVoice } from './microsoftVoices';
-import { synthesizeMicrosoftSpeechDirect } from './microsoftEdgeDirect';
 import { setTtsPlaybackActive } from './audioCoordinator';
+import {
+  DEFAULT_RELAY_LIVE_URL,
+  isMicrosoftMp3,
+  microsoftTtsFailure,
+  microsoftTtsHeaders,
+  microsoftTtsUrl,
+} from './microsoftRelay';
 
 const MAX_QUEUE = 5;
 const MAX_PENDING_AGE_MS = 10_000;
 const MAX_SPEECH_CHARS = 240;
-const SYNTHESIS_TIMEOUT_MS = 15_000;
+const SYNTHESIS_TIMEOUT_MS = 20_000;
+const RELAY_LIVE_URL = process.env.EXPO_PUBLIC_LULU_RELAY_URL || DEFAULT_RELAY_LIVE_URL;
+const RELAY_TTS_URL = microsoftTtsUrl(RELAY_LIVE_URL);
+const CLIENT_TOKEN = process.env.EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN || '';
 
 type PendingSpeech = {
   text: string;
@@ -56,15 +66,30 @@ async function synthesizeMicrosoftAudio(text: string, currentGeneration: number)
   const timeout = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
 
   try {
-    const bytes = await synthesizeMicrosoftSpeechDirect({
-      text,
-      voice: normalizeMicrosoftVoice(settings.voice, settings.language),
-      rate: Math.max(0.6, Math.min(1.5, settings.rate)),
-      pitch: Math.max(0.7, Math.min(1.3, settings.pitch)),
+    const response = await expoFetch(RELAY_TTS_URL, {
+      method: 'POST',
+      headers: microsoftTtsHeaders(CLIENT_TOKEN),
+      body: JSON.stringify({
+        text,
+        voice: normalizeMicrosoftVoice(settings.voice, settings.language),
+        rate: Math.max(0.6, Math.min(1.5, settings.rate)),
+        pitch: Math.max(0.7, Math.min(1.3, settings.pitch)),
+      }),
       signal: controller.signal,
-      timeoutMs: SYNTHESIS_TIMEOUT_MS,
     });
-    if (!bytes.length || currentGeneration !== generation) throw new Error('Audio TTS descartado');
+
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const payload = (await response.json()) as { error?: unknown };
+        detail = typeof payload.error === 'string' ? payload.error : '';
+      } catch {}
+      throw microsoftTtsFailure(response.status, detail);
+    }
+
+    const bytes = await response.bytes();
+    if (!isMicrosoftMp3(bytes)) throw new Error('El servidor no devolvió un MP3 válido de Microsoft.');
+    if (currentGeneration !== generation) throw new Error('Audio TTS descartado');
 
     const file = new File(Paths.cache, `lulu-microsoft-tts-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`);
     file.write(bytes);

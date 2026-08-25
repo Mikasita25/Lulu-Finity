@@ -38,7 +38,7 @@ jobs:
         run: npm run typecheck
       - name: Pruebas del LIVE
         run: npm run test:realtime
-      - name: Pruebas TTS Microsoft directo
-        run: npm run test:tts-direct
+      - name: Pruebas del relay Microsoft
+        run: npm run test:tts-relay
       - name: Pruebas de interfaz móvil
         run: npm run test:ui

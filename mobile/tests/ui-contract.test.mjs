@@ -144,25 +144,24 @@ const ttsRuntime = read('src/services/tts.ts');
 assert.match(ttsRuntime, /MAX_PENDING_AGE_MS/);
 assert.match(ttsRuntime, /queuedAt/);
 assert.match(ttsRuntime, /MICROSOFT_VOICES/);
-assert.match(ttsRuntime, /synthesizeMicrosoftSpeechDirect/);
+assert.match(ttsRuntime, /expoFetch\(RELAY_TTS_URL/);
+assert.match(ttsRuntime, /microsoftTtsHeaders\(CLIENT_TOKEN\)/);
+assert.match(ttsRuntime, /isMicrosoftMp3\(bytes\)/);
 assert.match(ttsRuntime, /setTtsPlaybackActive\(true\)/);
 assert.match(ttsRuntime, /status\.isLoaded/);
-assert.doesNotMatch(ttsRuntime, /\/v1\/tts\/microsoft|expo\/fetch/);
+assert.match(ttsRuntime, /expo\/fetch/);
 assert.doesNotMatch(ttsRuntime, /expo-speech|Speech\.speak/);
 
-const directTts = read('src/services/microsoftEdgeDirect.ts');
-assert.match(directTts, /speech\.platform\.bing\.com/);
-assert.match(directTts, /new NativeWebSocket\(url, null, \{ headers: edgeWebSocketHeaders\(\) \}\)/);
-assert.match(directTts, /audio-24khz-48kbitrate-mono-mp3/);
-assert.match(directTts, /chrome-extension:\/\/jdiccldimpdaibmpdkjnbmckianbfold/);
-assert.match(directTts, /'Sec-WebSocket-Version': '13'/);
-assert.match(directTts, /Cookie: `muid=/);
-assert.match(directTts, /attempt < 2/);
+const relayTts = read('src/services/microsoftRelay.ts');
+assert.match(relayTts, /\/v1\/tts\/microsoft/);
+assert.match(relayTts, /Authorization = `Bearer/);
+assert.match(relayTts, /audio\/mpeg/);
+assert.match(relayTts, /isMicrosoftMp3/);
 
 const ttsScreen = read('src/screens/TtsScreen.tsx');
 assert.match(ttsScreen, /voces de Microsoft/);
-assert.match(ttsScreen, /directamente desde Microsoft/);
-assert.match(ttsScreen, /directamente con Microsoft/);
+assert.match(ttsScreen, /mismo motor Microsoft que la versión de PC/);
+assert.match(ttsScreen, /motor Microsoft de Lulú para PC/);
 assert.match(ttsScreen, /No se pudo reproducir la voz/);
 assert.doesNotMatch(ttsScreen, /Predeterminada del sistema|voces instaladas/);
 

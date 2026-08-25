@@ -167,7 +167,7 @@ export function TtsScreen() {
         ))}
       </View>
 
-      <SectionTitle title="Elige una voz" subtitle="Estas voces se reproducen directamente desde Microsoft." />
+      <SectionTitle title="Elige una voz" subtitle="Usa el mismo motor Microsoft que la versión de PC." />
       <GlassCard>
         <View className="p-4">
           {matchingVoices.map((voice) => {
@@ -278,7 +278,7 @@ export function TtsScreen() {
       </GlassCard>
 
       <Text className="mt-5 text-center text-[10px] leading-5 text-white/25">
-        Requiere internet · la voz se genera directamente con Microsoft, sin usar el motor del celular.
+        Requiere internet · la voz se genera con el motor Microsoft de Lulú para PC, sin usar el motor del celular.
       </Text>
     </Screen>
   );
