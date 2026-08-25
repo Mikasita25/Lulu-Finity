@@ -1,5 +1,13 @@
 # Lulú Finity Mobile
 
+## 1.3.2
+
+- Replica el recorrido estable de PC: `edge-tts-universal` genera la voz Microsoft en Node y Android recibe un MP3 listo para reproducir.
+- Elimina el WebSocket directo del flujo móvil, que Android estaba rechazando incluso con los encabezados nuevos.
+- Añade una prueba HTTP de extremo a extremo a la compilación: la versión no se publica si el servidor real no devuelve audio MP3.
+- Mantiene la cola corta, el descarte de comentarios viejos y la coordinación de audio con la música.
+- Actualiza Android a `versionCode` 18 para instalarse encima de la compilación 1.3.1.
+
 ## 1.3.1
 
 - Actualiza la conexión directa de Microsoft Edge TTS con los encabezados de WebSocket que el servicio exige actualmente.

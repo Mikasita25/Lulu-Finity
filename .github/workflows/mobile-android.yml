@@ -37,6 +37,25 @@ jobs:
             echo "LULU_RELAY_CLIENT_TOKEN no está configurado o es inválido."
             exit 1
           fi
+      - name: Comprobar audio Microsoft real
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST https://lulu-finity-production.up.railway.app/v1/tts/microsoft \
+            --header "Authorization: Bearer $EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN" \
+            --header "x-lulu-client-token: $EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN" \
+            --header "content-type: application/json" \
+            --header "accept: audio/mpeg" \
+            --data '{"text":"Prueba real de Lulú Finity","voice":"es-MX-DaliaNeural","rate":1,"pitch":1}' \
+            --output /tmp/lulu-microsoft-test.mp3
+          python - <<'PY'
+          from pathlib import Path
+          audio = Path('/tmp/lulu-microsoft-test.mp3').read_bytes()
+          valid = audio.startswith(b'ID3') or (len(audio) > 1 and audio[0] == 0xFF and audio[1] & 0xE0 == 0xE0)
+          if len(audio) < 512 or not valid:
+              raise SystemExit('El relay no devolvió un MP3 real de Microsoft.')
+          print(f'Audio Microsoft verificado: {len(audio)} bytes.')
+          PY
       - name: Node 22
         uses: actions/setup-node@v4
         with:
@@ -68,8 +87,8 @@ jobs:
         run: npm run typecheck
       - name: Pruebas del LIVE
         run: npm run test:realtime
-      - name: Pruebas TTS Microsoft directo
-        run: npm run test:tts-direct
+      - name: Pruebas del relay Microsoft
+        run: npm run test:tts-relay
       - name: Pruebas de interfaz móvil
         run: npm run test:ui
       - name: Expo Doctor

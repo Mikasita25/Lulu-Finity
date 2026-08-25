@@ -1,5 +1,11 @@
 # Cambios
 
+## 1.3.2
+
+- El móvil deja de abrir el WebSocket de Microsoft desde Android y utiliza el mismo `edge-tts-universal` que la versión de PC, ejecutado por el servidor de Lulú.
+- La compilación se bloquea si el servidor no devuelve un MP3 Microsoft real; ya no basta con que las pruebas simuladas pasen.
+- Los errores ahora diferencian entre ruta no desplegada, autorización incorrecta, límite temporal y audio inválido.
+
 ## 1.3.1
 
 - Corrige la conexión directa con Microsoft Edge TTS usando los encabezados actuales del servicio y una cookie MUID nueva en cada intento.
