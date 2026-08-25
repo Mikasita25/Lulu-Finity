@@ -17,6 +17,8 @@ const RELAY_URL = 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live';
 const RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';
 const YOUTUBE_PARTITION = 'persist:lulu-music-youtube';
 const YOUTUBE_REPORT_INTERVAL_MS = 1_500;
+const YOUTUBE_BACKGROUND_SIZE = Object.freeze({ width:320, height:180 });
+const YOUTUBE_VISIBLE_SIZE = Object.freeze({ width:854, height:480 });
 const PROVIDERS = new Set(['auto','audius','youtube']);
 const PERMISSIONS = new Set(['all','followers','subscribers','selected']);
 
@@ -414,11 +416,11 @@ function createYoutubeWindow() {
   if (youtubeWindow && !youtubeWindow.isDestroyed()) return youtubeWindow;
   installYoutubeRequestIdentity();
   const win = new BrowserWindow({
-    width:854,height:480,minWidth:480,minHeight:270,show:false,paintWhenInitiallyHidden:false,skipTaskbar:true,autoHideMenuBar:true,
+    width:YOUTUBE_BACKGROUND_SIZE.width,height:YOUTUBE_BACKGROUND_SIZE.height,minWidth:320,minHeight:180,show:false,skipTaskbar:true,autoHideMenuBar:true,
     title:'Reproductor ligero — Lulu Music',backgroundColor:'#000000',
     webPreferences:{
       contextIsolation:true,nodeIntegration:false,sandbox:true,autoplayPolicy:'no-user-gesture-required',
-      backgroundThrottling:true,partition:YOUTUBE_PARTITION
+      backgroundThrottling:false,partition:YOUTUBE_PARTITION
     }
   });
   youtubeWindow = win;
@@ -451,7 +453,12 @@ function createYoutubeWindow() {
     const ended = message.match(/^__LULU_MUSIC_ENDED__:(\d+)$/);
     if (ended && Number(ended[1]) === playerNonce) advanceQueue({ natural:true });
   });
-  win.on('close', (event) => { if (!shuttingDown) { event.preventDefault(); win.hide(); } });
+  win.on('close', (event) => {
+    if (shuttingDown) return;
+    event.preventDefault();
+    win.hide();
+    win.setSize(YOUTUBE_BACKGROUND_SIZE.width, YOUTUBE_BACKGROUND_SIZE.height);
+  });
   win.on('closed', () => { if (youtubeWindow === win) youtubeWindow = null; });
   return win;
 }
@@ -565,7 +572,8 @@ function showPlayer() {
     notice(playback.loading ? 'La canción todavía se está buscando.' : 'Agrega una canción para abrir el reproductor.');
     return { ok:false };
   }
-  win.show(); win.focus();
+  win.setSize(YOUTUBE_VISIBLE_SIZE.width, YOUTUBE_VISIBLE_SIZE.height);
+  win.center(); win.show(); win.focus();
   return { ok:true };
 }
 

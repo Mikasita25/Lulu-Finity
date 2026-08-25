@@ -89,9 +89,10 @@ test('el ahorro de Electron reduce trabajo visual sin suspender LIVE ni audio', 
   const renderer = source('renderer.js');
   const html = source('index.html');
   const css = source('styles.css');
-  assert.doesNotMatch(main, /backgroundThrottling:false/);
-  assert.ok((main.match(/backgroundThrottling:true/g) || []).length >= 2);
-  assert.match(main, /paintWhenInitiallyHidden:false/);
+  assert.equal((main.match(/backgroundThrottling:false/g) || []).length, 1);
+  assert.equal((main.match(/backgroundThrottling:true/g) || []).length, 1);
+  assert.doesNotMatch(main, /paintWhenInitiallyHidden:false/);
+  assert.match(main, /YOUTUBE_BACKGROUND_SIZE = Object\.freeze\(\{ width:320, height:180 \}\)/);
   assert.match(main, /Menu\.setApplicationMenu\(null\)/);
   assert.match(main, /powerSaveBlocker\.start\('prevent-app-suspension'\)/);
   assert.match(main, /pauseYoutubePlayback\(\{ release:!next \}\)/);
