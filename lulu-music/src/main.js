@@ -498,17 +498,22 @@ async function installYoutubeWatcher(nonce, attempt) {
         if(video.muted)video.muted=false;
       };
       let ended=false;
+      let started=!video.paused;
+      const ensureStarted=()=>{if(!started)video.play().then(()=>{started=true}).catch(()=>{})};
       const report=()=>{
         const ad=Boolean(document.querySelector('.html5-video-player.ad-showing,.html5-video-player.ad-interrupting'));
         applyVolume();
+        ensureStarted();
         const payload={currentTime:video.currentTime,duration:video.duration,paused:video.paused};
         console.info('__LULU_MUSIC_PLAYER__:${nonce}:'+encodeURIComponent(JSON.stringify(payload)));
         if(!ad&&video.ended&&!ended){ended=true;console.info('__LULU_MUSIC_ENDED__:${nonce}')}
       };
+      const onPlaying=()=>{started=true};
       const onEnded=()=>{if(ended)return;ended=true;console.info('__LULU_MUSIC_ENDED__:${nonce}')};
+      video.addEventListener('playing',onPlaying);
       video.addEventListener('ended',onEnded);
-      const timer=setInterval(report,${YOUTUBE_REPORT_INTERVAL_MS});video.play().catch(()=>{});report();
-      window.__luluMusicCleanup=()=>{clearInterval(timer);video.removeEventListener('ended',onEnded);delete window.__luluMusicCleanup};
+      const timer=setInterval(report,${YOUTUBE_REPORT_INTERVAL_MS});ensureStarted();report();
+      window.__luluMusicCleanup=()=>{clearInterval(timer);video.removeEventListener('playing',onPlaying);video.removeEventListener('ended',onEnded);delete window.__luluMusicCleanup};
       return true;
     })()`, true);
     if (installed) return;
@@ -752,8 +757,13 @@ async function youtubeSmokeDiagnostics() {
   const firstWebContentsId = win.webContents.id;
   await win.loadURL(firstUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
   await win.loadURL(secondUrl, { extraHeaders:'Referer: https://github.com/Mikasita25/Lulu-Finity/\n' });
-  await new Promise((resolve) => setTimeout(resolve, 2_000));
-  const playbackStart = await win.webContents.executeJavaScript(`Number(document.querySelector('video')?.currentTime||0)`, true);
+  const playbackDeadline = Date.now() + 10_000;
+  let playbackReady = { ready:false, currentTime:0 };
+  while (Date.now() < playbackDeadline && !playbackReady.ready) {
+    playbackReady = await win.webContents.executeJavaScript(`(async()=>{const video=document.querySelector('video');if(!video)return{ready:false,currentTime:0};try{await video.play()}catch{}return{ready:!video.paused&&video.readyState>=2,currentTime:Number(video.currentTime||0)}})()`, true).catch(() => ({ ready:false, currentTime:0 }));
+    if (!playbackReady.ready) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const playbackStart = playbackReady.currentTime;
   await new Promise((resolve) => setTimeout(resolve, 1_600));
   const playbackAfterBackground = await win.webContents.executeJavaScript(`Number(document.querySelector('video')?.currentTime||0)`, true);
   const requestedVolume = 0.23;
@@ -779,7 +789,10 @@ async function youtubeSmokeDiagnostics() {
     playerWebContentsId:win.webContents.id,
     appWindowCount:BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed()).length,
     playerUrl:win.webContents.getURL(),
-    youtubeBackgroundPlayback:playbackAfterBackground > playbackStart + .5,
+    youtubePlaybackStarted:Boolean(playbackReady.ready),
+    youtubeBackgroundPlayback:Boolean(playbackReady.ready) && playbackAfterBackground > playbackStart + .5,
+    youtubePlaybackStart:playbackStart,
+    youtubePlaybackAfterBackground:playbackAfterBackground,
     volumeSliderPersistent:Boolean(volumeControlReady)
       && Math.abs(volumeState.actual - requestedVolume) < .01
       && Math.abs(volumeState.desired - requestedVolume) < .01

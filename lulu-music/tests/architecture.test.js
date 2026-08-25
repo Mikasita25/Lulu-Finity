@@ -97,6 +97,8 @@ test('el ahorro de Electron reduce trabajo visual sin suspender LIVE ni audio', 
   assert.match(main, /powerSaveBlocker\.start\('prevent-app-suspension'\)/);
   assert.match(main, /pauseYoutubePlayback\(\{ release:!next \}\)/);
   assert.match(main, /const YOUTUBE_REPORT_INTERVAL_MS = 1_500/);
+  assert.match(main, /const ensureStarted=\(\)=>/);
+  assert.match(main, /video\.addEventListener\('playing',onPlaying\)/);
   assert.match(renderer, /lastQueueSignature/);
   assert.match(renderer, /lastAudiusProgressAt < 1_000/);
   assert.doesNotMatch(html, /class="ambient/);
