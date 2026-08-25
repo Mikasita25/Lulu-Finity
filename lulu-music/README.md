@@ -1,4 +1,4 @@
-# Lulu Music 1.0.0
+# Lulu Music 1.0.1
 
 Aplicación independiente de Windows dedicada exclusivamente a solicitudes de música en TikTok LIVE.
 
