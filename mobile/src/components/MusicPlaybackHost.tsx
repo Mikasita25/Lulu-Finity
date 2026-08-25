@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, View } from 'react-native';
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { WebView } from 'react-native-webview';
 import { useAppStore } from '@/store/useAppStore';
 import { useMobileControlStore } from '@/store/useMobileControlStore';
 import { youtubeSearchUrl } from '@/services/music';
+import { subscribeTtsPlayback } from '@/services/audioCoordinator';
 
 // A one-second silent MP3 keeps Expo Audio's MediaSessionService active while the
 // audible YouTube media remains in WebView. The foreground media session prevents
@@ -164,21 +165,22 @@ export function MusicPlaybackHost() {
   const currentSong = useMobileControlStore((state) => state.currentSong);
   const playbackPaused = useMobileControlStore((state) => state.playbackPaused);
   const playNextSong = useMobileControlStore((state) => state.playNextSong);
-  const setPlaybackPaused = useMobileControlStore((state) => state.setPlaybackPaused);
+  const setPlaybackStatus = useMobileControlStore((state) => state.setPlaybackStatus);
   const webRef = useRef<WebView>(null);
-  const keeperHasPlayed = useRef(false);
-  const remotePauseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const loadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [ttsActive, setTtsActive] = useState(false);
   const keeper = useAudioPlayer(BACKGROUND_KEEPER_URI, { updateInterval: 1000 });
-  const keeperStatus = useAudioPlayerStatus(keeper);
   const liveActive = relayState === 'connecting' || relayState === 'rotating' || relayState === 'connected';
   const musicActive = music.enabled && Boolean(currentSong);
   const liveOnlyKeeper = liveActive && (!musicActive || playbackPaused);
 
   const sourceUrl = currentSong ? youtubeSearchUrl(currentSong.query) : '';
   const automation = useMemo(
-    () => playerAutomation(music.volume, playbackPaused),
-    [music.volume, playbackPaused],
+    () => playerAutomation(music.volume, playbackPaused || ttsActive),
+    [music.volume, playbackPaused, ttsActive],
   );
+
+  useEffect(() => subscribeTtsPlayback(setTtsActive), []);
 
   useEffect(() => {
     void setAudioModeAsync({
@@ -196,9 +198,6 @@ export function MusicPlaybackHost() {
   }, [keeper]);
 
   useEffect(() => {
-    clearTimeout(remotePauseTimer.current);
-    keeperHasPlayed.current = false;
-
     if (!musicActive && !liveOnlyKeeper) {
       keeper.pause();
       keeper.clearLockScreenControls();
@@ -221,54 +220,21 @@ export function MusicPlaybackHost() {
       { showSeekBackward: false, showSeekForward: false },
     );
 
-    if (liveOnlyKeeper || !playbackPaused) keeper.play();
-  }, [currentSong?.id, keeper, liveOnlyKeeper, musicActive, playbackPaused, username]);
+    if (ttsActive) keeper.pause();
+    else if (liveOnlyKeeper || !playbackPaused) keeper.play();
+  }, [currentSong?.id, keeper, liveOnlyKeeper, musicActive, playbackPaused, ttsActive, username]);
 
   useEffect(() => {
     if (!music.enabled || !currentSong) return;
 
     webRef.current?.injectJavaScript(automation);
-    if (playbackPaused) {
-      if (liveOnlyKeeper) keeper.play();
-      else keeper.pause();
-    } else {
-      keeper.play();
-    }
-  }, [automation, currentSong?.id, keeper, liveOnlyKeeper, music.enabled, playbackPaused]);
-
-  useEffect(() => {
-    clearTimeout(remotePauseTimer.current);
-    if (!music.enabled || !currentSong || !keeperStatus.isLoaded) return;
-
-    // A paused song must not turn off the LIVE foreground session. The silent
-    // keeper continues, while the WebView remains paused.
-    if (liveOnlyKeeper) {
-      if (!keeperStatus.playing) keeper.play();
-      return;
-    }
-
-    if (keeperStatus.playing) {
-      keeperHasPlayed.current = true;
-      if (playbackPaused) setPlaybackPaused(false);
-      return;
-    }
-
-    if (!keeperHasPlayed.current || playbackPaused) return;
-    remotePauseTimer.current = setTimeout(() => {
-      if (
-        !keeper.playing &&
-        useMobileControlStore.getState().currentSong?.id === currentSong.id &&
-        !useMobileControlStore.getState().playbackPaused
-      ) {
-        setPlaybackPaused(true);
-      }
-    }, 600);
-
-    return () => clearTimeout(remotePauseTimer.current);
-  }, [currentSong?.id, keeper, keeperStatus.isLoaded, keeperStatus.playing, liveOnlyKeeper, music.enabled, playbackPaused, setPlaybackPaused]);
+    if (playbackPaused || ttsActive) keeper.pause();
+    else keeper.play();
+  }, [automation, currentSong?.id, keeper, liveOnlyKeeper, music.enabled, playbackPaused, ttsActive]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
+      if (ttsActive) return;
       if (liveOnlyKeeper) {
         if (nextState === 'background' || nextState === 'inactive' || nextState === 'active') {
           keeper.play();
@@ -282,11 +248,11 @@ export function MusicPlaybackHost() {
       }
     });
     return () => subscription.remove();
-  }, [currentSong?.id, keeper, liveOnlyKeeper, music.enabled, music.volume, playbackPaused]);
+  }, [currentSong?.id, keeper, liveOnlyKeeper, music.enabled, music.volume, playbackPaused, ttsActive]);
 
   useEffect(
     () => () => {
-      clearTimeout(remotePauseTimer.current);
+      clearTimeout(loadTimer.current);
       keeper.clearLockScreenControls();
     },
     [keeper],
@@ -318,21 +284,42 @@ export function MusicPlaybackHost() {
         sharedCookiesEnabled
         mixedContentMode="never"
         androidLayerType="hardware"
+        userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
         injectedJavaScriptBeforeContentLoaded={automation}
         injectedJavaScript={automation}
+        onLoadStart={() => {
+          clearTimeout(loadTimer.current);
+          setPlaybackStatus('loading', 'Cargando la canción…');
+        }}
         onLoadEnd={() => {
           webRef.current?.injectJavaScript(automation);
+          clearTimeout(loadTimer.current);
+          loadTimer.current = setTimeout(() => {
+            const state = useMobileControlStore.getState();
+            if (state.currentSong?.id === currentSong.id && state.playbackStatus === 'loading') {
+              setPlaybackStatus('error', 'YouTube no inició la canción. Toca Reintentar.');
+            }
+          }, 15_000);
         }}
         onMessage={(event) => {
           try {
             const message = JSON.parse(event.nativeEvent.data);
-            if (message?.type === 'ended') playNextSong();
+            if (message?.type === 'playing') {
+              clearTimeout(loadTimer.current);
+              setPlaybackStatus('playing', 'Reproduciendo correctamente.');
+            }
+            if (message?.type === 'ended') {
+              setPlaybackStatus('loading', 'Cargando la siguiente canción…');
+              playNextSong();
+            }
+            if (message?.type === 'video-error') {
+              setPlaybackStatus('error', 'YouTube no pudo reproducir este video.');
+            }
           } catch {}
         }}
         onError={() => {
-          setTimeout(() => {
-            if (useMobileControlStore.getState().currentSong?.id === currentSong.id) playNextSong();
-          }, 2500);
+          clearTimeout(loadTimer.current);
+          setPlaybackStatus('error', 'No se pudo conectar con YouTube. Toca Reintentar.');
         }}
       />
     </View>

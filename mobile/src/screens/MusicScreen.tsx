@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
-import { ListMusic, Pause, Play, ShieldCheck, SkipForward, Trash2 } from 'lucide-react-native';
+import { AlertCircle, ListMusic, Pause, Play, RefreshCw, ShieldCheck, SkipForward, Trash2 } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { AppHeader } from '@/components/AppHeader';
 import { GlassCard } from '@/components/GlassCard';
@@ -36,6 +36,8 @@ export function MusicScreen({ navigation }: any) {
   const current = useMobileControlStore((state) => state.currentSong);
   const paused = useMobileControlStore((state) => state.musicPaused);
   const playbackPaused = useMobileControlStore((state) => state.playbackPaused);
+  const playbackStatus = useMobileControlStore((state) => state.playbackStatus);
+  const playbackMessage = useMobileControlStore((state) => state.playbackMessage);
   const updateMusic = useMobileControlStore((state) => state.updateMusic);
   const enqueueSong = useMobileControlStore((state) => state.enqueueSong);
   const playSong = useMobileControlStore((state) => state.playSong);
@@ -45,6 +47,7 @@ export function MusicScreen({ navigation }: any) {
   const clearSongQueue = useMobileControlStore((state) => state.clearSongQueue);
   const setPaused = useMobileControlStore((state) => state.setMusicPaused);
   const setPlaybackPaused = useMobileControlStore((state) => state.setPlaybackPaused);
+  const retryCurrentSong = useMobileControlStore((state) => state.retryCurrentSong);
 
   const commands = useMemo(() => [music.command, ...music.aliases].join(' · '), [music.aliases, music.command]);
 
@@ -78,7 +81,7 @@ export function MusicScreen({ navigation }: any) {
 
   return (
     <Screen>
-      <AppHeader title="Música" subtitle="Solicitudes automáticas, segundo plano y control de reproducción." />
+      <AppHeader title="Música" subtitle="Reproduce canciones y recibe solicitudes del chat." />
 
       <GlassCard>
         <View className="p-5">
@@ -87,7 +90,7 @@ export function MusicScreen({ navigation }: any) {
               <ListMusic size={20} color="#FF9DDA" />
             </View>
             <View className="flex-1">
-              <Text className="text-sm font-black text-white">Solicitudes del chat</Text>
+              <Text className="text-sm font-black text-white">Permitir solicitudes del chat</Text>
               <Text className="mt-1 text-xs leading-5 text-white/40">{commands}</Text>
             </View>
             <Switch
@@ -116,9 +119,9 @@ export function MusicScreen({ navigation }: any) {
           <ShieldCheck size={18} color="#86EFAC" />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-black text-white">Reproducción persistente</Text>
+          <Text className="text-sm font-black text-white">Sigue sonando en segundo plano</Text>
           <Text className="mt-1 text-xs leading-5 text-white/40">
-            Lulú mantiene una sesión multimedia de Android mientras hay música. Puedes minimizar la app o bloquear la pantalla sin desmontar el reproductor.
+            Puedes cambiar de app o bloquear la pantalla mientras hay una canción activa.
           </Text>
         </View>
       </View>
@@ -133,7 +136,7 @@ export function MusicScreen({ navigation }: any) {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Comando principal" />
+      <SectionTitle title="Comando para pedir canciones" />
       <GlassCard>
         <View className="p-5">
           <TextInput
@@ -151,7 +154,7 @@ export function MusicScreen({ navigation }: any) {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Agregar manualmente" />
+      <SectionTitle title="Agregar una canción" />
       <GlassCard>
         <View className="p-5">
           <TextInput
@@ -177,6 +180,11 @@ export function MusicScreen({ navigation }: any) {
               <Text className="text-lg font-black text-white">{current.query}</Text>
               <Text className="mt-1 text-xs text-white/35">pedido por @{current.requestedBy}</Text>
 
+              <View className={`mt-4 flex-row items-center gap-2 rounded-2xl border p-3 ${playbackStatus === 'error' ? 'border-red-400/20 bg-red-500/[0.08]' : 'border-white/[0.07] bg-white/[0.035]'}`}>
+                {playbackStatus === 'error' ? <AlertCircle size={16} color="#FDA4AF" /> : <ShieldCheck size={16} color={playbackStatus === 'playing' ? '#86EFAC' : '#FCD34D'} />}
+                <Text className="flex-1 text-xs leading-5 text-white/55">{playbackMessage}</Text>
+              </View>
+
               <Pressable
                 onPress={() => setPlaybackPaused(!playbackPaused)}
                 className={`mt-4 flex-row items-center justify-center gap-2 rounded-2xl px-3 py-3 ${playbackPaused ? 'bg-emerald-500/15' : 'bg-white/[0.07]'}`}
@@ -190,13 +198,18 @@ export function MusicScreen({ navigation }: any) {
               <View className="mt-3 flex-row gap-2">
                 <Pressable onPress={() => openSong(current)} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-lulu-500/15 px-3 py-3">
                   <ShieldCheck size={16} color="#FF9DDA" />
-                  <Text className="text-xs font-black text-white">Abrir navegador</Text>
+                  <Text className="text-xs font-black text-white">Ver reproductor</Text>
                 </Pressable>
                 <Pressable onPress={skip} className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white/[0.07] px-3 py-3">
                   <SkipForward size={16} color="#FF9DDA" />
                   <Text className="text-xs font-black text-white">Siguiente</Text>
                 </Pressable>
               </View>
+              {playbackStatus === 'error' ? (
+                <View className="mt-3">
+                  <Button label="Reintentar canción" compact onPress={retryCurrentSong} icon={<RefreshCw size={15} color="white" />} />
+                </View>
+              ) : null}
             </>
           ) : (
             <>

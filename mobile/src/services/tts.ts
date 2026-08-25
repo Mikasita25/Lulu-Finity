@@ -4,6 +4,7 @@ import type { LiveEvent } from '@/types/live';
 import { useTtsStore } from '@/store/useTtsStore';
 import { MICROSOFT_VOICES, normalizeMicrosoftVoice } from './microsoftVoices';
 import { synthesizeMicrosoftSpeechDirect } from './microsoftEdgeDirect';
+import { setTtsPlaybackActive } from './audioCoordinator';
 
 const MAX_QUEUE = 5;
 const MAX_PENDING_AGE_MS = 10_000;
@@ -75,33 +76,46 @@ async function synthesizeMicrosoftAudio(text: string, currentGeneration: number)
 }
 
 function playAudioFile(file: File, volume: number, currentGeneration: number) {
-  const player = createAudioPlayer(file.uri, { updateInterval: 250 });
+  const player = createAudioPlayer(file.uri, {
+    updateInterval: 200,
+    preferredForwardBufferDuration: 2,
+  });
   activePlayer = player;
   let subscription: Subscription | null = null;
 
-  return new Promise<void>((resolve) => {
+  return new Promise<void>((resolve, reject) => {
     let finished = false;
+    let started = false;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
-    const finish = () => {
+    const finish = (error?: Error) => {
       if (finished) return;
       finished = true;
       if (watchdog) clearTimeout(watchdog);
       if (activePlaybackFinish === finish) activePlaybackFinish = null;
-      resolve();
+      if (error) reject(error);
+      else resolve();
     };
 
-    activePlaybackFinish = finish;
-    subscription = player.addListener('playbackStatusUpdate', (status) => {
-      if (currentGeneration !== generation || status.didJustFinish || status.error) finish();
-    });
-    watchdog = setTimeout(finish, 60_000);
+    const start = () => {
+      if (started || finished) return;
+      started = true;
+      try {
+        player.volume = Math.max(0, Math.min(1, volume));
+        player.play();
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error('Android interrumpió la reproducción de la voz.'));
+      }
+    };
 
-    try {
-      player.volume = Math.max(0, Math.min(1, volume));
-      player.play();
-    } catch {
-      finish();
-    }
+    activePlaybackFinish = () => finish();
+    subscription = player.addListener('playbackStatusUpdate', (status) => {
+      if (currentGeneration !== generation) return finish();
+      if (status.error) return finish(new Error(`Android no pudo reproducir la voz: ${status.error}`));
+      if (status.isLoaded) start();
+      if (status.didJustFinish) finish();
+    });
+    if (player.isLoaded) start();
+    watchdog = setTimeout(finish, 60_000);
   }).finally(() => {
     try {
       subscription?.remove();
@@ -123,6 +137,7 @@ async function processNext(item: PendingSpeech) {
       return;
     }
     const { volume } = useTtsStore.getState();
+    setTtsPlaybackActive(true);
     await playAudioFile(file, volume, currentGeneration);
     item.resolve?.();
   } catch (error) {
@@ -131,6 +146,7 @@ async function processNext(item: PendingSpeech) {
     }
     item.reject?.(error instanceof Error ? error : new Error('Microsoft TTS no pudo generar el audio.'));
   } finally {
+    setTtsPlaybackActive(false);
     if (currentGeneration === generation) {
       speaking = false;
       runNext();
@@ -205,6 +221,7 @@ export async function stopTts() {
   synthesisController = null;
   activePlaybackFinish?.();
   activePlaybackFinish = null;
+  setTtsPlaybackActive(false);
 }
 
 export async function getTtsVoices() {

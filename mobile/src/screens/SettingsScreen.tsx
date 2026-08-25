@@ -69,21 +69,21 @@ export function SettingsScreen() {
 
   return (
     <Screen>
-      <AppHeader title="Ajustes" subtitle="Preferencias generales de la app." />
+      <AppHeader title="Ajustes" subtitle="Configura cómo se siente y cómo te avisa Lulú." />
 
-      <SectionTitle title="Interacciones" />
+      <SectionTitle title="Avisos del teléfono" />
       <GlassCard>
         <View className="px-5">
           <SettingSwitch
-            title="Haptics"
-            subtitle="Vibración sutil para regalos, follows y metas."
+            title="Vibración"
+            subtitle="Vibra suavemente con regalos, seguidores y metas."
             value={hapticsEnabled}
             onValueChange={setHapticsEnabled}
             icon={<Vibrate size={18} color="#FF9DDA" />}
           />
           <SettingSwitch
-            title="Heads-up notifications"
-            subtitle="Alertas importantes cuando Lulú Finity no está al frente."
+            title="Avisos emergentes"
+            subtitle="Muestra eventos importantes aunque estés usando otra app."
             value={headsUpNotifications}
             onValueChange={toggleNotifications}
             icon={<BellRing size={18} color="#FF9DDA" />}
@@ -91,15 +91,15 @@ export function SettingsScreen() {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Conexión" />
+      <SectionTitle title="Estado del LIVE" />
       <GlassCard>
         <View className="p-5">
           <View className="flex-row items-center gap-3">
             <Cable size={20} color="#FF9DDA" />
             <View className="flex-1">
-              <Text className="text-sm font-black text-white">Relay Lulú Finity</Text>
+              <Text className="text-sm font-black text-white">Conexión con TikTok</Text>
               <Text className="mt-1 text-xs text-white/40">
-                {username ? `@${username}` : 'Sin usuario'} · {relayState}
+                {username ? `@${username}` : 'Sin cuenta configurada'} · {relayState === 'connected' ? 'conectado' : 'sin conexión'}
               </Text>
             </View>
           </View>
@@ -113,19 +113,18 @@ export function SettingsScreen() {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Android" />
+      <SectionTitle title="Funcionamiento en segundo plano" />
       <GlassCard>
         <View className="flex-row items-start gap-3 p-5">
           <Smartphone size={21} color="#FF9DDA" />
           <Text className="flex-1 text-xs leading-5 text-white/40">
-            Esta edición está optimizada exclusivamente para Android. Picture-in-Picture solo se usa cuando
-            Android dispone de contenido compatible; para eventos de Lulú se priorizan notificaciones heads-up.
+            Lulú mantiene la voz y la música activas cuando cambias de aplicación. En algunos teléfonos debes permitir el uso de batería en segundo plano desde los ajustes de Android.
           </Text>
         </View>
       </GlassCard>
 
       <Text className="mt-6 text-center text-[10px] leading-5 text-white/25">
-        Lulú Finity Mobile 1.1.3 · Expo SDK 57 · Android
+        Lulú Finity 1.3.0 · Android
       </Text>
     </Screen>
   );

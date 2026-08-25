@@ -25,6 +25,9 @@ assert.doesNotMatch(splash, /videoFrame/);
 
 const dashboard = read('src/screens/DashboardScreen.tsx');
 assert.match(dashboard, /<LiveConnectionCard\s*\/>/);
+assert.match(dashboard, /Accesos rápidos/);
+assert.match(dashboard, /Voz del chat/);
+assert.match(dashboard, /Resumen del LIVE/);
 
 const connection = read('src/components/LiveConnectionCard.tsx');
 assert.match(connection, /Conectar al LIVE/);
@@ -34,6 +37,8 @@ assert.match(connection, /LIVE conectado/);
 const header = read('src/components/AppHeader.tsx');
 assert.match(header, /assets\/icon\.png/);
 assert.match(header, /Logo de Lulú Finity/);
+assert.match(header, /accessibilityLabel="Volver"/);
+assert.match(header, />Atrás</);
 
 const onboarding = read('src/screens/OnboardingScreen.tsx');
 assert.match(onboarding, /assets\/icon\.png/);
@@ -59,6 +64,13 @@ assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main
 assert.match(navigator, /name="Music"/);
 assert.match(navigator, /name="YouTubeBrowser"/);
 assert.match(navigator, /name="RecentActivity"/);
+assert.match(navigator, /title: 'Control'/);
+assert.match(navigator, /title: 'Menú'/);
+
+const menu = read('src/screens/MoreScreen.tsx');
+assert.match(menu, /Herramientas del LIVE/);
+assert.match(menu, /Tu app/);
+assert.match(menu, /Respuestas automáticas/);
 
 const liveView = read('src/screens/LiveViewScreen.tsx');
 assert.match(liveView, /Control del LIVE/);
@@ -85,11 +97,11 @@ assert.match(volumeControl, /Subir volumen/);
 assert.match(volumeControl, /Bajar volumen/);
 
 const music = read('src/screens/MusicScreen.tsx');
-assert.match(music, /Solicitudes del chat/);
+assert.match(music, /Permitir solicitudes del chat/);
 assert.match(music, /!song/);
 assert.match(music, /!sr/);
 assert.match(music, /Pausar solicitudes/);
-assert.match(music, /Reproducción persistente/);
+assert.match(music, /Sigue sonando en segundo plano/);
 assert.match(music, /MusicVolumeControl/);
 assert.match(music, /Pausar música/);
 assert.match(music, /YouTubeBrowser/);
@@ -98,15 +110,11 @@ assert.match(music, /if \(wasIdle\) playSong\(result\.song\)/);
 assert.doesNotMatch(music, /Linking\.openURL/);
 
 const youtubeBrowser = read('src/screens/YouTubeBrowserScreen.tsx');
-assert.match(youtubeBrowser, /react-native-webview/);
-assert.match(youtubeBrowser, /YOUTUBE_AD_CLEANUP/);
-assert.match(youtubeBrowser, /ytp-skip-ad-button/);
-assert.match(youtubeBrowser, /fastForwardVideoAd/);
-assert.match(youtubeBrowser, /MutationObserver/);
-assert.match(youtubeBrowser, /setSupportMultipleWindows=\{false\}/);
-assert.match(youtubeBrowser, /javaScriptCanOpenWindowsAutomatically=\{false\}/);
-assert.match(youtubeBrowser, /Bloqueo activo/);
+assert.match(youtubeBrowser, /Un solo reproductor/);
+assert.match(youtubeBrowser, /Reintentar canción/);
+assert.match(youtubeBrowser, /playbackStatus/);
 assert.match(youtubeBrowser, /skipCurrentSong/);
+assert.doesNotMatch(youtubeBrowser, /react-native-webview/);
 
 const playbackHost = read('src/components/MusicPlaybackHost.tsx');
 assert.match(playbackHost, /setAudioModeAsync/);
@@ -128,12 +136,17 @@ assert.match(playbackHost, /liveOnlyKeeper/);
 assert.match(playbackHost, /interruptionMode: 'doNotMix'/);
 assert.match(playbackHost, /video\.paused && !video\.ended/);
 assert.match(playbackHost, /setInterval\(tick, 1000\)/);
+assert.match(playbackHost, /subscribeTtsPlayback/);
+assert.match(playbackHost, /setPlaybackStatus\('playing'/);
+assert.doesNotMatch(playbackHost, /remotePauseTimer|setPlaybackPaused/);
 
 const ttsRuntime = read('src/services/tts.ts');
 assert.match(ttsRuntime, /MAX_PENDING_AGE_MS/);
 assert.match(ttsRuntime, /queuedAt/);
 assert.match(ttsRuntime, /MICROSOFT_VOICES/);
 assert.match(ttsRuntime, /synthesizeMicrosoftSpeechDirect/);
+assert.match(ttsRuntime, /setTtsPlaybackActive\(true\)/);
+assert.match(ttsRuntime, /status\.isLoaded/);
 assert.doesNotMatch(ttsRuntime, /\/v1\/tts\/microsoft|expo\/fetch/);
 assert.doesNotMatch(ttsRuntime, /expo-speech|Speech\.speak/);
 
@@ -143,8 +156,8 @@ assert.match(directTts, /new WebSocket\(url\)/);
 assert.match(directTts, /audio-24khz-48kbitrate-mono-mp3/);
 
 const ttsScreen = read('src/screens/TtsScreen.tsx');
-assert.match(ttsScreen, /Voces neuronales de Microsoft/);
-assert.match(ttsScreen, /ya no depende del motor de voz del celular/);
+assert.match(ttsScreen, /voces de Microsoft/);
+assert.match(ttsScreen, /directamente desde Microsoft/);
 assert.match(ttsScreen, /directamente con Microsoft/);
 assert.match(ttsScreen, /No se pudo reproducir la voz/);
 assert.doesNotMatch(ttsScreen, /Predeterminada del sistema|voces instaladas/);

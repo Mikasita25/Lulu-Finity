@@ -16,11 +16,11 @@ export function StatCard({
     <Animated.View entering={FadeInUp.duration(320)} className="w-[48.5%]">
       <GlassCard>
         <View className="p-4">
-          <View className="mb-5 h-10 w-10 items-center justify-center rounded-2xl bg-lulu-500/20">
+          <View className="mb-3 h-9 w-9 items-center justify-center rounded-xl bg-lulu-500/15">
             {icon}
           </View>
           <Text
-            className="text-2xl font-black tracking-tight text-white"
+            className="text-[22px] font-black tracking-tight text-white"
             numberOfLines={1}
             adjustsFontSizeToFit
           >

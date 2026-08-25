@@ -1,7 +1,7 @@
 import { NavigationContainer, DarkTheme, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { BarChart3, MoreHorizontal, Radio, Target, Trophy } from 'lucide-react-native';
+import { House, Menu, Radio, Target, Trophy } from 'lucide-react-native';
 import { DashboardScreen } from '@/screens/DashboardScreen';
 import { LiveViewScreen } from '@/screens/LiveViewScreen';
 import { GoalsScreen } from '@/screens/GoalsScreen';
@@ -35,11 +35,11 @@ function makeNavTheme(accent: string): Theme {
 
 function TabIcon({ route, color, size }: { route: string; color: string; size: number }) {
   const props = { color, size, strokeWidth: 2.4 };
-  if (route === 'Dashboard') return <BarChart3 {...props} />;
+  if (route === 'Dashboard') return <House {...props} />;
   if (route === 'LiveView') return <Radio {...props} />;
   if (route === 'Goals') return <Target {...props} />;
   if (route === 'Leaderboard') return <Trophy {...props} />;
-  return <MoreHorizontal {...props} />;
+  return <Menu {...props} />;
 }
 
 function MainTabs() {
@@ -51,15 +51,15 @@ function MainTabs() {
       tabBarShowLabel: true,
       tabBarActiveTintColor: accent,
       tabBarInactiveTintColor: '#786B76',
-      tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginBottom: 6 },
-      tabBarStyle: { position: 'absolute', height: 72, paddingTop: 8, backgroundColor: '#120D15F5', borderTopColor: 'rgba(255,255,255,0.08)', elevation: 14 },
+      tabBarLabelStyle: { fontSize: 11, fontWeight: '800', marginBottom: 8 },
+      tabBarStyle: { position: 'absolute', height: 76, paddingTop: 9, backgroundColor: '#151019FA', borderTopColor: 'rgba(255,255,255,0.08)', elevation: 14 },
       tabBarIcon: ({ color, size }) => <TabIcon route={route.name} color={color} size={size} />,
     })}>
       <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Inicio' }} />
-      <Tabs.Screen name="LiveView" component={LiveViewScreen} options={{ title: 'En Vivo' }} />
+      <Tabs.Screen name="LiveView" component={LiveViewScreen} options={{ title: 'Control' }} />
       <Tabs.Screen name="Goals" component={GoalsScreen} options={{ title: 'Metas' }} />
       <Tabs.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: 'Ranking' }} />
-      <Tabs.Screen name="More" component={MoreScreen} options={{ title: 'Más' }} />
+      <Tabs.Screen name="More" component={MoreScreen} options={{ title: 'Menú' }} />
     </Tabs.Navigator>
   );
 }

@@ -52,10 +52,8 @@ export function LiveConnectionCard() {
             <Radio size={21} color="#FF9DDA" />
           </View>
           <View className="min-w-0 flex-1">
-            <Text className="text-[11px] font-black uppercase tracking-[1.5px] text-white/40">
-              TikTok LIVE
-            </Text>
-            <Text className="mt-1 text-lg font-black text-white">Conectar al LIVE</Text>
+            <Text className="text-[11px] font-black uppercase tracking-[1.5px] text-white/40">Conexión</Text>
+            <Text className="mt-1 text-lg font-black text-white">Tu TikTok LIVE</Text>
             <View className="mt-3 self-start flex-row items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-2">
               <View style={{ backgroundColor: status.dot }} className="h-2.5 w-2.5 rounded-full" />
               <Text style={{ color: status.color }} className="text-[10px] font-black uppercase tracking-[1px]">
@@ -66,7 +64,7 @@ export function LiveConnectionCard() {
         </View>
 
         <Text className="mb-2 mt-5 text-xs font-black uppercase tracking-[1.5px] text-white/40">
-          Usuario de TikTok
+          Cuenta que está transmitiendo
         </Text>
         <View className="flex-row items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4">
           <Text className="text-lg font-black text-lulu-200">@</Text>
@@ -85,7 +83,7 @@ export function LiveConnectionCard() {
         </View>
 
         <Text className="mt-3 text-xs leading-5 text-white/40">
-          {relayMessage || 'Escribe la cuenta que está transmitiendo. No necesitas pegar una API key.'}
+          {relayMessage || 'Escribe el usuario sin @. Lulú empezará a recibir comentarios, regalos y seguidores.'}
         </Text>
 
         <View className="mt-5">
