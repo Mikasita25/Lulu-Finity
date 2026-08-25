@@ -1,5 +1,11 @@
 # Cambios
 
+## 1.3.3
+
+- Reemplaza Ranking, Metas y el panel recargado por pestañas directas de Voz, Música y Automatizaciones.
+- Simplifica Inicio para conectar el LIVE, activar lo esencial y comprobar el estado antes de volver al juego.
+- Reserva Ajustes para opciones poco frecuentes y elimina la personalización de rankings de la interfaz móvil.
+
 ## 1.3.2
 
 - El móvil deja de abrir el WebSocket de Microsoft desde Android y utiliza el mismo `edge-tts-universal` que la versión de PC, ejecutado por el servidor de Lulú.

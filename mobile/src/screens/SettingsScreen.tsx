@@ -124,7 +124,7 @@ export function SettingsScreen() {
       </GlassCard>
 
       <Text className="mt-6 text-center text-[10px] leading-5 text-white/25">
-        Lulú Finity 1.3.2 · Android
+        Lulú Finity 1.3.3 · Android
       </Text>
     </Screen>
   );

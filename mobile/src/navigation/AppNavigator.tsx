@@ -1,11 +1,8 @@
 import { NavigationContainer, DarkTheme, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { House, Menu, Radio, Target, Trophy } from 'lucide-react-native';
+import { AudioLines, House, Music2, Settings, Zap } from 'lucide-react-native';
 import { DashboardScreen } from '@/screens/DashboardScreen';
-import { LiveViewScreen } from '@/screens/LiveViewScreen';
-import { GoalsScreen } from '@/screens/GoalsScreen';
-import { LeaderboardScreen } from '@/screens/LeaderboardScreen';
 import { MoreScreen } from '@/screens/MoreScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { ConnectScreen } from '@/screens/ConnectScreen';
@@ -36,10 +33,10 @@ function makeNavTheme(accent: string): Theme {
 function TabIcon({ route, color, size }: { route: string; color: string; size: number }) {
   const props = { color, size, strokeWidth: 2.4 };
   if (route === 'Dashboard') return <House {...props} />;
-  if (route === 'LiveView') return <Radio {...props} />;
-  if (route === 'Goals') return <Target {...props} />;
-  if (route === 'Leaderboard') return <Trophy {...props} />;
-  return <Menu {...props} />;
+  if (route === 'TTS') return <AudioLines {...props} />;
+  if (route === 'Music') return <Music2 {...props} />;
+  if (route === 'Interactions') return <Zap {...props} />;
+  return <Settings {...props} />;
 }
 
 function MainTabs() {
@@ -51,15 +48,15 @@ function MainTabs() {
       tabBarShowLabel: true,
       tabBarActiveTintColor: accent,
       tabBarInactiveTintColor: '#786B76',
-      tabBarLabelStyle: { fontSize: 11, fontWeight: '800', marginBottom: 8 },
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginBottom: 8 },
       tabBarStyle: { position: 'absolute', height: 76, paddingTop: 9, backgroundColor: '#151019FA', borderTopColor: 'rgba(255,255,255,0.08)', elevation: 14 },
       tabBarIcon: ({ color, size }) => <TabIcon route={route.name} color={color} size={size} />,
     })}>
       <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Inicio' }} />
-      <Tabs.Screen name="LiveView" component={LiveViewScreen} options={{ title: 'Control' }} />
-      <Tabs.Screen name="Goals" component={GoalsScreen} options={{ title: 'Metas' }} />
-      <Tabs.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: 'Ranking' }} />
-      <Tabs.Screen name="More" component={MoreScreen} options={{ title: 'Menú' }} />
+      <Tabs.Screen name="TTS" component={TtsScreen} options={{ title: 'Voz' }} />
+      <Tabs.Screen name="Music" component={MusicScreen} options={{ title: 'Música' }} />
+      <Tabs.Screen name="Interactions" component={InteractionsScreen} options={{ title: 'Automatiza' }} />
+      <Tabs.Screen name="More" component={MoreScreen} options={{ title: 'Ajustes' }} />
     </Tabs.Navigator>
   );
 }
@@ -76,11 +73,8 @@ export function AppNavigator() {
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Connect" component={ConnectScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
-        <Stack.Screen name="TTS" component={TtsScreen} />
-        <Stack.Screen name="Music" component={MusicScreen} />
         <Stack.Screen name="YouTubeBrowser" component={YouTubeBrowserScreen} options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="RecentActivity" component={RecentActivityScreen} />
-        <Stack.Screen name="Interactions" component={InteractionsScreen} />
         <Stack.Screen name="Updates" component={UpdatesScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Sounds" component={SoundsScreen} />

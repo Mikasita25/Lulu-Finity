@@ -15,10 +15,8 @@ Versión Android, mobile-first, de Lulú Finity. Vive junto a la aplicación de 
 ## Funciones principales
 
 - Splash con video local centrado, onboarding y conexión por usuario de TikTok LIVE
-- Dashboard y Vista en Vivo
+- Centro de control con conexión y estado de segundo plano
 - TTS Bot con voces neuronales Microsoft generadas por el relay
-- Metas animadas
-- Top Fans / rankings, incluido **Fan Stickers**
 - Historial persistente con nombre/ID de Fan Stickers
 - Sonidos personalizados
 - **Automatizaciones** por comando, Fan Sticker, regalo, follow, share, suscripción o entrada
@@ -30,7 +28,7 @@ Versión Android, mobile-first, de Lulú Finity. Vive junto a la aplicación de 
 
 El móvil usa el nombre y la métrica de PC: `fanStickers`. Los eventos de emote/fan del proveedor se normalizan a `fanSticker`; no se considera Fan Sticker cualquier sticker visual genérico del chat.
 
-En `Más → Automatizaciones` se puede crear, por ejemplo:
+En la pestaña `Automatiza` se puede crear, por ejemplo:
 
 `Fan Sticker corazón → reproducir sonido + decir TTS`
 
@@ -80,7 +78,7 @@ npm run android
 
 Mientras el LIVE está conectado, Lulú conserva una sesión multimedia de Android con la notificación **TTS Bot activo**. Esa sesión mantiene el proceso en primer plano para que el WebSocket y la cola TTS continúen trabajando con la pantalla apagada o con otra app abierta. Si Android llegara a suspender el proceso de todos modos, los comentarios atrasados caducan y no se leen en bloque al regresar.
 
-Android no utiliza `expo-speech` ni el motor TTS instalado en el teléfono. Envía como máximo 240 caracteres directamente al servicio en línea Microsoft Edge TTS mediante WebSocket, recibe el MP3 y lo elimina de la caché después de reproducirlo. Railway se conserva para los eventos del LIVE, pero ya no participa en la generación de voz. Esto requiere internet y evita competir por CPU con el motor local mientras hay un juego abierto.
+Android no utiliza `expo-speech` ni el motor TTS instalado en el teléfono. Envía como máximo 240 caracteres al relay autenticado de Railway, donde el mismo motor Microsoft de la versión de PC genera el MP3. El teléfono lo reproduce y lo elimina de la caché al terminar. Esto requiere internet y evita competir por CPU con el motor local mientras hay un juego abierto.
 
 Desconectar el LIVE libera la sesión. Forzar la detención de Lulú desde Ajustes siempre finaliza el TTS y la conexión.
 
