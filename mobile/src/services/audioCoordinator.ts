@@ -3,31 +3,33 @@ type Listener = (active: boolean) => void;
 const listeners = new Set<Listener>();
 let ttsActive = false;
 
-// Música y TTS comparten la sesión de audio de Lulú. El TTS sigue exponiendo su
-// estado real para diagnóstico, pero ya no pide al reproductor musical que se
-// pause mientras habla. Esto también evita apagar temporalmente el foreground
-// MediaSession que mantiene la música viva cuando Android manda la app al fondo.
-const MIX_TTS_WITH_MUSIC = true;
-
-function musicPauseState() {
-  return MIX_TTS_WITH_MUSIC ? false : ttsActive;
-}
-
 export function setTtsPlaybackActive(active: boolean) {
   if (ttsActive === active) return;
   ttsActive = active;
-  const pauseMusic = musicPauseState();
-  for (const listener of listeners) listener(pauseMusic);
+  for (const listener of listeners) listener(ttsActive);
 }
 
 export function getTtsPlaybackActive() {
   return ttsActive;
 }
 
-export function subscribeTtsPlayback(listener: Listener) {
+export function subscribeTtsActivity(listener: Listener) {
   listeners.add(listener);
-  listener(musicPauseState());
+  listener(ttsActive);
   return () => {
     listeners.delete(listener);
   };
+}
+
+// Alias mantenido para no romper consumidores antiguos mientras migramos a la
+// semántica correcta: este callback informa si el TTS está hablando; ya no es una
+// orden para pausar música.
+export const subscribeTtsPlayback = subscribeTtsActivity;
+
+export function duckMusicVolume(volume: number, active = ttsActive) {
+  const base = Math.max(0, Math.min(1, volume));
+  if (!active) return base;
+  // La canción sigue sonando, pero a ~22 % de su nivel mientras habla Microsoft.
+  // Es suficiente para conservar ambiente sin tapar el comentario.
+  return Math.max(0, Math.min(base, base * 0.22));
 }
