@@ -1,0 +1,151 @@
+name: Lulu Finity 1.1.2
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v1112/**"
+      - ".github/workflows/v1112.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v1112/**"
+      - ".github/workflows/v1112.yml"
+
+permissions:
+  contents: write
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.1.1/Lulu-Finity-Source-1.1.1.zip
+  BASE_SHA256: 8c66a6af88bc2cd4b91631eb8369014dc8e4b3877eeca38ced844ea1813d3f61
+  CLOUDFLARED_SHA256: c29eee2b121f5436a642eed69fd9767da7e7b8c510fa50aaa130337f931357b5
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir Lulu Finity 1.1.2
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error "$BASE_URL" -o base.zip
+          echo "$BASE_SHA256  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v1112/apply-v1112.py app
+      - name: Validar HTTPS y vista previa
+        run: |
+          set -euo pipefail
+          python build-v1112/test-v1112.py app
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/preview-panel.js
+          node --check app/src/overlay-tunnel-health.js
+          node --test app/src/overlay-tunnel-health.test.js
+      - name: Ejecutar regresiones de la aplicación
+        run: |
+          set -euo pipefail
+          cd app
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          node ../build-v1005/test-main-startup.js .
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir fuente 1.1.2
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente 1.1.1 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1112/apply-v1112.py app
+          python build-v1112/test-v1112.py app
+          node --check app/src/main.js
+          node --check app/src/preview-panel.js
+          node --test app/src/overlay-tunnel-health.test.js
+      - name: Verificar cloudflared empaquetado
+        shell: pwsh
+        run: |
+          $binary = "app/resources/tools/cloudflared.exe"
+          if (!(Test-Path $binary)) { throw "La fuente 1.1.1 no contiene cloudflared.exe" }
+          $actual = (Get-FileHash $binary -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:CLOUDFLARED_SHA256) { throw "cloudflared cambió: $actual" }
+          $version = & $binary --version
+          if ($LASTEXITCODE -ne 0 -or "$version" -notmatch "cloudflared") { throw "cloudflared no pudo validarse" }
+      - name: Instalar dependencias y probar
+        working-directory: app
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          node ../build-v1005/test-main-startup.js .
+      - name: Crear fuente reproducible
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory source-v1112 -Force | Out-Null
+          foreach ($file in @("package.json","package-lock.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v1112/$file" -Force } }
+          foreach ($folder in @("src","resources","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v1112/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v1112/*" -DestinationPath "Lulu-Finity-Source-1.1.2.zip" -Force
+      - name: Inyectar token oficial del relay
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador de relay" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win -- --publish never
+      - name: Comprobar paquete
+        shell: pwsh
+        run: |
+          foreach ($file in @("app/dist/Lulu-Finity-Setup-1.1.2.exe","app/dist/Lulu-Finity-1.1.2-x64.zip","app/dist/latest.yml","app/dist/Lulu-Finity-Setup-1.1.2.exe.blockmap","Lulu-Finity-Source-1.1.2.zip")) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          $asar = "app/dist/win-unpacked/resources/app.asar"
+          if (!(Test-Path $asar)) { throw "No se generó app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar))
+          foreach ($token in @("v1.1.2","preview-panel.js","scheduleOverlayTunnelRecovery","HTTPS listo y protegido con recuperación automática","Vista previa")) {
+            if (!$text.Contains($token)) { throw "El paquete no contiene $token" }
+          }
+      - name: Publicar 1.1.2
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v1.1.2"
+          $assets = @(
+            "app/dist/Lulu-Finity-Setup-1.1.2.exe",
+            "app/dist/Lulu-Finity-1.1.2-x64.zip",
+            "app/dist/latest.yml",
+            "app/dist/Lulu-Finity-Setup-1.1.2.exe.blockmap",
+            "Lulu-Finity-Source-1.1.2.zip"
+          )
+          $notes = @"
+          ## 1.1.2
+          - HTTPS con comprobación periódica y recuperación automática si cloudflared o el Quick Tunnel dejan de responder.
+          - Nueva categoría Vista previa dentro de Lulu Finity: Chat simulado y Pantalla/Overlay sin abrir TikTok Studio u OBS.
+          - Datos de muestra para Usuario 1, Meta, Regalos, Alertas, Música, Juegos y Rankings.
+          "@
+          if (gh release view $tag 2>$null) {
+            gh release upload $tag @assets --clobber
+          } else {
+            gh release create $tag @assets --title "Lulu Finity 1.1.2" --notes $notes --latest
+          }
