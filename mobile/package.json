@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "test:realtime": "node --no-warnings --experimental-strip-types tests/realtime.test.mjs",
     "test:tts-relay": "node --no-warnings --experimental-strip-types tests/microsoft-relay.test.mjs",
-    "test:ui": "node tests/ui-contract.test.mjs",
+    "test:ui": "node tests/ui-contract.test.mjs && node --no-warnings --experimental-strip-types tests/audio-session.test.mjs",
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
     "prebuild:android": "expo prebuild --platform android --clean"

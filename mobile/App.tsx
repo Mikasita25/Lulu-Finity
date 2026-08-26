@@ -5,7 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { SplashView } from '@/components/SplashView';
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
-import { MusicPlaybackHost } from '@/components/MusicPlaybackHost';
+import { FloatingPanelBridge } from '@/components/FloatingPanelBridge';
+import { MusicPlaybackHostV2 } from '@/components/MusicPlaybackHostV2';
 import { useAppStore } from '@/store/useAppStore';
 import { useUpdateStore } from '@/store/useUpdateStore';
 import { MOBILE_UPDATES_ENABLED } from '@/services/updates';
@@ -114,7 +115,8 @@ export default function App() {
         ) : (
           <View style={styles.appRoot}>
             <AppNavigator />
-            <MusicPlaybackHost />
+            <MusicPlaybackHostV2 />
+            <FloatingPanelBridge />
             <CelebrationOverlay />
           </View>
         )}
