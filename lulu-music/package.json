@@ -2,14 +2,14 @@
   "name": "lulu-music",
   "version": "1.0.3",
   "description": "Lulu Music: comandos de TikTok LIVE, cola única y reproducción Audius/YouTube estable",
-  "main": "src/main-v103.js",
+  "main": "src/main-v103-stable.js",
   "author": "Mikasita25",
   "license": "AGPL-3.0-or-later",
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
     "test": "node --test src/*.test.js tests/*.test.js",
-    "check": "node --check src/main.js && node --check src/main-v103.js && node --check src/playback-recovery-policy.js && node --check src/playback-guard.js && node --check src/preload.js && node --check src/renderer.js",
+    "check": "node --check src/main.js && node --check src/main-v103-stable.js && node --check src/playback-recovery-policy.js && node --check src/playback-guard.js && node --check src/preload.js && node --check src/renderer.js",
     "build:win": "electron-builder --win nsis --x64 --publish never && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-portable.ps1",
     "build:dir": "electron-builder --dir --win --x64"
   },
