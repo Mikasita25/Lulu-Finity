@@ -5,11 +5,13 @@ on:
   pull_request:
     paths:
       - "build-v1112/**"
+      - "railway-relay/**"
       - ".github/workflows/v1112.yml"
   push:
     branches: [main]
     paths:
       - "build-v1112/**"
+      - "railway-relay/**"
       - ".github/workflows/v1112.yml"
 
 permissions:
@@ -28,6 +30,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Validar servidor Railway y overlays estables
+        working-directory: railway-relay
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+          npm test
       - name: Reconstruir Lulu Finity 1.1.2
         run: |
           set -euo pipefail
@@ -35,7 +44,8 @@ jobs:
           echo "$BASE_SHA256  base.zip" | sha256sum --check
           unzip -q base.zip -d app
           python build-v1112/apply-v1112.py app
-      - name: Validar HTTPS y vista previa
+          python build-v1112/stable-relay-patch.py app
+      - name: Validar HTTPS estable y vista previa
         run: |
           set -euo pipefail
           python build-v1112/test-v1112.py app
@@ -44,7 +54,11 @@ jobs:
           node --check app/src/renderer.js
           node --check app/src/preview-panel.js
           node --check app/src/overlay-tunnel-health.js
-          node --test app/src/overlay-tunnel-health.test.js
+          node --check app/src/stable-overlay-relay.js
+          node --test app/src/overlay-tunnel-health.test.js app/src/stable-overlay-relay.test.js
+          grep -q "RELAY_OVERLAY_BASE_URL" app/src/main.js
+          grep -q "publishStableOverlaySource" app/src/main.js
+          grep -q "HTTPS estable de Lulu listo" app/src/main.js
       - name: Ejecutar regresiones de la aplicación
         run: |
           set -euo pipefail
@@ -69,11 +83,13 @@ jobs:
           if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente 1.1.1 incorrecta" }
           Expand-Archive base.zip -DestinationPath app -Force
           python build-v1112/apply-v1112.py app
+          python build-v1112/stable-relay-patch.py app
           python build-v1112/test-v1112.py app
           node --check app/src/main.js
           node --check app/src/preview-panel.js
-          node --test app/src/overlay-tunnel-health.test.js
-      - name: Verificar cloudflared empaquetado
+          node --check app/src/stable-overlay-relay.js
+          node --test app/src/overlay-tunnel-health.test.js app/src/stable-overlay-relay.test.js
+      - name: Verificar cloudflared de respaldo
         shell: pwsh
         run: |
           $binary = "app/resources/tools/cloudflared.exe"
@@ -121,7 +137,7 @@ jobs:
           $asar = "app/dist/win-unpacked/resources/app.asar"
           if (!(Test-Path $asar)) { throw "No se generó app.asar" }
           $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar))
-          foreach ($token in @("v1.1.2","preview-panel.js","scheduleOverlayTunnelRecovery","HTTPS listo y protegido con recuperación automática","Vista previa")) {
+          foreach ($token in @("v1.1.2","preview-panel.js","stable-overlay-relay.js","RELAY_OVERLAY_BASE_URL","publishStableOverlaySource","Vista previa")) {
             if (!$text.Contains($token)) { throw "El paquete no contiene $token" }
           }
       - name: Publicar 1.1.2
@@ -140,7 +156,8 @@ jobs:
           )
           $notes = @"
           ## 1.1.2
-          - HTTPS con comprobación periódica y recuperación automática si cloudflared o el Quick Tunnel dejan de responder.
+          - Los HTTPS de overlays, metas, regalos, rankings, juegos y música usan primero el dominio fijo del servidor de Lulu en Railway; `cloudflared` queda únicamente como respaldo.
+          - El escritorio sincroniza estado, diseño e imágenes con el relay y vuelve a publicar periódicamente para recuperarse de reinicios del servidor sin cambiar la URL copiada.
           - Nueva categoría Vista previa dentro de Lulu Finity: Chat simulado y Pantalla/Overlay sin abrir TikTok Studio u OBS.
           - Datos de muestra para Usuario 1, Meta, Regalos, Alertas, Música, Juegos y Rankings.
           "@
