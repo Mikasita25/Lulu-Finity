@@ -39,6 +39,33 @@
     return element;
   }
 
+  function loadRewardWheelAssets() {
+    if (!document.querySelector('link[data-lulu-reward-wheel]')) {
+      const style = document.createElement('link');
+      style.rel = 'stylesheet';
+      style.href = 'reward-wheel-panel.css';
+      style.dataset.luluRewardWheel = 'style';
+      document.head.appendChild(style);
+    }
+    const loadPanel = () => {
+      if (document.querySelector('script[data-lulu-reward-wheel-panel]')) return;
+      const panel = document.createElement('script');
+      panel.src = 'reward-wheel-panel.js';
+      panel.dataset.luluRewardWheelPanel = '1';
+      document.body.appendChild(panel);
+    };
+    if (window.LuluRewardWheelPolicy) {
+      loadPanel();
+      return;
+    }
+    if (document.querySelector('script[data-lulu-reward-wheel-policy]')) return;
+    const policy = document.createElement('script');
+    policy.src = 'reward-wheel-policy.js';
+    policy.dataset.luluRewardWheelPolicy = '1';
+    policy.addEventListener('load', loadPanel, { once:true });
+    document.body.appendChild(policy);
+  }
+
   function activatePage() {
     if (typeof window.goToPage === 'function') {
       window.goToPage('preview');
@@ -230,6 +257,10 @@
     main.appendChild(page);
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
-  else setTimeout(init, 0);
+  const boot = () => {
+    init();
+    loadRewardWheelAssets();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else setTimeout(boot, 0);
 })();
