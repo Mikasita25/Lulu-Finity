@@ -9,6 +9,7 @@
   let settings = null;
   let root = null;
   let wheel = null;
+  let labelsLayer = null;
   let resultBox = null;
   let segmentsHost = null;
   let saveTimer = null;
@@ -35,7 +36,7 @@
   }
 
   function rewardText(segment) {
-    const { symbol, name } = currencyLabel();
+    const { name } = currencyLabel();
     if (segment.rewardType === 'currency_add') return `+${Number(segment.amount || 0).toLocaleString('es-MX')} ${name}`;
     if (segment.rewardType === 'currency_remove') return `-${Number(segment.amount || 0).toLocaleString('es-MX')} ${name}`;
     if (segment.rewardType === 'none') return 'Sin premio';
@@ -55,9 +56,28 @@
     return `conic-gradient(${stops.join(',')})`;
   }
 
+  function renderWheelLabels() {
+    if (!labelsLayer) return;
+    const items = policy.segmentProbabilities(config);
+    let cursor = 0;
+    labelsLayer.replaceChildren(...items.map((item) => {
+      const start = cursor * 360;
+      cursor += item.probability;
+      const mid = (start + cursor * 360) / 2;
+      const label = document.createElement('span');
+      label.className = 'reward-wheel-label';
+      label.textContent = item.label;
+      label.title = `${item.label} · ${(item.probability * 100).toFixed(1)}%`;
+      label.style.transform = `translate(-50%,-50%) rotate(${mid}deg) translateY(-116px) rotate(${-mid}deg)`;
+      if (items.length > 20) label.classList.add('compact');
+      return label;
+    }));
+  }
+
   function renderWheel() {
     if (!wheel) return;
     wheel.style.background = wheelGradient();
+    renderWheelLabels();
   }
 
   function segmentMidAngle(index) {
@@ -201,7 +221,9 @@
     const delta = ((normalizedTarget - currentNormalized + 360) % 360) + turns * 360;
     rotation += delta;
     wheel.style.transition = 'transform 4s cubic-bezier(.12,.72,.08,1)';
+    labelsLayer?.style.setProperty('transition', 'transform 4s cubic-bezier(.12,.72,.08,1)');
     wheel.style.transform = `rotate(${rotation}deg)`;
+    if (labelsLayer) labelsLayer.style.transform = `rotate(${rotation}deg)`;
     await new Promise((resolve) => setTimeout(resolve, 4050));
   }
 
@@ -266,7 +288,7 @@
     section.className = 'panel reward-wheel-studio';
     section.id = 'rewardWheelStudio';
     section.innerHTML = `<div class="reward-wheel-head"><div><h2>Ruleta de premios</h2><p>Configura los espacios, probabilidades y recompensas. Los premios de monedas usan la misma Economía de Lulu Finity.</p></div><div class="reward-wheel-head-actions"><label class="switch"><input id="rewardWheelEnabled" type="checkbox"/><span></span></label><button class="ghost tiny" id="rewardWheelSaveBtn" type="button">Guardar</button></div></div>
-      <div class="reward-wheel-layout"><div class="reward-wheel-preview"><div class="reward-wheel-wrap"><div class="reward-wheel-pointer"></div><div class="reward-wheel-disc" id="rewardWheelDisc"></div></div><div class="reward-wheel-result" id="rewardWheelResult"><strong>Lista para girar</strong><span>La prueba local no cambia saldos.</span></div><div class="reward-wheel-preview-actions"><input id="rewardWheelPreviewName" value="Usuario 1" maxlength="80"/><button class="secondary" id="rewardWheelPreviewBtn" type="button">Girar prueba</button></div></div>
+      <div class="reward-wheel-layout"><div class="reward-wheel-preview"><div class="reward-wheel-wrap"><div class="reward-wheel-pointer"></div><div class="reward-wheel-disc" id="rewardWheelDisc"></div><div class="reward-wheel-labels" id="rewardWheelLabels"></div></div><div class="reward-wheel-result" id="rewardWheelResult"><strong>Lista para girar</strong><span>La prueba local no cambia saldos.</span></div><div class="reward-wheel-preview-actions"><input id="rewardWheelPreviewName" value="Usuario 1" maxlength="80"/><button class="secondary" id="rewardWheelPreviewBtn" type="button">Girar prueba</button></div></div>
       <div class="reward-wheel-settings"><div class="reward-wheel-basic-grid"><label>Comando<input id="rewardWheelCommand" value="!girar" maxlength="40"/></label><label>Costo por giro<input id="rewardWheelCost" type="number" min="0" max="1000000000" step="1" value="0"/></label><label>Cooldown por usuario (s)<input id="rewardWheelCooldown" type="number" min="0" max="86400" step="1" value="30"/></label><label>Espacios<input id="rewardWheelCount" type="number" min="2" max="40" step="1" value="8"/></label></div><div class="reward-wheel-economy-warning hidden" id="rewardWheelEconomyWarning">Activa Economía para que los premios o costos de monedas cambien el saldo real del canal.</div><div class="reward-wheel-segments-head"><strong>Espacios y premios</strong><div><button class="ghost tiny" id="rewardWheelEqualWeights" type="button">Igualar probabilidades</button><button class="secondary tiny" id="rewardWheelAddSegment" type="button">+ Espacio</button></div></div><div class="reward-wheel-segments" id="rewardWheelSegments"></div><div class="reward-wheel-note">El peso controla la probabilidad. Si todos tienen el mismo peso, todos los espacios tienen la misma posibilidad. Máximo: 40 espacios.</div></div></div>`;
     const heading = page.querySelector('.page-heading');
     if (heading?.nextSibling) page.insertBefore(section, heading.nextSibling);
@@ -328,6 +350,7 @@
     config = policy.sanitizeConfig(settings.rewardWheel || {});
     root = buildUi(page);
     wheel = root.querySelector('#rewardWheelDisc');
+    labelsLayer = root.querySelector('#rewardWheelLabels');
     resultBox = root.querySelector('#rewardWheelResult');
     segmentsHost = root.querySelector('#rewardWheelSegments');
     renderBasic();
