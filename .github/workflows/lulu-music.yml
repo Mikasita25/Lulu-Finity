@@ -88,7 +88,7 @@ jobs:
           }
           $listing = & node_modules/.bin/asar list $asar
           $appSource = ($listing | Where-Object { $_ -like "\src\*" }) -join "`n"
-          foreach ($required in @("src\main-v103.js", "src\playback-recovery-policy.js", "src\playback-guard.js")) {
+          foreach ($required in @("src\main.js", "src\main-v103-final.js", "src\playback-recovery-policy.js", "src\playback-guard.js")) {
             if (!$appSource.Contains($required)) { throw "El paquete no contiene $required" }
           }
           foreach ($forbidden in @("src\local-tts", "src\local-voice", "src\live-games", "src\automation-engine", "src\economy", ".test.js")) {
@@ -100,20 +100,34 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $profile = Join-Path $env:RUNNER_TEMP "lulu-music-profile"
           $marker = Join-Path $env:RUNNER_TEMP "lulu-music-smoke.json"
+          $stdout = Join-Path $env:RUNNER_TEMP "lulu-music-smoke.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "lulu-music-smoke.stderr.log"
           New-Item -ItemType Directory $profile -Force | Out-Null
-          Remove-Item $marker -Force -ErrorAction SilentlyContinue
+          Remove-Item $marker,$stdout,$stderr -Force -ErrorAction SilentlyContinue
           $env:LULU_MUSIC_SMOKE_TEST = "1"
           $env:LULU_MUSIC_PLAYER_SMOKE_TEST = "1"
           $env:LULU_MUSIC_SMOKE_MARKER = $marker
-          $process = Start-Process -FilePath "dist/win-unpacked/Lulu Music.exe" -ArgumentList "--user-data-dir=$profile" -PassThru
+          $process = Start-Process -FilePath "dist/win-unpacked/Lulu Music.exe" -ArgumentList "--user-data-dir=$profile" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
           try {
             for ($attempt = 0; $attempt -lt 60 -and !(Test-Path $marker); $attempt++) {
               Start-Sleep -Milliseconds 500
               $process.Refresh()
-              if ($process.HasExited -and !(Test-Path $marker)) { throw "Lulu Music se cerró antes de confirmar su renderer" }
+              if ($process.HasExited -and !(Test-Path $marker)) {
+                Write-Host "Lulu Music terminó con código $($process.ExitCode)."
+                if (Test-Path $stdout) { Write-Host "--- STDOUT ---"; Get-Content $stdout -Raw | Write-Host }
+                if (Test-Path $stderr) { Write-Host "--- STDERR ---"; Get-Content $stderr -Raw | Write-Host }
+                throw "Lulu Music se cerró antes de confirmar su renderer"
+              }
             }
-            if (!(Test-Path $marker)) { throw "El renderer no respondió en 30 segundos" }
+            if (!(Test-Path $marker)) {
+              Write-Host "Proceso principal: PID=$($process.Id) HasExited=$($process.HasExited)"
+              Get-Process | Where-Object { $_.ProcessName -like '*Lulu*' -or $_.ProcessName -like '*electron*' } | Select-Object Id,ProcessName,WorkingSet64 | Format-Table | Out-String | Write-Host
+              if (Test-Path $stdout) { Write-Host "--- STDOUT ---"; Get-Content $stdout -Raw | Write-Host }
+              if (Test-Path $stderr) { Write-Host "--- STDERR ---"; Get-Content $stderr -Raw | Write-Host }
+              throw "El renderer no respondió en 30 segundos"
+            }
             $result = Get-Content $marker -Raw | ConvertFrom-Json
+            if ($result.error) { throw "El smoke interno falló: $($result.error)" }
             if ($result.title -ne "Lulu Music" -or !$result.hasQueue -or !$result.hasPlayer -or !$result.hasSettings -or $result.hasSidebar -or $result.hasIframe -or $result.panels -lt 4) {
               throw "La pantalla única no pasó la prueba: $($result | ConvertTo-Json -Compress)"
             }
