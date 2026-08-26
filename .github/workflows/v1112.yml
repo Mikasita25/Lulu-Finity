@@ -45,10 +45,12 @@ jobs:
           unzip -q base.zip -d app
           python build-v1112/apply-v1112.py app
           python build-v1112/stable-relay-patch.py app
+          python build-v1112/reward-wheel-stream-patch.py app
       - name: Validar HTTPS estable, vista previa y ruleta
         run: |
           set -euo pipefail
           python build-v1112/test-v1112.py app
+          python -m py_compile build-v1112/reward-wheel-stream-patch.py
           node --check app/src/main.js
           node --check app/src/preload.js
           node --check app/src/renderer.js
@@ -64,6 +66,9 @@ jobs:
           grep -q "HTTPS estable de Lulu listo" app/src/main.js
           grep -q "Ruleta de premios" app/src/reward-wheel-panel.js
           grep -q "currency_add" app/src/reward-wheel-policy.js
+          grep -q "rewardWheelStage" app/src/main.js
+          grep -q "renderRewardWheel" app/src/main.js
+          grep -q "conic-gradient" app/src/main.js
       - name: Ejecutar regresiones de la aplicación
         run: |
           set -euo pipefail
@@ -89,7 +94,9 @@ jobs:
           Expand-Archive base.zip -DestinationPath app -Force
           python build-v1112/apply-v1112.py app
           python build-v1112/stable-relay-patch.py app
+          python build-v1112/reward-wheel-stream-patch.py app
           python build-v1112/test-v1112.py app
+          python -m py_compile build-v1112/reward-wheel-stream-patch.py
           node --check app/src/main.js
           node --check app/src/preview-panel.js
           node --check app/src/reward-wheel-policy.js
@@ -97,6 +104,8 @@ jobs:
           node --check app/src/stable-overlay-relay.js
           node --test app/src/overlay-tunnel-health.test.js app/src/stable-overlay-relay.test.js
           node --test build-v1112/reward-wheel-policy.test.js
+          if (!(Select-String -Path app/src/main.js -Pattern "rewardWheelStage" -Quiet)) { throw "Falta la ruleta visual del widget" }
+          if (!(Select-String -Path app/src/main.js -Pattern "renderRewardWheel" -Quiet)) { throw "Falta el render visual de la ruleta" }
       - name: Verificar cloudflared de respaldo
         shell: pwsh
         run: |
@@ -145,7 +154,7 @@ jobs:
           $asar = "app/dist/win-unpacked/resources/app.asar"
           if (!(Test-Path $asar)) { throw "No se generó app.asar" }
           $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar))
-          foreach ($token in @("v1.1.2","preview-panel.js","reward-wheel-panel.js","reward-wheel-policy.js","stable-overlay-relay.js","RELAY_OVERLAY_BASE_URL","publishStableOverlaySource","Vista previa","Ruleta de premios")) {
+          foreach ($token in @("v1.1.2","preview-panel.js","reward-wheel-panel.js","reward-wheel-policy.js","rewardWheelStage","renderRewardWheel","stable-overlay-relay.js","RELAY_OVERLAY_BASE_URL","publishStableOverlaySource","Vista previa","Ruleta de premios")) {
             if (!$text.Contains($token)) { throw "El paquete no contiene $token" }
           }
       - name: Publicar 1.1.2
@@ -168,6 +177,7 @@ jobs:
           - El escritorio sincroniza estado, diseño e imágenes con el relay y vuelve a publicar periódicamente para recuperarse de reinicios del servidor sin cambiar la URL copiada.
           - Nueva categoría Vista previa dentro de Lulu Finity: Chat simulado y Pantalla/Overlay sin abrir TikTok Studio u OBS.
           - Nueva Ruleta de premios configurable dentro de Juegos: de 2 a 40 espacios, colores, pesos/probabilidades, costo, cooldown y premios que pueden sumar o quitar monedas de Economía.
+          - La ruleta también se anima visualmente en el widget/fuente de Juegos para el stream, tanto en enlace local como HTTPS estable.
           - El giro de prueba es local y no modifica saldos; los giros reales desde el chat usan el saldo del canal y publican el resultado en el widget de Juegos.
           - Datos de muestra para Usuario 1, Meta, Regalos, Alertas, Música, Juegos y Rankings.
           "@
