@@ -72,6 +72,22 @@ replace_once(
 index_text = read(index_path).replace("Lulu Finity 1.1.1", "Lulu Finity 1.1.2").replace("v1.1.1", "v1.1.2")
 write(index_path, index_text)
 
+# La vista previa no debe iniciar el servidor local ni activar overlays durante el
+# arranque. Solo carga la fuente cuando el usuario abre Pantalla / Overlay.
+preview_path = ROOT / "src" / "preview-panel.js"
+replace_once(
+    preview_path,
+    "    setTimeout(() => loadSource(currentSource, frame, status, sourceButtons), 50);\n    return pane;",
+    "    pane.__luluLoadSource = () => loadSource(currentSource, frame, status, sourceButtons);\n    return pane;",
+    "carga bajo demanda de la vista previa"
+)
+replace_once(
+    preview_path,
+    "    overlayTab.addEventListener('click', () => selectTab('overlay'));",
+    "    overlayTab.addEventListener('click', () => { selectTab('overlay'); overlayPane.__luluLoadSource?.(); });",
+    "activación bajo demanda del servidor local"
+)
+
 main_path = ROOT / "src" / "main.js"
 replace_once(
     main_path,
@@ -207,6 +223,7 @@ if changelog_path.is_file():
             "- Elimina el flujo manual de ‘pulsa copiar para reintentar’ y mantiene el enlace en modo de autorrecuperación mientras la fuente HTTPS está solicitada.",
             "- Añade una sección Vista previa dentro de Lulu Finity con Chat simulado y Pantalla/Overlay, sin TikTok Studio ni OBS.",
             "- Las vistas de Usuario 1, Meta, Regalos, Alertas, Música, Juegos y Rankings usan el servidor local y datos de muestra.",
+            "- La vista Pantalla/Overlay se mantiene completamente bajo demanda para no activar el servidor local durante el arranque.",
             ""
         ]
         lines[insert_at:insert_at] = entry
