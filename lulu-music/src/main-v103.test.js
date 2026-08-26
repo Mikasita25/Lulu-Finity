@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 process.env.LULU_MUSIC_PATCH_TEST = '1';
-const { patchMainSource } = require('./main-v103');
+const { patchMainSource } = require('./main-v103-stable');
 delete process.env.LULU_MUSIC_PATCH_TEST;
 
 test('runtime patch adds bounded YouTube recovery and Audius retry', () => {
