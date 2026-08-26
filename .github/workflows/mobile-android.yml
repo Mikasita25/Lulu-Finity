@@ -37,6 +37,64 @@ jobs:
             echo "LULU_RELAY_CLIENT_TOKEN no está configurado o es inválido."
             exit 1
           fi
+      - name: Comprobar WebSocket LIVE real
+        shell: bash
+        run: |
+          npm ci --prefix "$GITHUB_WORKSPACE/railway-relay" --omit=dev --no-audit --no-fund
+          node <<'NODE'
+          const WebSocket = require(process.env.GITHUB_WORKSPACE + '/railway-relay/node_modules/ws');
+          const token = process.env.EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN;
+          const url = process.env.EXPO_PUBLIC_LULU_RELAY_URL + '?uniqueId=lulu_finity_probe';
+          const ws = new WebSocket(url, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'x-lulu-client-token': token,
+              'User-Agent': 'Lulu-Finity-Mobile-CI/1.0',
+            },
+            handshakeTimeout: 15000,
+          });
+          let opened = false;
+          let sawConnecting = false;
+          let sawConnected = false;
+          const timeout = setTimeout(() => {
+            console.error(`LIVE probe timeout. opened=${opened} connecting=${sawConnecting} connected=${sawConnected}`);
+            try { ws.terminate(); } catch {}
+            process.exit(1);
+          }, 25000);
+          ws.on('open', () => {
+            opened = true;
+            console.log('WebSocket LIVE autenticado correctamente.');
+          });
+          ws.on('message', (data) => {
+            let payload;
+            try { payload = JSON.parse(data.toString('utf8')); } catch { return; }
+            if (payload?.type !== 'lulu.relay.status') return;
+            const state = payload?.data?.state;
+            if (state === 'connecting' || state === 'rotating') sawConnecting = true;
+            if (state === 'connected') {
+              sawConnected = true;
+              clearTimeout(timeout);
+              console.log('Relay LIVE llegó al proveedor upstream correctamente.');
+              ws.close(1000, 'ci probe complete');
+              setTimeout(() => process.exit(0), 100);
+            }
+          });
+          ws.on('unexpected-response', (_request, response) => {
+            clearTimeout(timeout);
+            console.error(`Handshake LIVE rechazado con HTTP ${response.statusCode}.`);
+            process.exit(1);
+          });
+          ws.on('close', (code, reason) => {
+            if (sawConnected) return;
+            clearTimeout(timeout);
+            console.error(`LIVE cerró antes de conectar. code=${code} reason=${reason.toString()}`);
+            process.exit(1);
+          });
+          ws.on('error', (error) => {
+            if (sawConnected) return;
+            console.error('Error WebSocket LIVE:', error.message);
+          });
+          NODE
       - name: Comprobar audio Microsoft real
         shell: bash
         run: |
