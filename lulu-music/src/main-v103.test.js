@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 process.env.LULU_MUSIC_PATCH_TEST = '1';
-const { patchMainSource } = require('./main-v103-stable');
+const { patchMainSource, normalizeSource } = require('./main-v103-final');
 delete process.env.LULU_MUSIC_PATCH_TEST;
 
 test('runtime patch adds bounded YouTube recovery and Audius retry', () => {
@@ -21,6 +21,12 @@ test('runtime patch adds bounded YouTube recovery and Audius retry', () => {
   assert.doesNotMatch(patched, /El reproductor ligero de YouTube no cargó:[\s\S]{0,120}advanceQueue\(\)/);
 });
 
+test('runtime patch produces the same result with Windows CRLF source', () => {
+  const original = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
+  const windowsSource = normalizeSource(original).replace(/\n/g, '\r\n');
+  assert.equal(patchMainSource(windowsSource), patchMainSource(original));
+});
+
 test('runtime patch refuses to silently drift from the audited 1.0.2 source', () => {
-  assert.throws(() => patchMainSource("'use strict';\nmodule.exports={};"), /No se pudo aplicar/);
+  assert.throws(() => patchMainSource("'use strict';\r\nmodule.exports={};\r\n"), /No se pudo aplicar/);
 });
