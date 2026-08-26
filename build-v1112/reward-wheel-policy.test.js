@@ -36,3 +36,12 @@ test('currency rewards and commands are sanitized', () => {
   assert.equal(config.segments[1].amount, 0);
   assert.equal(config.segments[1].color, '#abcdef');
 });
+
+test('custom reward labels stay visible and bounded', () => {
+  const config = policy.sanitizeConfig({ segments:[
+    { label:'  JACKPOT +5,000 Lunitas  ', weight:1, rewardType:'currency_add', amount:5000, color:'#123456' },
+    { label:'Premio especial para el chat', weight:1, rewardType:'message', message:'Gana un premio especial', color:'#654321' }
+  ]});
+  assert.equal(config.segments[0].label, 'JACKPOT +5,000 Lunitas');
+  assert.equal(config.segments[1].message, 'Gana un premio especial');
+});
