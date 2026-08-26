@@ -40,9 +40,10 @@ jobs:
       - name: Comprobar WebSocket LIVE real
         shell: bash
         run: |
-          npm ci --prefix "$GITHUB_WORKSPACE/railway-relay" --omit=dev --no-audit --no-fund
-          node <<'NODE'
-          const WebSocket = require(process.env.GITHUB_WORKSPACE + '/railway-relay/node_modules/ws');
+          mkdir -p "$RUNNER_TEMP/lulu-ws"
+          npm install --prefix "$RUNNER_TEMP/lulu-ws" ws@8.21.3 --no-save --no-audit --no-fund
+          LULU_WS_MODULE="$RUNNER_TEMP/lulu-ws/node_modules/ws" node <<'NODE'
+          const WebSocket = require(process.env.LULU_WS_MODULE);
           const token = process.env.EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN;
           const url = process.env.EXPO_PUBLIC_LULU_RELAY_URL + '?uniqueId=lulu_finity_probe';
           const ws = new WebSocket(url, {
