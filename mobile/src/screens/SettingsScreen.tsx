@@ -7,8 +7,15 @@ import { GlassCard } from '@/components/GlassCard';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Button } from '@/components/Button';
 import { useAppStore } from '@/store/useAppStore';
+import { useFloatingPanelStore } from '@/store/useFloatingPanelStore';
 import { configureNotifications } from '@/services/notifications';
 import { connectLive, disconnectLive } from '@/services/liveRuntime';
+import {
+  canDrawFloatingPanel,
+  requestFloatingPanelPermission,
+  startFloatingPanel,
+  stopFloatingPanel,
+} from '@/services/floatingPanel';
 
 function SettingSwitch({
   title,
@@ -49,6 +56,8 @@ export function SettingsScreen() {
   const mode = useAppStore((state) => state.mode);
   const setHapticsEnabled = useAppStore((state) => state.setHapticsEnabled);
   const setHeadsUpNotifications = useAppStore((state) => state.setHeadsUpNotifications);
+  const floatingPanelEnabled = useFloatingPanelStore((state) => state.enabled);
+  const setFloatingPanelEnabled = useFloatingPanelStore((state) => state.setEnabled);
 
   const toggleNotifications = async (enabled: boolean) => {
     if (enabled) {
@@ -57,6 +66,42 @@ export function SettingsScreen() {
       } catch {}
     }
     setHeadsUpNotifications(enabled);
+  };
+
+  const toggleFloatingPanel = (enabled: boolean) => {
+    if (!enabled) {
+      setFloatingPanelEnabled(false);
+      try {
+        stopFloatingPanel();
+      } catch {}
+      return;
+    }
+
+    try {
+      if (canDrawFloatingPanel()) {
+        setFloatingPanelEnabled(true);
+        startFloatingPanel();
+        return;
+      }
+
+      Alert.alert(
+        'Permitir panel flotante',
+        'Android abrirá el permiso “Mostrar sobre otras apps”. Actívalo para Lulú Finity y vuelve a la app; el panel aparecerá automáticamente.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Abrir ajustes',
+            onPress: () => {
+              setFloatingPanelEnabled(true);
+              requestFloatingPanelPermission();
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      setFloatingPanelEnabled(false);
+      Alert.alert('No se pudo activar', error instanceof Error ? error.message : String(error));
+    }
   };
 
   const reconnect = () => {
@@ -88,6 +133,13 @@ export function SettingsScreen() {
             onValueChange={toggleNotifications}
             icon={<BellRing size={18} color="#FF9DDA" />}
           />
+          <SettingSwitch
+            title="Panel flotante del LIVE"
+            subtitle="Comentarios, likes, follows, regalos y controles de música encima de otras apps."
+            value={floatingPanelEnabled}
+            onValueChange={toggleFloatingPanel}
+            icon={<Smartphone size={18} color="#FF9DDA" />}
+          />
         </View>
       </GlassCard>
 
@@ -118,13 +170,13 @@ export function SettingsScreen() {
         <View className="flex-row items-start gap-3 p-5">
           <Smartphone size={21} color="#FF9DDA" />
           <Text className="flex-1 text-xs leading-5 text-white/40">
-            Lulú mantiene la voz y la música activas cuando cambias de aplicación. En algunos teléfonos debes permitir el uso de batería en segundo plano desde los ajustes de Android.
+            Con el panel flotante activado, Android mantiene un servicio visible mientras usas el juego o TikTok. El panel baja su opacidad cuando no hay actividad y vuelve a mostrarse completo cuando llega un evento o lo tocas.
           </Text>
         </View>
       </GlassCard>
 
       <Text className="mt-6 text-center text-[10px] leading-5 text-white/25">
-        Lulú Finity 1.3.3 · Android
+        Lulú Finity 1.3.4 · Android
       </Text>
     </Screen>
   );
