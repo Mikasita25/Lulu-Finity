@@ -6,7 +6,7 @@
 process.env.TTS_CLIENT_TOKENS =
   process.env.TTS_CLIENT_TOKENS || process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN || '';
 process.env.OVERLAY_CLIENT_TOKENS =
-  process.env.OVERLAY_CLIENT_TOKENS || process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN || '';
+  process.env.OVERLAY_CLIENT_TOKENS || process.env.TTS_CLIENT_TOKENS || process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN || '';
 process.env.CLIENT_TOKENS = '';
 process.env.CLIENT_TOKEN = '';
 
