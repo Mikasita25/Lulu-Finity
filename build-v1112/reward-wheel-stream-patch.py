@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else "app").resolve()
@@ -36,3 +37,6 @@ text = text[:match.start()] + replacement + text[match.end():]
 
 MAIN.write_text(text, encoding="utf-8", newline="\n")
 print("Ruleta de premios visual integrada en el widget de Juegos")
+
+customization_patch = Path(__file__).with_name("widget-customization-patch.py")
+subprocess.run([sys.executable, str(customization_patch), str(ROOT)], check=True)
