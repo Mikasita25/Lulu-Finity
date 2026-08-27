@@ -95,10 +95,18 @@ test('widget customization clamps unsafe visual values', () => {
 test('customization studio browser scripts parse before packaging', () => {
   const files = [
     'widget-customizer-panel.js',
-    'widget-customizer-panel-fix.js',
-    'preview-panel.js'
+    'widget-customizer-panel-fix.js'
   ].map((name) => path.join(buildRoot, 'files', 'src', name));
   for (const file of files) assertJavaScriptParses(file);
+});
+
+test('preview panel wires the customization studio assets', () => {
+  const source = fs.readFileSync(path.join(buildRoot, 'files', 'src', 'preview-panel.js'), 'utf8');
+  assert.match(source, /function loadCustomizerAssets\(\)/);
+  assert.match(source, /widget-customization-policy\.js/);
+  assert.match(source, /widget-customizer-panel\.js/);
+  assert.match(source, /widget-customizer-panel-fix\.js/);
+  assert.match(source, /loadCustomizerAssets\(\)/);
 });
 
 test('reconstructed now playing template contains the safe progress expression', () => {
