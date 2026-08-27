@@ -1,9 +1,20 @@
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const policy = require('./files/src/reward-wheel-policy');
 const widgetPolicy = require('./files/src/widget-customization-policy');
+
+const buildRoot = __dirname;
+const repoRoot = path.resolve(buildRoot, '..');
+
+function assertJavaScriptParses(file) {
+  const source = fs.readFileSync(file, 'utf8');
+  assert.doesNotThrow(() => new Function(source), `${path.basename(file)} debe tener JavaScript válido`);
+  return source;
+}
 
 test('reward wheel supports configurable segment counts from 2 to 40', () => {
   assert.equal(policy.resizeSegments({}, 2).segments.length, 2);
@@ -79,4 +90,24 @@ test('widget customization clamps unsafe visual values', () => {
   assert.equal(config.blur, 32);
   assert.equal(config.scale, 60);
   assert.equal(config.goalBarHeight, 30);
+});
+
+test('customization studio browser scripts parse before packaging', () => {
+  const files = [
+    'widget-customizer-panel.js',
+    'widget-customizer-panel-fix.js',
+    'preview-panel.js'
+  ].map((name) => path.join(buildRoot, 'files', 'src', name));
+  for (const file of files) assertJavaScriptParses(file);
+});
+
+test('reconstructed now playing template contains the safe progress expression', () => {
+  const mainPath = path.join(repoRoot, 'app', 'src', 'main.js');
+  if (!fs.existsSync(mainPath)) return;
+  const source = fs.readFileSync(mainPath, 'utf8');
+  assert.match(source, /widgetCustomizationPolicy/);
+  assert.match(source, /lf-progress-track/);
+  assert.match(source, /preview\?0\.42:0/);
+  assert.doesNotMatch(source, /preview\?\.42/);
+  assert.match(source, /artworkUrl:playlistArtworkUrl/);
 });
