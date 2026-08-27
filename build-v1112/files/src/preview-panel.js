@@ -66,6 +66,41 @@
     document.body.appendChild(policy);
   }
 
+  function loadCustomizerAssets() {
+    if (!document.querySelector('link[data-lulu-customizer]')) {
+      const style = document.createElement('link');
+      style.rel = 'stylesheet';
+      style.href = 'widget-customizer-panel.css';
+      style.dataset.luluCustomizer = 'style';
+      document.head.appendChild(style);
+    }
+    const loadFix = () => {
+      if (document.querySelector('script[data-lulu-customizer-fix]')) return;
+      const fix = document.createElement('script');
+      fix.src = 'widget-customizer-panel-fix.js';
+      fix.dataset.luluCustomizerFix = '1';
+      document.body.appendChild(fix);
+    };
+    const loadPanel = () => {
+      if (document.querySelector('script[data-lulu-customizer-panel]')) { loadFix(); return; }
+      const panel = document.createElement('script');
+      panel.src = 'widget-customizer-panel.js';
+      panel.dataset.luluCustomizerPanel = '1';
+      panel.addEventListener('load', loadFix, { once:true });
+      document.body.appendChild(panel);
+    };
+    if (window.LuluWidgetCustomizationPolicy) {
+      loadPanel();
+      return;
+    }
+    if (document.querySelector('script[data-lulu-customizer-policy]')) return;
+    const policy = document.createElement('script');
+    policy.src = 'widget-customization-policy.js';
+    policy.dataset.luluCustomizerPolicy = '1';
+    policy.addEventListener('load', loadPanel, { once:true });
+    document.body.appendChild(policy);
+  }
+
   function activatePage() {
     if (typeof window.goToPage === 'function') {
       window.goToPage('preview');
@@ -260,6 +295,7 @@
   const boot = () => {
     init();
     loadRewardWheelAssets();
+    loadCustomizerAssets();
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else setTimeout(boot, 0);
