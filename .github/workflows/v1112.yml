@@ -46,17 +46,20 @@ jobs:
           python build-v1112/apply-v1112.py app
           python build-v1112/stable-relay-patch.py app
           python build-v1112/reward-wheel-stream-patch.py app
-      - name: Validar HTTPS estable, vista previa y ruleta
+      - name: Validar HTTPS estable, vista previa, ruleta y Personalizar
         run: |
           set -euo pipefail
           python build-v1112/test-v1112.py app
-          python -m py_compile build-v1112/reward-wheel-stream-patch.py
+          python -m py_compile build-v1112/reward-wheel-stream-patch.py build-v1112/widget-customization-patch.py
           node --check app/src/main.js
           node --check app/src/preload.js
           node --check app/src/renderer.js
           node --check app/src/preview-panel.js
           node --check app/src/reward-wheel-policy.js
           node --check app/src/reward-wheel-panel.js
+          node --check app/src/widget-customization-policy.js
+          node --check app/src/widget-customizer-panel.js
+          node --check app/src/widget-customizer-panel-fix.js
           node --check app/src/overlay-tunnel-health.js
           node --check app/src/stable-overlay-relay.js
           node --test app/src/overlay-tunnel-health.test.js app/src/stable-overlay-relay.test.js
@@ -69,6 +72,11 @@ jobs:
           grep -q "rewardWheelStage" app/src/main.js
           grep -q "renderRewardWheel" app/src/main.js
           grep -q "conic-gradient" app/src/main.js
+          grep -q "streamWidgetCustomizations" app/src/main.js
+          grep -q "lf-progress-track" app/src/main.js
+          grep -q "playlistArtworkUrl" app/src/renderer.js
+          grep -q "Personalizar" app/src/widget-customizer-panel.js
+          if grep -Fq "preview?.42" app/src/main.js; then echo "Expresión inválida en Now Playing"; exit 1; fi
       - name: Ejecutar regresiones de la aplicación
         run: |
           set -euo pipefail
@@ -96,16 +104,22 @@ jobs:
           python build-v1112/stable-relay-patch.py app
           python build-v1112/reward-wheel-stream-patch.py app
           python build-v1112/test-v1112.py app
-          python -m py_compile build-v1112/reward-wheel-stream-patch.py
+          python -m py_compile build-v1112/reward-wheel-stream-patch.py build-v1112/widget-customization-patch.py
           node --check app/src/main.js
           node --check app/src/preview-panel.js
           node --check app/src/reward-wheel-policy.js
           node --check app/src/reward-wheel-panel.js
+          node --check app/src/widget-customization-policy.js
+          node --check app/src/widget-customizer-panel.js
+          node --check app/src/widget-customizer-panel-fix.js
           node --check app/src/stable-overlay-relay.js
           node --test app/src/overlay-tunnel-health.test.js app/src/stable-overlay-relay.test.js
           node --test build-v1112/reward-wheel-policy.test.js
           if (!(Select-String -Path app/src/main.js -Pattern "rewardWheelStage" -Quiet)) { throw "Falta la ruleta visual del widget" }
           if (!(Select-String -Path app/src/main.js -Pattern "renderRewardWheel" -Quiet)) { throw "Falta el render visual de la ruleta" }
+          if (!(Select-String -Path app/src/main.js -Pattern "lf-progress-track" -Quiet)) { throw "Falta el Now Playing de Música" }
+          if (!(Select-String -Path app/src/widget-customizer-panel.js -Pattern "Personalizar" -Quiet)) { throw "Falta el estudio Personalizar" }
+          if (Select-String -Path app/src/main.js -SimpleMatch "preview?.42" -Quiet) { throw "Expresión inválida en Now Playing" }
       - name: Verificar cloudflared de respaldo
         shell: pwsh
         run: |
@@ -154,7 +168,7 @@ jobs:
           $asar = "app/dist/win-unpacked/resources/app.asar"
           if (!(Test-Path $asar)) { throw "No se generó app.asar" }
           $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar))
-          foreach ($token in @("v1.1.2","preview-panel.js","reward-wheel-panel.js","reward-wheel-policy.js","rewardWheelStage","renderRewardWheel","stable-overlay-relay.js","RELAY_OVERLAY_BASE_URL","publishStableOverlaySource","Vista previa","Ruleta de premios")) {
+          foreach ($token in @("v1.1.2","preview-panel.js","reward-wheel-panel.js","reward-wheel-policy.js","rewardWheelStage","renderRewardWheel","widget-customizer-panel.js","widget-customization-policy.js","lf-progress-track","playlistArtworkUrl","Personalizar","stable-overlay-relay.js","RELAY_OVERLAY_BASE_URL","publishStableOverlaySource","Vista previa","Ruleta de premios")) {
             if (!$text.Contains($token)) { throw "El paquete no contiene $token" }
           }
       - name: Publicar 1.1.2
@@ -178,7 +192,9 @@ jobs:
           - Nueva categoría Vista previa dentro de Lulu Finity: Chat simulado y Pantalla/Overlay sin abrir TikTok Studio u OBS.
           - Nueva Ruleta de premios configurable dentro de Juegos: de 2 a 40 espacios, colores, pesos/probabilidades, costo, cooldown y premios que pueden sumar o quitar monedas de Economía.
           - La ruleta también se anima visualmente en el widget/fuente de Juegos para el stream, tanto en enlace local como HTTPS estable.
-          - El giro de prueba es local y no modifica saldos; los giros reales desde el chat usan el saldo del canal y publican el resultado en el widget de Juegos.
+          - Nueva sección Personalizar para Música, Metas, Regalos, Alertas, Monedas/usuario y Rankings. Los juegos conservan únicamente los estilos incluidos por Lulu Finity.
+          - Música estrena un Now Playing compacto con portada, título/artista y barra de progreso; colores, transparencia, esquinas, tamaño, blur y grosor de barra se pueden editar.
+          - El giro de prueba de la ruleta es local y no modifica saldos; los giros reales desde el chat usan el saldo del canal y publican el resultado en el widget de Juegos.
           - Datos de muestra para Usuario 1, Meta, Regalos, Alertas, Música, Juegos y Rankings.
           "@
           if (gh release view $tag 2>$null) {
