@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const policy = require('./files/src/reward-wheel-policy');
+const widgetPolicy = require('./files/src/widget-customization-policy');
 
 test('reward wheel supports configurable segment counts from 2 to 40', () => {
   assert.equal(policy.resizeSegments({}, 2).segments.length, 2);
@@ -44,4 +45,38 @@ test('custom reward labels stay visible and bounded', () => {
   ]});
   assert.equal(config.segments[0].label, 'JACKPOT +5,000 Lunitas');
   assert.equal(config.segments[1].message, 'Gana un premio especial');
+});
+
+test('music starts with a compact now playing design', () => {
+  const all = widgetPolicy.defaults();
+  assert.equal(all.playlist.enabled, true);
+  assert.equal(all.playlist.layout, 'compact');
+  assert.equal(all.playlist.showArtwork, true);
+  assert.equal(all.playlist.showQueue, false);
+  assert.equal(all.playlist.backgroundColor, '#5b989c');
+});
+
+test('free customization excludes game widgets', () => {
+  assert.equal(widgetPolicy.sanitizeWidget('game', { enabled:true }), null);
+  assert.deepEqual(widgetPolicy.TYPES, ['playlist','wallet','alert','goal','gift']);
+});
+
+test('widget customization clamps unsafe visual values', () => {
+  const config = widgetPolicy.sanitizeWidget('goal', {
+    enabled:true,
+    primaryColor:'red',
+    secondaryColor:'#ABCDEF',
+    backgroundOpacity:999,
+    borderRadius:-20,
+    blur:90,
+    scale:12,
+    goalBarHeight:100
+  });
+  assert.equal(config.primaryColor, '#ff70b5');
+  assert.equal(config.secondaryColor, '#abcdef');
+  assert.equal(config.backgroundOpacity, 100);
+  assert.equal(config.borderRadius, 0);
+  assert.equal(config.blur, 32);
+  assert.equal(config.scale, 60);
+  assert.equal(config.goalBarHeight, 30);
 });
