@@ -1,0 +1,204 @@
+name: Lulu Finity 1.1.2
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v1112/**"
+      - "railway-relay/**"
+      - ".github/workflows/v1112.yml"
+  push:
+    branches: [main]
+    paths:
+      - "build-v1112/**"
+      - "railway-relay/**"
+      - ".github/workflows/v1112.yml"
+
+permissions:
+  contents: write
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.1.1/Lulu-Finity-Source-1.1.1.zip
+  BASE_SHA256: 8c66a6af88bc2cd4b91631eb8369014dc8e4b3877eeca38ced844ea1813d3f61
+  CLOUDFLARED_SHA256: c29eee2b121f5436a642eed69fd9767da7e7b8c510fa50aaa130337f931357b5
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validar servidor Railway y overlays estables
+        working-directory: railway-relay
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+          npm test
+      - name: Reconstruir Lulu Finity 1.1.2
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error "$BASE_URL" -o base.zip
+          echo "$BASE_SHA256  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v1112/apply-v1112.py app
+          python build-v1112/stable-relay-patch.py app
+          python build-v1112/reward-wheel-stream-patch.py app
+      - name: Validar HTTPS estable, vista previa, ruleta y Personalizar
+        run: |
+          set -euo pipefail
+          python build-v1112/test-v1112.py app
+          python -m py_compile build-v1112/reward-wheel-stream-patch.py build-v1112/widget-customization-patch.py
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/preview-panel.js
+          node --check app/src/reward-wheel-policy.js
+          node --check app/src/reward-wheel-panel.js
+          node --check app/src/widget-customization-policy.js
+          node --check app/src/widget-customizer-panel.js
+          node --check app/src/widget-customizer-panel-fix.js
+          node --check app/src/overlay-tunnel-health.js
+          node --check app/src/stable-overlay-relay.js
+          node --test app/src/overlay-tunnel-health.test.js app/src/stable-overlay-relay.test.js
+          node --test build-v1112/reward-wheel-policy.test.js
+          grep -q "RELAY_OVERLAY_BASE_URL" app/src/main.js
+          grep -q "publishStableOverlaySource" app/src/main.js
+          grep -q "HTTPS estable de Lulu listo" app/src/main.js
+          grep -q "Ruleta de premios" app/src/reward-wheel-panel.js
+          grep -q "currency_add" app/src/reward-wheel-policy.js
+          grep -q "rewardWheelStage" app/src/main.js
+          grep -q "renderRewardWheel" app/src/main.js
+          grep -q "conic-gradient" app/src/main.js
+          grep -q "streamWidgetCustomizations" app/src/main.js
+          grep -q "lf-progress-track" app/src/main.js
+          grep -q "playlistArtworkUrl" app/src/renderer.js
+          grep -q "Personalizar" app/src/widget-customizer-panel.js
+          if grep -Fq "preview?.42" app/src/main.js; then echo "Expresión inválida en Now Playing"; exit 1; fi
+      - name: Ejecutar regresiones de la aplicación
+        run: |
+          set -euo pipefail
+          cd app
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          node ../build-v1005/test-main-startup.js .
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir fuente 1.1.2
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente 1.1.1 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1112/apply-v1112.py app
+          python build-v1112/stable-relay-patch.py app
+          python build-v1112/reward-wheel-stream-patch.py app
+          python build-v1112/test-v1112.py app
+          python -m py_compile build-v1112/reward-wheel-stream-patch.py build-v1112/widget-customization-patch.py
+          node --check app/src/main.js
+          node --check app/src/preview-panel.js
+          node --check app/src/reward-wheel-policy.js
+          node --check app/src/reward-wheel-panel.js
+          node --check app/src/widget-customization-policy.js
+          node --check app/src/widget-customizer-panel.js
+          node --check app/src/widget-customizer-panel-fix.js
+          node --check app/src/stable-overlay-relay.js
+          node --test app/src/overlay-tunnel-health.test.js app/src/stable-overlay-relay.test.js
+          node --test build-v1112/reward-wheel-policy.test.js
+          if (!(Select-String -Path app/src/main.js -Pattern "rewardWheelStage" -Quiet)) { throw "Falta la ruleta visual del widget" }
+          if (!(Select-String -Path app/src/main.js -Pattern "renderRewardWheel" -Quiet)) { throw "Falta el render visual de la ruleta" }
+          if (!(Select-String -Path app/src/main.js -Pattern "lf-progress-track" -Quiet)) { throw "Falta el Now Playing de Música" }
+          if (!(Select-String -Path app/src/widget-customizer-panel.js -Pattern "Personalizar" -Quiet)) { throw "Falta el estudio Personalizar" }
+          if (Select-String -Path app/src/main.js -SimpleMatch "preview?.42" -Quiet) { throw "Expresión inválida en Now Playing" }
+      - name: Verificar cloudflared de respaldo
+        shell: pwsh
+        run: |
+          $binary = "app/resources/tools/cloudflared.exe"
+          if (!(Test-Path $binary)) { throw "La fuente 1.1.1 no contiene cloudflared.exe" }
+          $actual = (Get-FileHash $binary -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:CLOUDFLARED_SHA256) { throw "cloudflared cambió: $actual" }
+          $version = & $binary --version
+          if ($LASTEXITCODE -ne 0 -or "$version" -notmatch "cloudflared") { throw "cloudflared no pudo validarse" }
+      - name: Instalar dependencias y probar
+        working-directory: app
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          node ../build-v1005/test-main-startup.js .
+      - name: Crear fuente reproducible
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory source-v1112 -Force | Out-Null
+          foreach ($file in @("package.json","package-lock.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) { if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v1112/$file" -Force } }
+          foreach ($folder in @("src","resources","build","railway-relay")) { if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v1112/$folder" -Recurse -Force } }
+          Compress-Archive -Path "source-v1112/*" -DestinationPath "Lulu-Finity-Source-1.1.2.zip" -Force
+      - name: Inyectar token oficial del relay
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Token inválido" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta marcador de relay" }
+          $content = $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN)
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+      - name: Compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win -- --publish never
+      - name: Comprobar paquete
+        shell: pwsh
+        run: |
+          foreach ($file in @("app/dist/Lulu-Finity-Setup-1.1.2.exe","app/dist/Lulu-Finity-1.1.2-x64.zip","app/dist/latest.yml","app/dist/Lulu-Finity-Setup-1.1.2.exe.blockmap","Lulu-Finity-Source-1.1.2.zip")) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          $asar = "app/dist/win-unpacked/resources/app.asar"
+          if (!(Test-Path $asar)) { throw "No se generó app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar))
+          foreach ($token in @("v1.1.2","preview-panel.js","reward-wheel-panel.js","reward-wheel-policy.js","rewardWheelStage","renderRewardWheel","widget-customizer-panel.js","widget-customization-policy.js","lf-progress-track","playlistArtworkUrl","Personalizar","stable-overlay-relay.js","RELAY_OVERLAY_BASE_URL","publishStableOverlaySource","Vista previa","Ruleta de premios")) {
+            if (!$text.Contains($token)) { throw "El paquete no contiene $token" }
+          }
+      - name: Publicar 1.1.2
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v1.1.2"
+          $assets = @(
+            "app/dist/Lulu-Finity-Setup-1.1.2.exe",
+            "app/dist/Lulu-Finity-1.1.2-x64.zip",
+            "app/dist/latest.yml",
+            "app/dist/Lulu-Finity-Setup-1.1.2.exe.blockmap",
+            "Lulu-Finity-Source-1.1.2.zip"
+          )
+          $notes = @"
+          ## 1.1.2
+          - Los HTTPS de overlays, metas, regalos, rankings, juegos y música usan primero el dominio fijo del servidor de Lulu en Railway; `cloudflared` queda únicamente como respaldo.
+          - El escritorio sincroniza estado, diseño e imágenes con el relay y vuelve a publicar periódicamente para recuperarse de reinicios del servidor sin cambiar la URL copiada.
+          - Nueva categoría Vista previa dentro de Lulu Finity: Chat simulado y Pantalla/Overlay sin abrir TikTok Studio u OBS.
+          - Nueva Ruleta de premios configurable dentro de Juegos: de 2 a 40 espacios, colores, pesos/probabilidades, costo, cooldown y premios que pueden sumar o quitar monedas de Economía.
+          - La ruleta también se anima visualmente en el widget/fuente de Juegos para el stream, tanto en enlace local como HTTPS estable.
+          - Nueva sección Personalizar para Música, Metas, Regalos, Alertas, Monedas/usuario y Rankings. Los juegos conservan únicamente los estilos incluidos por Lulu Finity.
+          - Música estrena un Now Playing compacto con portada, título/artista y barra de progreso; colores, transparencia, esquinas, tamaño, blur y grosor de barra se pueden editar.
+          - El giro de prueba de la ruleta es local y no modifica saldos; los giros reales desde el chat usan el saldo del canal y publican el resultado en el widget de Juegos.
+          - Datos de muestra para Usuario 1, Meta, Regalos, Alertas, Música, Juegos y Rankings.
+          "@
+          if (gh release view $tag 2>$null) {
+            gh release upload $tag @assets --clobber
+          } else {
+            gh release create $tag @assets --title "Lulu Finity 1.1.2" --notes "$notes" --latest
+          }
