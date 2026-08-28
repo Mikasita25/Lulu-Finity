@@ -15,7 +15,7 @@ function replaceOnce(oldText, newText, label) {
 
 replaceOnce(
   "const { MICROSOFT_VOICES, synthesizeMicrosoftSpeech } = require('./microsoft-tts');",
-  "const { MICROSOFT_VOICES, synthesizeMicrosoftSpeech } = require('./microsoft-tts');\nconst { OverlayHub } = require('./overlay-hub');",
+  "const { MICROSOFT_VOICES, synthesizeMicrosoftSpeech } = require('./microsoft-tts');\nconst { OverlayHub } = require('./overlay-hub-custom-assets');",
   'OverlayHub'
 );
 
