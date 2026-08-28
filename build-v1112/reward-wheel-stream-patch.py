@@ -38,5 +38,11 @@ text = text[:match.start()] + replacement + text[match.end():]
 MAIN.write_text(text, encoding="utf-8", newline="\n")
 print("Ruleta de premios visual integrada en el widget de Juegos")
 
-customization_patch = Path(__file__).with_name("widget-customization-patch.py")
-subprocess.run([sys.executable, str(customization_patch), str(ROOT)], check=True)
+for patch_name in (
+    "widget-customization-patch.py",
+    "custom-assets-ui-patch.py",
+    "custom-assets-visual-patch.py",
+    "custom-assets-relay-patch.py",
+):
+    patch = Path(__file__).with_name(patch_name)
+    subprocess.run([sys.executable, str(patch), str(ROOT)], check=True)
