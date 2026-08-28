@@ -39,3 +39,29 @@ test('does not retry deterministic 4xx responses', async () => {
   await assert.rejects(() => relay.publish({ token: 'c'.repeat(32), source: 'ranking:1', state: {} }), /No autorizado/);
   assert.equal(calls, 1);
 });
+
+test('checks the media manifest and uploads a missing custom image once', async () => {
+  const calls = [];
+  const bytes = Buffer.from('image-bytes');
+  const relay = new StableOverlayRelay({
+    baseUrl: 'https://lulu.example',
+    clientToken: 'secret-token',
+    appVersion: '1.1.2',
+    fs: { promises: {
+      stat: async () => ({ isFile: () => true, size: bytes.length }),
+      readFile: async () => bytes
+    } },
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      if (options.method === 'GET') return { ok:true, status:200, json:async()=>({ ok:true, media:[] }) };
+      return { ok:true, status:200, json:async()=>({ ok:true }) };
+    }
+  });
+  await relay.publish({ token:'d'.repeat(32), source:'widget:goal', state:{type:'goal'}, mediaPaths:['/tmp/image-custom.png'], verifyMedia:true });
+  assert.equal(calls.length, 3);
+  assert.match(calls[1].url, /media-manifest/);
+  const upload = JSON.parse(calls[2].options.body);
+  assert.equal(upload.media.name, 'image-custom.png');
+  assert.equal(upload.media.type, 'image/png');
+  assert.equal(Buffer.from(upload.media.base64, 'base64').toString(), bytes.toString());
+});
