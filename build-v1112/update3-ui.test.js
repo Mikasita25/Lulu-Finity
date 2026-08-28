@@ -5,7 +5,7 @@ const path = require('path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const root = path.resolve(process.argv[2] || 'app');
+const root = path.resolve(process.env.LULU_APP_ROOT || 'app');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
 const ui = read('src/update3-ui.js');
