@@ -1,7 +1,10 @@
 from pathlib import Path
+import os
+import subprocess
 import sys
 
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else "app").resolve()
+HERE = Path(__file__).resolve().parent
 
 
 def read(path):
@@ -91,5 +94,15 @@ checks = {
 for needle, haystack in checks.items():
     if needle not in haystack:
         raise SystemExit(f"Falta {needle!r} en la integración Update 3.0")
+
+# Estas comprobaciones se ejecutan dentro de la reconstrucción tanto en Linux
+# como en Windows, sin crear un workflow paralelo ni renombrar la versión interna.
+subprocess.run(["node", "--check", str(update_js)], check=True)
+test_file = HERE / "update3-ui.test.js"
+if not test_file.is_file():
+    raise SystemExit(f"No se encontró {test_file}")
+env = dict(os.environ)
+env["LULU_APP_ROOT"] = str(ROOT)
+subprocess.run(["node", "--test", str(test_file)], check=True, env=env)
 
 print("Update 3.0 visual integrada sin cambiar el build interno")
