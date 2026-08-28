@@ -43,6 +43,7 @@ for patch_name in (
     "custom-assets-ui-patch.py",
     "custom-assets-visual-patch.py",
     "custom-assets-relay-patch.py",
+    "update3-ui-patch.py",
 ):
     patch = Path(__file__).with_name(patch_name)
     subprocess.run([sys.executable, str(patch), str(ROOT)], check=True)
