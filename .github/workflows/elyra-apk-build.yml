@@ -23,38 +23,59 @@ jobs:
           cat .elyra-build/chunk_00 .elyra-build/chunk_01 .elyra-build/chunk_02 .elyra-build/chunk_03 .elyra-build/chunk_04 .elyra-build/chunk_05 .elyra-build/chunk_06 > /tmp/elyra-project.b64
           base64 -d /tmp/elyra-project.b64 > /tmp/elyra-project.zip
           unzip -q /tmp/elyra-project.zip
+
           cat .elyra-build/patch32_* > /tmp/elyra-v32.patch.xz.b64
           base64 -d /tmp/elyra-v32.patch.xz.b64 > /tmp/elyra-v32.patch.xz
           echo '757844890b10f078877207c6763302e64245b648de33b8e69edbbf46a743fdc9  /tmp/elyra-v32.patch.xz' | sha256sum -c -
           xz -dc /tmp/elyra-v32.patch.xz > /tmp/elyra-v32.patch
           patch -p1 < /tmp/elyra-v32.patch
+
           cat .elyra-build/patch33_* > /tmp/elyra-v33.patch.xz.b64
           base64 -d /tmp/elyra-v33.patch.xz.b64 > /tmp/elyra-v33.patch.xz
           echo '6dcc88ea5d7074c4c95396c4ae4e1dd2663f2fe9189d19351d9fd611a043710d  /tmp/elyra-v33.patch.xz' | sha256sum -c -
           xz -dc /tmp/elyra-v33.patch.xz > /tmp/elyra-v33.patch
           patch -p1 < /tmp/elyra-v33.patch
+
           cat .elyra-build/patch34_* > /tmp/elyra-v34.patch.xz.b64
           base64 -d /tmp/elyra-v34.patch.xz.b64 > /tmp/elyra-v34.patch.xz
           echo '5c1c48a77adaae63d71789e76b9e27478fcc433e23b67ab9638254f119c3c6c2  /tmp/elyra-v34.patch.xz' | sha256sum -c -
           xz -dc /tmp/elyra-v34.patch.xz > /tmp/elyra-v34.patch
           patch -p1 < /tmp/elyra-v34.patch
+
           cat .elyra-build/patch35_* > /tmp/elyra-v35.patch.xz.b64
           base64 -d /tmp/elyra-v35.patch.xz.b64 > /tmp/elyra-v35.patch.xz
           echo '9a74f95038c7f6f447e9e43e340bd52535fd3c378bb2bf5ce0a96ce1a1c0c54c  /tmp/elyra-v35.patch.xz' | sha256sum -c -
           xz -dc /tmp/elyra-v35.patch.xz > /tmp/elyra-v35.patch
           patch -p1 < /tmp/elyra-v35.patch
+
+          cat .elyra-build/patch36_* > /tmp/elyra-v36.patch.xz.b64
+          base64 -d /tmp/elyra-v36.patch.xz.b64 > /tmp/elyra-v36.patch.xz
+          echo '8c6289e25be12939ed767edfd63ddd8f0fb06f5b394314441e000c28c980d944  /tmp/elyra-v36.patch.xz' | sha256sum -c -
+          xz -dc /tmp/elyra-v36.patch.xz > /tmp/elyra-v36.patch
+          patch -p1 < /tmp/elyra-v36.patch
+
           printf '\nandroid.useAndroidX=true\n' >> elyra-android/gradle.properties
           base64 -d .elyra-build/elyra-update-key.b64 > /tmp/elyra-update.jks
+
           test -f elyra-android/app/build.gradle
           test -f elyra-android/app/src/main/java/com/elyra/ai/MainActivity.java
           test -f elyra-android/app/src/main/java/com/elyra/ai/LocalModelEngine.kt
           grep -q "litertlm-android:0.15.0" elyra-android/app/build.gradle
-          grep -q "versionCode 8" elyra-android/app/build.gradle
-          grep -q "versionName '3.5'" elyra-android/app/build.gradle
-          grep -q "repeatedAssistantReply" elyra-android/app/src/main/assets/app.js
-          grep -q "HISTORIAL PREVIO" elyra-android/app/src/main/assets/app.js
-          grep -q "double temperature" elyra-android/app/src/main/java/com/elyra/ai/MainActivity.java
-          grep -q "android.useAndroidX=true" elyra-android/gradle.properties
+          grep -q "versionCode 9" elyra-android/app/build.gradle
+          grep -q "versionName '3.6'" elyra-android/app/build.gradle
+          grep -q "completeCloud" elyra-android/app/src/main/java/com/elyra/ai/MainActivity.java
+          grep -q "openai/gpt-oss-20b" elyra-android/app/src/main/assets/app.js
+          grep -q "qwen/qwen3.8-27b" elyra-android/app/src/main/assets/app.js
+          grep -q "openai/gpt-oss-120b" elyra-android/app/src/main/assets/app.js
+          grep -q "gemini-3.7-flash" elyra-android/app/src/main/assets/app.js
+          grep -q "gemini-3.5-flash-lite" elyra-android/app/src/main/assets/app.js
+          grep -q "openrouter/free" elyra-android/app/src/main/assets/app.js
+          grep -q "__elyraCloudModelToken" elyra-android/app/src/main/assets/app.js
+          grep -q "cloudFallback" elyra-android/app/src/main/assets/app.js
+          grep -q "groqKey" elyra-android/app/src/main/index.html
+          grep -q "geminiKey" elyra-android/app/src/main/index.html
+          grep -q "openrouterKey" elyra-android/app/src/main/index.html
+          node --check elyra-android/app/src/main/assets/app.js
           test -s /tmp/elyra-update.jks
 
       - name: Set up Java
@@ -90,16 +111,17 @@ jobs:
           APK=elyra-android/app/build/outputs/apk/release/app-release.apk
           test -f "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "package: name='com.elyra.ai' versionCode='8' versionName='3.5'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "package: name='com.elyra.ai' versionCode='9' versionName='3.6'"
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/'
-          unzip -p "$APK" assets/app.js | grep -q 'repeatedAssistantReply'
+          unzip -p "$APK" assets/app.js | grep -q '__elyraCloudModelToken'
+          unzip -p "$APK" assets/app.js | grep -q 'openai/gpt-oss-20b'
 
       - name: Prepare APK
-        run: cp elyra-android/app/build/outputs/apk/release/app-release.apk Elyra-AI-v3.5.apk
+        run: cp elyra-android/app/build/outputs/apk/release/app-release.apk Elyra-AI-v3.6.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Elyra-AI-v3.5
-          path: Elyra-AI-v3.5.apk
+          name: Elyra-AI-v3.6
+          path: Elyra-AI-v3.6.apk
           retention-days: 1
