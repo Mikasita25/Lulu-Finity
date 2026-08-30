@@ -23,24 +23,18 @@ jobs:
           cat .elyra-build/chunk_00 .elyra-build/chunk_01 .elyra-build/chunk_02 .elyra-build/chunk_03 .elyra-build/chunk_04 .elyra-build/chunk_05 .elyra-build/chunk_06 > /tmp/elyra-project.b64
           base64 -d /tmp/elyra-project.b64 > /tmp/elyra-project.zip
           unzip -q /tmp/elyra-project.zip
-          cat .elyra-build/patch32_* > /tmp/elyra-v32.patch.xz.b64
-          base64 -d /tmp/elyra-v32.patch.xz.b64 > /tmp/elyra-v32.patch.xz
-          xz -dc /tmp/elyra-v32.patch.xz > /tmp/elyra-v32.patch
-          patch -p1 < /tmp/elyra-v32.patch
-          cat .elyra-build/patch33_* > /tmp/elyra-v33.patch.xz.b64
-          base64 -d /tmp/elyra-v33.patch.xz.b64 > /tmp/elyra-v33.patch.xz
-          xz -dc /tmp/elyra-v33.patch.xz > /tmp/elyra-v33.patch
-          patch -p1 < /tmp/elyra-v33.patch
-          cat .elyra-build/patch34_* > /tmp/elyra-v34.patch.xz.b64
-          base64 -d /tmp/elyra-v34.patch.xz.b64 > /tmp/elyra-v34.patch.xz
-          xz -dc /tmp/elyra-v34.patch.xz > /tmp/elyra-v34.patch
-          patch -p1 < /tmp/elyra-v34.patch
+          for v in 32 33 34 35; do
+            cat .elyra-build/patch${v}_* > /tmp/elyra-v${v}.patch.xz.b64
+            base64 -d /tmp/elyra-v${v}.patch.xz.b64 > /tmp/elyra-v${v}.patch.xz
+            xz -dc /tmp/elyra-v${v}.patch.xz > /tmp/elyra-v${v}.patch
+            patch -p1 < /tmp/elyra-v${v}.patch
+          done
           printf '\nandroid.useAndroidX=true\n' >> elyra-android/gradle.properties
-          tar -czf Elyra-v3.4-source.tar.gz elyra-android
+          tar -czf Elyra-v3.5-source.tar.gz elyra-android
 
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: Elyra-v3.4-source
-          path: Elyra-v3.4-source.tar.gz
+          name: Elyra-v3.5-source
+          path: Elyra-v3.5-source.tar.gz
           retention-days: 1
