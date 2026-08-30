@@ -1,6 +1,13 @@
 # Railway API Relay de Lulu Finity
 
-Este servicio conserva las API keys de EulerStream en Railway, rota las claves al alcanzar límites, entrega un contador diario aproximado y genera el audio TTS Microsoft para Android.
+Este servicio conserva las API keys de EulerStream en Railway, rota las claves al alcanzar límites, entrega un contador diario aproximado, genera el audio TTS Microsoft para Android y aloja las fuentes HTTPS estables de Lulu Finity PC.
+
+## Fuentes HTTPS estables
+
+- Lulu crea una capacidad secreta por instalación y sólo expone una identidad pública derivada dentro de la URL de OBS/TikTok Studio.
+- Widgets, rankings y pantallas conservan la misma dirección tras reinicios. Los cambios de tema y contenido aparecen en esa URL sin reemplazar la fuente.
+- Los estados se guardan de forma atómica y las imágenes se validan por nombre, extensión, MIME, tamaño, firma y SHA-256.
+- Monta un Railway Volume y configura `OVERLAY_STATE_DIR=/data/lulu-overlays`. Si el volumen se pierde, Lulu vuelve a registrar las fuentes activas con la misma identidad.
 
 ## Uso diario
 
@@ -13,7 +20,7 @@ Este servicio conserva las API keys de EulerStream en Railway, rota las claves a
 
 ## Despliegue
 
-Configura `EULER_API_KEYS`, conserva una sola réplica y genera un dominio público. Los endpoints disponibles son `GET /health`, `GET /usage`, `GET /v1/tts/voices`, `POST /v1/tts/microsoft` y el WebSocket `/v1/tiktok/live`.
+Configura `EULER_API_KEYS`, conserva una sola réplica, monta el volumen y genera un dominio público. Además de `GET /health`, `GET /usage`, TTS y el WebSocket `/v1/tiktok/live`, el relay sirve `/overlays/:id/:tipo/:nombre` y sincroniza estados/recursos bajo `/v1/overlays/:id/*` mediante capacidad Bearer.
 
 ## TTS Microsoft para Android
 

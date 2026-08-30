@@ -7,21 +7,14 @@ const { WebSocketServer } = WebSocket;
 const { KeyPool, parseList } = require('./key-pool');
 const { classifyUpstreamFailure } = require('./failure-classifier');
 const { DailyUsageMeter } = require('./usage-meter');
-const { MICROSOFT_VOICES, synthesizeMicrosoftSpeech } = require('./microsoft-tts');
 const { MAX_ASSET_BYTES, MAX_SOURCE_BYTES, OverlayStore, safePublicId, safeSource } = require('./overlay-store');
 const { overlayPageCsp, renderOverlayPage } = require('./overlay-page');
 
 const PORT = Math.max(1, Number(process.env.PORT || 3000));
 const UPSTREAM_WS_URL = String(process.env.UPSTREAM_WS_URL || 'wss://ws.eulerstream.com').trim();
 const CLIENT_TOKENS = new Set(parseList(process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN));
-const TTS_CLIENT_TOKENS = new Set(parseList(
-  process.env.TTS_CLIENT_TOKENS || process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN
-));
 const MAX_CLIENTS = Math.max(1, Number(process.env.MAX_CLIENTS || 50));
 const MAX_ATTEMPTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_CONNECTION_ATTEMPTS_PER_MINUTE || 30));
-const MAX_TTS_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_TTS_REQUESTS_PER_MINUTE || 90));
-const MAX_TTS_CONCURRENT = Math.max(1, Number(process.env.MAX_TTS_CONCURRENT || 4));
-const RELAY_BUILD = 'microsoft-tts-stable-overlays-v2';
 const UPSTREAM_OPEN_TIMEOUT_MS = Math.max(3000, Number(process.env.UPSTREAM_OPEN_TIMEOUT_MS || 18000));
 const DAILY_USAGE_LIMIT = Math.max(1, Number(process.env.DAILY_USAGE_LIMIT || 7500));
 const USAGE_PER_CONNECTION = Math.max(0.1, Number(process.env.USAGE_PER_CONNECTION || 2));
@@ -46,10 +39,8 @@ if (!keyPool.size) {
 }
 
 let activeClients = 0;
-let activeTtsRequests = 0;
 let shuttingDown = false;
 const attemptsByIp = new Map();
-const ttsAttemptsByIp = new Map();
 const sessions = new Set();
 
 function cleanUsername(value) {
@@ -69,14 +60,6 @@ function rateLimitAllows(ip, now = Date.now()) {
   return current.length <= MAX_ATTEMPTS_PER_MINUTE;
 }
 
-function ttsRateLimitAllows(ip, now = Date.now()) {
-  const windowStart = now - 60_000;
-  const current = (ttsAttemptsByIp.get(ip) || []).filter((time) => time >= windowStart);
-  current.push(now);
-  ttsAttemptsByIp.set(ip, current);
-  return current.length <= MAX_TTS_REQUESTS_PER_MINUTE;
-}
-
 function suppliedToken(request) {
   const authorization = String(request.headers.authorization || '');
   if (/^Bearer\s+/i.test(authorization)) return authorization.replace(/^Bearer\s+/i, '').trim();
@@ -86,63 +69,6 @@ function suppliedToken(request) {
 function authorized(request) {
   if (!CLIENT_TOKENS.size) return true;
   return CLIENT_TOKENS.has(suppliedToken(request));
-}
-
-function authorizedTts(request) {
-  if (!TTS_CLIENT_TOKENS.size) return true;
-  return TTS_CLIENT_TOKENS.has(suppliedToken(request));
-}
-
-function readJsonBody(request, maxBytes = 4096) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    let rejected = false;
-    request.on('data', (chunk) => {
-      if (rejected) return;
-      size += chunk.length;
-      if (size > maxBytes) {
-        rejected = true;
-        const error = new Error('La solicitud es demasiado grande.');
-        error.statusCode = 413;
-        reject(error);
-        return;
-      }
-      chunks.push(chunk);
-    });
-    request.on('end', () => {
-      if (rejected) return;
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
-      } catch {
-        const error = new Error('El cuerpo debe ser JSON válido.');
-        error.statusCode = 400;
-        reject(error);
-      }
-    });
-    request.on('error', reject);
-  });
-}
-
-function readBufferBody(request, maxBytes) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    let rejected = false;
-    request.on('data', (chunk) => {
-      if (rejected) return;
-      size += chunk.length;
-      if (size > maxBytes) {
-        rejected = true;
-        reject(Object.assign(new Error('La solicitud es demasiado grande.'), { statusCode: 413 }));
-        request.resume();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    request.on('end', () => { if (!rejected) resolve(Buffer.concat(chunks)); });
-    request.on('error', reject);
-  });
 }
 
 function sendJson(socket, payload) {
@@ -288,164 +214,126 @@ function jsonHeaders() {
   return {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
-    'access-control-allow-origin': '*',
-    'access-control-allow-headers': 'authorization, content-type, x-lulu-client-token',
-    'access-control-allow-methods': 'GET, POST, PUT, OPTIONS'
+    'access-control-allow-origin': '*'
   };
 }
 
+function readRequestBody(request, limit) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    request.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(Object.assign(new Error('La solicitud supera el límite permitido.'), { statusCode: 413 }));
+        request.resume();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on('end', () => resolve(Buffer.concat(chunks)));
+    request.on('error', reject);
+  });
+}
+
 function sendHttpJson(response, status, payload, extraHeaders = {}) {
-  response.writeHead(status, { ...jsonHeaders(), 'x-content-type-options':'nosniff', ...extraHeaders });
+  response.writeHead(status, { ...jsonHeaders(), 'x-content-type-options': 'nosniff', ...extraHeaders });
   response.end(JSON.stringify(payload));
 }
 
 function noStorePageHeaders() {
   return {
-    'content-type':'text/html; charset=utf-8',
-    'cache-control':'no-store, no-cache, must-revalidate',
-    'content-security-policy':overlayPageCsp(),
-    'cross-origin-resource-policy':'cross-origin',
-    'x-content-type-options':'nosniff',
-    'referrer-policy':'no-referrer'
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store, no-cache, must-revalidate',
+    'content-security-policy': overlayPageCsp(),
+    'cross-origin-resource-policy': 'cross-origin',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'no-referrer'
   };
 }
 
-async function handleHttpRequest(request, response) {
-  const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
-  const parts = url.pathname.split('/').filter(Boolean).map((part) => decodeURIComponent(part));
-  if (request.method === 'OPTIONS') {
-    response.writeHead(204, jsonHeaders());
-    response.end();
-    return;
-  }
-  if (request.method === 'GET' && url.pathname === '/health') {
-    const snapshot = keyPool.snapshot();
-    const usage = usageMeter.snapshot();
-    response.writeHead(200, jsonHeaders());
-    response.end(JSON.stringify({
-      ok: true,
-      service: 'lulu-finity-railway-relay',
-      build: RELAY_BUILD,
-      overlays: { stableHttps: true },
-      uptimeSeconds: Math.round(process.uptime()),
-      clients: activeClients,
-      tts: { provider: 'microsoft-edge', activeRequests: activeTtsRequests, voices: MICROSOFT_VOICES.length },
-      keys: { total: snapshot.total, available: snapshot.available, activeConnections: snapshot.activeConnections },
-      usage: { used: usage.used, limit: usage.limit, percent: usage.percent, resetAt: usage.resetAt }
-    }));
-    return;
-  }
-  if (request.method === 'GET' && url.pathname === '/usage') {
-    response.writeHead(200, jsonHeaders());
-    const uniqueId = cleanUsername(url.searchParams.get('uniqueId'));
-    response.end(JSON.stringify({ ok: true, ...usageMeter.snapshot(), user: uniqueId ? usageMeter.userSnapshot(uniqueId) : null }));
-    return;
-  }
-  if (request.method === 'GET' && parts[0] === 'overlays' && parts.length === 4) {
-    const publicId = safePublicId(parts[1]);
-    const source = safeSource(parts[2], parts[3]);
-    if (!publicId || !source) return sendHttpJson(response, 404, { ok:false, error:'Not found' });
-    response.writeHead(200, noStorePageHeaders());
-    response.end(renderOverlayPage(publicId, source.kind, source.name));
-    return;
-  }
-  if (parts[0] === 'v1' && parts[1] === 'overlays' && parts[3] === 'sources' && parts.length === 6) {
-    const publicId = safePublicId(parts[2]);
-    const source = safeSource(parts[4], parts[5]);
-    if (!publicId || !source) return sendHttpJson(response, 404, { ok:false, error:'Not found' });
-    if (request.method === 'GET') {
-      const document = await overlayStore.getSource(publicId, source.kind, source.name);
-      return document ? sendHttpJson(response, 200, document) : sendHttpJson(response, 404, { ok:false, error:'Source not registered' });
-    }
-    if (request.method === 'PUT') {
-      overlayStore.authorize(publicId, suppliedToken(request));
-      const data = await readJsonBody(request, MAX_SOURCE_BYTES);
-      const document = await overlayStore.putSource(publicId, source.kind, source.name, data, suppliedToken(request));
-      return sendHttpJson(response, 200, { ok:true, updatedAt:document.updatedAt });
-    }
-  }
-  if (parts[0] === 'v1' && parts[1] === 'overlays' && parts[3] === 'assets' && parts.length === 5) {
-    const publicId = safePublicId(parts[2]);
-    if (!publicId) return sendHttpJson(response, 404, { ok:false, error:'Not found' });
-    if (request.method === 'GET') {
-      const asset = await overlayStore.getAsset(publicId, parts[4]);
-      if (!asset) return sendHttpJson(response, 404, { ok:false, error:'Asset not found' });
-      response.writeHead(200, { 'content-type':asset.mime, 'content-length':asset.size, 'cache-control':'public, max-age=31536000, immutable', 'cross-origin-resource-policy':'cross-origin', 'x-content-type-options':'nosniff' });
-      require('fs').createReadStream(asset.file).pipe(response);
-      return;
-    }
-    if (request.method === 'PUT') {
-      overlayStore.authorize(publicId, suppliedToken(request));
-      const bytes = await readBufferBody(request, MAX_ASSET_BYTES);
-      const asset = await overlayStore.putAsset(publicId, parts[4], bytes, request.headers['content-type'], suppliedToken(request));
-      return sendHttpJson(response, 200, { ok:true, asset });
-    }
-  }
-  if (request.method === 'GET' && parts[0] === 'v1' && parts[1] === 'overlays' && parts[3] === 'manifest' && parts.length === 4) {
-    const publicId = safePublicId(parts[2]);
-    if (!publicId) return sendHttpJson(response, 404, { ok:false, error:'Not found' });
-    return sendHttpJson(response, 200, await overlayStore.manifest(publicId, suppliedToken(request)));
-  }
-  if (request.method === 'GET' && url.pathname === '/v1/tts/voices') {
-    response.writeHead(200, jsonHeaders());
-    response.end(JSON.stringify({ ok: true, provider: 'microsoft-edge', voices: MICROSOFT_VOICES }));
-    return;
-  }
-  if (request.method === 'POST' && url.pathname === '/v1/tts/microsoft') {
-    if (!authorizedTts(request)) {
-      response.writeHead(401, jsonHeaders());
-      response.end(JSON.stringify({ ok: false, error: 'No autorizado.' }));
-      return;
-    }
-    if (!ttsRateLimitAllows(requestIp(request))) {
-      response.writeHead(429, { ...jsonHeaders(), 'retry-after': '60' });
-      response.end(JSON.stringify({ ok: false, error: 'Demasiadas solicitudes de voz. Intenta en un minuto.' }));
-      return;
-    }
-    if (activeTtsRequests >= MAX_TTS_CONCURRENT) {
-      response.writeHead(503, { ...jsonHeaders(), 'retry-after': '2' });
-      response.end(JSON.stringify({ ok: false, error: 'El servicio de voz está ocupado. Intenta de nuevo.' }));
-      return;
-    }
-
-    activeTtsRequests += 1;
-    try {
-      const body = await readJsonBody(request);
-      const result = await synthesizeMicrosoftSpeech(body);
-      response.writeHead(200, {
-        'content-type': 'audio/mpeg',
-        'content-length': result.audio.length,
-        'cache-control': 'no-store',
-        'access-control-allow-origin': '*',
-        'x-lulu-tts-voice': result.voice,
-        'x-lulu-tts-cache': result.cacheHit ? 'hit' : 'miss'
+const server = http.createServer(async (request, response) => {
+  try {
+    const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
+    const parts = url.pathname.split('/').filter(Boolean).map((part) => decodeURIComponent(part));
+    if (request.method === 'GET' && url.pathname === '/health') {
+      const snapshot = keyPool.snapshot();
+      const usage = usageMeter.snapshot();
+      sendHttpJson(response, 200, {
+        ok: true,
+        service: 'lulu-finity-railway-relay',
+        overlays: { stableHttps: true },
+        uptimeSeconds: Math.round(process.uptime()),
+        clients: activeClients,
+        keys: { total: snapshot.total, available: snapshot.available, activeConnections: snapshot.activeConnections },
+        usage: { used: usage.used, limit: usage.limit, percent: usage.percent, resetAt: usage.resetAt }
       });
-      response.end(result.audio);
-    } catch (error) {
-      const statusCode = Number(error?.statusCode) || 502;
-      if (statusCode >= 500) console.error('[tts] Microsoft TTS falló:', error?.message || error);
-      response.writeHead(statusCode, jsonHeaders());
-      response.end(JSON.stringify({
-        ok: false,
-        error: statusCode >= 500 ? 'No se pudo generar la voz Microsoft.' : String(error.message || error)
-      }));
-    } finally {
-      activeTtsRequests = Math.max(0, activeTtsRequests - 1);
+      return;
     }
-    return;
+    if (request.method === 'GET' && url.pathname === '/usage') {
+      const uniqueId = cleanUsername(url.searchParams.get('uniqueId'));
+      sendHttpJson(response, 200, { ok: true, ...usageMeter.snapshot(), user: uniqueId ? usageMeter.userSnapshot(uniqueId) : null });
+      return;
+    }
+    if (request.method === 'GET' && parts[0] === 'overlays' && parts.length === 4) {
+      const publicId = safePublicId(parts[1]);
+      const source = safeSource(parts[2], parts[3]);
+      if (!publicId || !source) return sendHttpJson(response, 404, { ok: false, error: 'Not found' });
+      response.writeHead(200, noStorePageHeaders());
+      response.end(renderOverlayPage(publicId, source.kind, source.name));
+      return;
+    }
+    if (parts[0] === 'v1' && parts[1] === 'overlays' && parts[3] === 'sources' && parts.length === 6) {
+      const publicId = safePublicId(parts[2]);
+      const source = safeSource(parts[4], parts[5]);
+      if (!publicId || !source) return sendHttpJson(response, 404, { ok: false, error: 'Not found' });
+      if (request.method === 'GET') {
+        const document = await overlayStore.getSource(publicId, source.kind, source.name);
+        return document ? sendHttpJson(response, 200, document) : sendHttpJson(response, 404, { ok: false, error: 'Source not registered' });
+      }
+      if (request.method === 'PUT') {
+        overlayStore.authorize(publicId, suppliedToken(request));
+        const body = await readRequestBody(request, MAX_SOURCE_BYTES);
+        let data;
+        try { data = JSON.parse(body.toString('utf8')); }
+        catch { return sendHttpJson(response, 400, { ok: false, error: 'JSON inválido.' }); }
+        const document = await overlayStore.putSource(publicId, source.kind, source.name, data, suppliedToken(request));
+        return sendHttpJson(response, 200, { ok: true, updatedAt: document.updatedAt });
+      }
+    }
+    if (parts[0] === 'v1' && parts[1] === 'overlays' && parts[3] === 'assets' && parts.length === 5) {
+      const publicId = safePublicId(parts[2]);
+      if (!publicId) return sendHttpJson(response, 404, { ok: false, error: 'Not found' });
+      if (request.method === 'GET') {
+        const asset = await overlayStore.getAsset(publicId, parts[4]);
+        if (!asset) return sendHttpJson(response, 404, { ok: false, error: 'Asset not found' });
+        response.writeHead(200, {
+          'content-type': asset.mime,
+          'content-length': asset.size,
+          'cache-control': 'public, max-age=31536000, immutable',
+          'cross-origin-resource-policy': 'cross-origin',
+          'x-content-type-options': 'nosniff'
+        });
+        require('fs').createReadStream(asset.file).pipe(response);
+        return;
+      }
+      if (request.method === 'PUT') {
+        overlayStore.authorize(publicId, suppliedToken(request));
+        const bytes = await readRequestBody(request, MAX_ASSET_BYTES);
+        const asset = await overlayStore.putAsset(publicId, parts[4], bytes, request.headers['content-type'], suppliedToken(request));
+        return sendHttpJson(response, 200, { ok: true, asset });
+      }
+    }
+    if (request.method === 'GET' && parts[0] === 'v1' && parts[1] === 'overlays' && parts[3] === 'manifest' && parts.length === 4) {
+      const publicId = safePublicId(parts[2]);
+      if (!publicId) return sendHttpJson(response, 404, { ok: false, error: 'Not found' });
+      return sendHttpJson(response, 200, await overlayStore.manifest(publicId, suppliedToken(request)));
+    }
+    sendHttpJson(response, 404, { ok: false, error: 'Not found' });
+  } catch (error) {
+    if (response.headersSent) return response.destroy(error);
+    sendHttpJson(response, Number(error?.statusCode || 500), { ok: false, error: String(error?.message || 'Error interno').slice(0, 240) });
   }
-  response.writeHead(404, jsonHeaders());
-  response.end(JSON.stringify({ ok: false, error: 'Not found' }));
-}
-
-const server = http.createServer((request, response) => {
-  void handleHttpRequest(request, response).catch((error) => {
-    console.error('[http] Solicitud fallida:', error?.message || error);
-    if (response.headersSent) return response.end();
-    const statusCode = Number(error?.statusCode || 500);
-    response.writeHead(statusCode, jsonHeaders());
-    response.end(JSON.stringify({ ok: false, error:statusCode >= 500 ? 'Error interno.' : String(error?.message || error) }));
-  });
 });
 
 // El cliente oficial nunca envía mensajes de aplicación al relay.
