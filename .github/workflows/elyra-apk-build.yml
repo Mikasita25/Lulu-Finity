@@ -89,8 +89,8 @@ jobs:
         run: |
           APK=elyra-android/app/build/outputs/apk/release/app-release.apk
           test -f "$APK"
-          apksigner verify --verbose --print-certs "$APK"
-          aapt dump badging "$APK" | grep -q "package: name='com.elyra.ai' versionCode='8' versionName='3.5'"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "package: name='com.elyra.ai' versionCode='8' versionName='3.5'"
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/'
           unzip -p "$APK" assets/app.js | grep -q 'repeatedAssistantReply'
 
