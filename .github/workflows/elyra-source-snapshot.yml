@@ -29,12 +29,16 @@ jobs:
             xz -dc /tmp/elyra-v${v}.patch.xz > /tmp/elyra-v${v}.patch
             patch -p1 < /tmp/elyra-v${v}.patch
           done
+          cat .elyra-build/patch36_00 .elyra-build/patch36b_00 .elyra-build/patch36b_01 .elyra-build/patch36c_00 .elyra-build/patch36c_01 .elyra-build/patch36c_02 .elyra-build/patch36c_03 .elyra-build/patch36b_03 .elyra-build/patch36_02 > /tmp/elyra-v36.patch.xz.b64
+          base64 -d /tmp/elyra-v36.patch.xz.b64 > /tmp/elyra-v36.patch.xz
+          xz -dc /tmp/elyra-v36.patch.xz > /tmp/elyra-v36.patch
+          patch -p1 < /tmp/elyra-v36.patch
           printf '\nandroid.useAndroidX=true\n' >> elyra-android/gradle.properties
-          tar -czf Elyra-v3.5-source.tar.gz elyra-android
+          tar -czf Elyra-v3.6-source.tar.gz elyra-android
 
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: Elyra-v3.5-source
-          path: Elyra-v3.5-source.tar.gz
+          name: Elyra-v3.6-source
+          path: Elyra-v3.6-source.tar.gz
           retention-days: 1
