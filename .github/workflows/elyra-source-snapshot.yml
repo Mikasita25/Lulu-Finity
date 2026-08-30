@@ -29,8 +29,9 @@ jobs:
             xz -dc /tmp/elyra-v${v}.patch.xz > /tmp/elyra-v${v}.patch
             patch -p1 < /tmp/elyra-v${v}.patch
           done
-          cat .elyra-build/patch36_00 .elyra-build/patch36b_00 .elyra-build/patch36b_01 .elyra-build/patch36c_00 .elyra-build/patch36c_01 .elyra-build/patch36c_02 .elyra-build/patch36c_03 .elyra-build/patch36b_03 .elyra-build/patch36_02 > /tmp/elyra-v36.patch.xz.b64
+          cat .elyra-build/patch36_00 .elyra-build/patch36b_00 .elyra-build/patch36b_01 .elyra-build/patch36c_00 .elyra-build/patch36d_00 .elyra-build/patch36d_01 .elyra-build/patch36d_02 .elyra-build/patch36d_03 .elyra-build/patch36d_04 .elyra-build/patch36c_02 .elyra-build/patch36c_03 .elyra-build/patch36b_03 .elyra-build/patch36_02 > /tmp/elyra-v36.patch.xz.b64
           base64 -d /tmp/elyra-v36.patch.xz.b64 > /tmp/elyra-v36.patch.xz
+          echo '8c6289e25be12939ed767edfd63ddd8f0fb06f5b394314441e000c28c980d944  /tmp/elyra-v36.patch.xz' | sha256sum -c -
           xz -dc /tmp/elyra-v36.patch.xz > /tmp/elyra-v36.patch
           patch -p1 < /tmp/elyra-v36.patch
           printf '\nandroid.useAndroidX=true\n' >> elyra-android/gradle.properties
