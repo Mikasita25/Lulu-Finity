@@ -1,0 +1,60 @@
+name: Elyra APK Builder
+
+on:
+  push:
+    branches:
+      - elyra-apk-build
+    paths:
+      - '.elyra-build/chunk_*'
+      - '.github/workflows/elyra-apk-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Android project
+        shell: bash
+        run: |
+          cat .elyra-build/chunk_* > /tmp/elyra-project.b64
+          base64 -d /tmp/elyra-project.b64 > /tmp/elyra-project.zip
+          unzip -q /tmp/elyra-project.zip
+          test -f elyra-android/app/build.gradle
+          test -f elyra-android/app/src/main/java/com/elyra/ai/MainActivity.java
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        shell: bash
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build APK
+        working-directory: elyra-android
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Prepare APK
+        run: cp elyra-android/app/build/outputs/apk/debug/app-debug.apk Elyra-AI-v3.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Elyra-AI-v3
+          path: Elyra-AI-v3.apk
+          retention-days: 1
