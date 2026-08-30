@@ -1,0 +1,119 @@
+{
+  "name": "lulu-finity",
+  "version": "1.1.4",
+  "description": "Lulu Finity 1.1.4: editor propio de widgets, HTTPS fiel y overlays estáticos",
+  "main": "src/main.js",
+  "author": "Mikasita25",
+  "license": "AGPL-3.0-or-later",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64",
+    "build:dir": "electron-builder --dir --win --x64",
+    "release:win": "electron-builder --win nsis zip --x64 --publish always",
+    "test": "node --test src/*.test.js"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "2.4.3",
+    "edge-tts-universal": "1.4.0",
+    "electron-updater": "6.8.9",
+    "ws": "8.21.3",
+    "@ghostery/adblocker-electron": "2.18.1",
+    "adm-zip": "0.6.0",
+    "sherpa-onnx-node": "1.13.4"
+  },
+  "devDependencies": {
+    "electron": "43.2.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.mikasita.lulufinity",
+    "productName": "Lulu Finity",
+    "asar": true,
+    "compression": "normal",
+    "asarUnpack": [
+      "node_modules/sherpa-onnx-node/**",
+      "node_modules/sherpa-onnx-*/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/voices",
+        "to": "lulu-voices"
+      },
+      {
+        "from": "resources/tools",
+        "to": "lulu-tools",
+        "filter": [
+          "cloudflared.exe"
+        ]
+      },
+      {
+        "from": "src/default-sounds",
+        "to": "lulu-default-sounds"
+      }
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "NOTICE.md"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "Lulu-Finity-${version}-${arch}.${ext}",
+      "legalTrademarks": "Lulu Finity",
+      "electronUpdaterCompatibility": ">=2.16"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "packElevateHelper": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Lulu Finity",
+      "uninstallDisplayName": "Lulu Finity",
+      "artifactName": "Lulu-Finity-Setup-${version}.exe",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Mikasita25",
+        "repo": "Lulu-Finity",
+        "releaseType": "release",
+        "channel": "latest"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mikasita25/Lulu-Finity.git"
+  },
+  "homepage": "https://github.com/Mikasita25/Lulu-Finity#readme",
+  "bugs": {
+    "url": "https://github.com/Mikasita25/Lulu-Finity/issues"
+  }
+}
