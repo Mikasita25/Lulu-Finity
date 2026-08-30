@@ -5,7 +5,6 @@ on:
     branches:
       - elyra-apk-build
     paths:
-      - '.elyra-build/chunk_*'
       - '.github/workflows/elyra-apk-build.yml'
 
 permissions:
@@ -26,6 +25,7 @@ jobs:
           unzip -q /tmp/elyra-project.zip
           test -f elyra-android/app/build.gradle
           test -f elyra-android/app/src/main/java/com/elyra/ai/MainActivity.java
+          test -f elyra-android/app/src/main/java/com/elyra/ai/LocalModelEngine.kt
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -50,11 +50,11 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp elyra-android/app/build/outputs/apk/debug/app-debug.apk Elyra-AI-v3.apk
+        run: cp elyra-android/app/build/outputs/apk/debug/app-debug.apk Elyra-AI-v3.2.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Elyra-AI-v3
-          path: Elyra-AI-v3.apk
+          name: Elyra-AI-v3.2
+          path: Elyra-AI-v3.2.apk
           retention-days: 1
