@@ -28,11 +28,13 @@ jobs:
           echo '757844890b10f078877207c6763302e64245b648de33b8e69edbbf46a743fdc9  /tmp/elyra-v32.patch.xz' | sha256sum -c -
           xz -dc /tmp/elyra-v32.patch.xz > /tmp/elyra-v32.patch
           patch -p1 < /tmp/elyra-v32.patch
+          printf '\nandroid.useAndroidX=true\n' >> elyra-android/gradle.properties
           test -f elyra-android/app/build.gradle
           test -f elyra-android/app/src/main/java/com/elyra/ai/MainActivity.java
           test -f elyra-android/app/src/main/java/com/elyra/ai/LocalModelEngine.kt
           grep -q "llama-android:0.1.1" elyra-android/app/build.gradle
           grep -q "Qwen3-1.7B-Q4_K_M.gguf" elyra-android/app/src/main/java/com/elyra/ai/LocalModelEngine.kt
+          grep -q "android.useAndroidX=true" elyra-android/gradle.properties
 
       - name: Set up Java
         uses: actions/setup-java@v4
