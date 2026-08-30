@@ -6,6 +6,8 @@ Este servicio conserva las API keys de EulerStream en Railway, rota las claves a
 
 - Lulu crea una capacidad secreta por instalación y sólo expone una identidad pública derivada dentro de la URL de OBS/TikTok Studio.
 - Widgets, rankings y pantallas conservan la misma dirección tras reinicios. Los cambios de tema y contenido aparecen en esa URL sin reemplazar la fuente.
+- Los catorce temas, los doce fondos y el editor propio de cada widget se reflejan igual en HTTPS y en la vista local.
+- Colores, opacidad, bordes y grosor de barra se validan antes de mostrarse; las fuentes no ejecutan animaciones continuas.
 - Los estados se guardan de forma atómica y las imágenes se validan por nombre, extensión, MIME, tamaño, firma y SHA-256.
 - Monta un Railway Volume y configura `OVERLAY_STATE_DIR=/data/lulu-overlays`. Si el volumen se pierde, Lulu vuelve a registrar las fuentes activas con la misma identidad.
 

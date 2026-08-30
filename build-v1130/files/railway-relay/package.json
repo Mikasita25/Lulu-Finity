@@ -1,0 +1,19 @@
+{
+  "name": "lulu-finity-railway-relay",
+  "version": "1.3.1",
+  "private": true,
+  "description": "Relay WebSocket de TikTok y alojamiento HTTPS estable para fuentes de Lulu Finity.",
+  "type": "commonjs",
+  "main": "src/public-server.js",
+  "scripts": {
+    "start": "node src/public-server.js",
+    "check": "node --check src/public-server.js && node --check src/server.js && node --check src/overlay-store.js && node --check src/overlay-page.js && node --check src/usage-meter.js && node --check src/key-pool.js && node --check src/failure-classifier.js",
+    "test": "node --test src/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "8.21.3"
+  }
+}

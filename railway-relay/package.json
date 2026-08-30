@@ -1,6 +1,6 @@
 {
   "name": "lulu-finity-railway-relay",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "description": "Relay de TikTok/Microsoft TTS y alojamiento HTTPS estable para fuentes de Lulu Finity.",
   "type": "commonjs",
