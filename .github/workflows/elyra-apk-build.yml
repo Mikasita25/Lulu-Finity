@@ -129,4 +129,4 @@ jobs:
           path: Elyra-AI-v3.7.apk
           retention-days: 1
 
-# retry after verified split upload
+# retry after final split patch chunks
