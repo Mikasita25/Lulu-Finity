@@ -2,19 +2,18 @@
   "name": "lulu-finity-railway-relay",
   "version": "1.3.2",
   "private": true,
-  "description": "Relay de TikTok/Microsoft TTS y alojamiento HTTPS estable para fuentes de Lulu Finity.",
+  "description": "Relay WebSocket de TikTok y alojamiento HTTPS estable para fuentes de Lulu Finity.",
   "type": "commonjs",
   "main": "src/public-server.js",
   "scripts": {
     "start": "node src/public-server.js",
-    "check": "node --check src/public-server.js && node --check src/server.js && node --check src/overlay-store.js && node --check src/overlay-page.js && node --check src/microsoft-tts.js && node --check src/usage-meter.js && node --check src/key-pool.js && node --check src/failure-classifier.js",
+    "check": "node --check src/public-server.js && node --check src/server.js && node --check src/overlay-store.js && node --check src/overlay-page.js && node --check src/usage-meter.js && node --check src/key-pool.js && node --check src/failure-classifier.js",
     "test": "node --test src/*.test.js"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
-    "edge-tts-universal": "1.4.0",
     "ws": "8.21.3"
   }
 }
