@@ -41,6 +41,9 @@ overlay_page = read("railway-relay/src/overlay-page.js")
 assert package["version"] == "1.1.5"
 assert lock["version"] == "1.1.5"
 assert lock["packages"][""]["version"] == "1.1.5"
+assert lock["packages"]["node_modules/color-name"]["version"] == "1.1.4"
+assert lock["packages"]["node_modules/define-data-property"]["version"] == "1.1.4"
+assert lock["packages"]["node_modules/sprintf-js"]["version"] == "1.1.4"
 assert 'id="versionLabel">v1.1.5' in html
 assert 'id="updateVersionBadge">v1.1.5' in html
 assert "## 1.1.5" in read("CHANGELOG.md")
