@@ -74,8 +74,23 @@ export type SoundSlot =
   | 'goal'
   | 'rank';
 
-export type SoundSetting = { enabled: boolean; uri?: string; name?: string; volume: number };
+export type SoundSetting = {
+  enabled: boolean;
+  uri?: string;
+  name?: string;
+  presetId?: string;
+  volume: number;
+};
 export type SoundSettings = Record<SoundSlot, SoundSetting>;
+
+export type SoundMixProfile = 'soft' | 'balanced' | 'impact';
+export type SoundMixSettings = {
+  masterVolume: number;
+  profile: SoundMixProfile;
+  duckMusic: boolean;
+  duckMusicVolume: number;
+  allowOverlap: boolean;
+};
 
 export type InteractionTriggerType =
   | 'command'

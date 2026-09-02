@@ -119,12 +119,94 @@ export function MusicScreen({ navigation }: any) {
           <ShieldCheck size={18} color="#86EFAC" />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-black text-white">Sigue sonando en segundo plano</Text>
+          <Text className="text-sm font-black text-white">Reproducción tipo navegador en segundo plano</Text>
           <Text className="mt-1 text-xs leading-5 text-white/40">
-            Puedes cambiar de app o bloquear la pantalla mientras hay una canción activa.
+            {music.backgroundPlayback
+              ? 'Activa: conserva la sesión multimedia al cambiar de app o bloquear la pantalla.'
+              : 'Desactivada: la canción se pausa cuando Lulú deja de estar visible.'}
           </Text>
         </View>
       </View>
+
+      <SectionTitle title="Segundo plano y protección" />
+      <GlassCard>
+        <View className="p-5">
+          <View className="flex-row items-center gap-3">
+            <View className="flex-1">
+              <Text className="text-sm font-black text-white">Mantener música en segundo plano</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/40">Usa el servicio multimedia de Android y muestra controles en la notificación.</Text>
+            </View>
+            <Switch
+              value={music.backgroundPlayback}
+              onValueChange={(backgroundPlayback) => updateMusic({ backgroundPlayback })}
+              trackColor={{ false: '#342C34', true: '#10B981' }}
+              thumbColor="#FFF7FC"
+            />
+          </View>
+
+          <View className="mt-5 flex-row items-center gap-3 border-t border-white/[0.06] pt-4">
+            <View className="flex-1">
+              <Text className="text-sm font-black text-white">Bloquear anuncios del reproductor</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/40">Oculta promociones, overlays y destinos publicitarios dentro de Lulu‑finity.</Text>
+            </View>
+            <Switch
+              value={music.adBlockEnabled}
+              onValueChange={(adBlockEnabled) => updateMusic({ adBlockEnabled })}
+              trackColor={{ false: '#342C34', true: '#FF5FC8' }}
+              thumbColor="#FFF7FC"
+            />
+          </View>
+
+          {music.adBlockEnabled ? (
+            <>
+              <View className="mt-4 flex-row items-center gap-3">
+                <View className="flex-1">
+                  <Text className="text-xs font-black text-white">Saltar anuncios de video automáticamente</Text>
+                  <Text className="mt-1 text-[10px] leading-4 text-white/35">Pulsa el botón de omitir y evita que el anuncio termine completo.</Text>
+                </View>
+                <Switch
+                  value={music.autoSkipAds}
+                  onValueChange={(autoSkipAds) => updateMusic({ autoSkipAds })}
+                  trackColor={{ false: '#342C34', true: '#FF5FC8' }}
+                  thumbColor="#FFF7FC"
+                />
+              </View>
+              <View className="mt-4 flex-row items-center gap-3">
+                <View className="flex-1">
+                  <Text className="text-xs font-black text-white">Bloquear enlaces externos</Text>
+                  <Text className="mt-1 text-[10px] leading-4 text-white/35">No permite que un anuncio saque el reproductor fuera de YouTube.</Text>
+                </View>
+                <Switch
+                  value={music.blockExternalLinks}
+                  onValueChange={(blockExternalLinks) => updateMusic({ blockExternalLinks })}
+                  trackColor={{ false: '#342C34', true: '#8B5CF6' }}
+                  thumbColor="#FFF7FC"
+                />
+              </View>
+            </>
+          ) : null}
+        </View>
+      </GlassCard>
+
+      <SectionTitle title="Mezcla con la voz" />
+      <GlassCard>
+        <View className="p-5">
+          <Text className="text-xs leading-5 text-white/40">La música ya no se detiene cuando habla el TTS. Elige cuánto baja mientras se lee el comentario.</Text>
+          <View className="mt-4 flex-row gap-2">
+            {[0.12, 0.22, 0.38, 0.55].map((volume) => (
+              <Pressable
+                key={volume}
+                onPress={() => updateMusic({ ttsDuckingVolume: volume })}
+                className={`flex-1 rounded-xl py-2.5 ${Math.abs(music.ttsDuckingVolume - volume) < 0.01 ? 'bg-lulu-500' : 'bg-white/[0.06]'}`}
+              >
+                <Text className={`text-center text-xs font-black ${Math.abs(music.ttsDuckingVolume - volume) < 0.01 ? 'text-white' : 'text-white/40'}`}>
+                  {Math.round(volume * 100)}%
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </GlassCard>
 
       <SectionTitle title="Volumen" />
       <GlassCard>
@@ -240,7 +322,7 @@ export function MusicScreen({ navigation }: any) {
       ) : null}
 
       <Text className="mt-4 text-center text-[10px] leading-5 text-white/25">
-        Android puede mostrar una notificación multimedia mientras hay una canción activa. Esto ayuda a conservar la reproducción cuando Lulú está en segundo plano.
+        El bloqueo solo actúa dentro del reproductor integrado de Lulu‑finity; no modifica otras apps ni instala certificados o VPN.
       </Text>
     </Screen>
   );

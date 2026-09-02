@@ -1,5 +1,15 @@
 # Lulú Finity Mobile
 
+## 1.4.0
+
+- Amplía la personalización de sonidos con seis efectos integrados: Campanita cute, Brillo mágico, Pop suave, Cristal, Subida de nivel y Celebración.
+- Añade perfiles de mezcla Suave, Equilibrado e Impacto, volumen maestro, superposición opcional y volumen independiente por evento.
+- Mantiene música, TTS y alertas coordinadas: la canción baja de volumen mientras habla Microsoft o suena una alerta, sin detenerse ni perder la cola.
+- Refuerza la reproducción en segundo plano con el servicio multimedia de Android, controles de notificación y permisos de foreground media playback.
+- Añade controles para activar o desactivar segundo plano, bloqueo de anuncios, salto automático y bloqueo de enlaces publicitarios externos.
+- El bloqueador solo funciona dentro del reproductor de Lulu‑finity; no modifica otras aplicaciones ni usa VPN o certificados.
+- Recupera automáticamente el WebView si Android termina su proceso mientras la app está en segundo plano.
+
 ## 1.3.3
 
 - Sustituye las pestañas de Ranking, Metas y el panel recargado por accesos directos a Voz, Música y Automatizaciones.

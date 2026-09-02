@@ -10,6 +10,8 @@ import type {
   LiveEvent,
   LiveStats,
   RelayState,
+  SoundMixProfile,
+  SoundMixSettings,
   SoundSettings,
 } from '@/types/live';
 
@@ -37,6 +39,20 @@ const defaultSounds: SoundSettings = {
   rank: { enabled: false, volume: 0.8 },
 };
 
+const defaultSoundMix: SoundMixSettings = {
+  masterVolume: 0.9,
+  profile: 'balanced',
+  duckMusic: true,
+  duckMusicVolume: 0.28,
+  allowOverlap: false,
+};
+
+const soundProfiles: Record<SoundMixProfile, Pick<SoundMixSettings, 'masterVolume' | 'duckMusicVolume' | 'allowOverlap'>> = {
+  soft: { masterVolume: 0.62, duckMusicVolume: 0.45, allowOverlap: false },
+  balanced: { masterVolume: 0.9, duckMusicVolume: 0.28, allowOverlap: false },
+  impact: { masterVolume: 1, duckMusicVolume: 0.16, allowOverlap: true },
+};
+
 type AppState = {
   hydrated: boolean;
   onboardingDone: boolean;
@@ -55,6 +71,7 @@ type AppState = {
   hapticsEnabled: boolean;
   headsUpNotifications: boolean;
   soundSettings: SoundSettings;
+  soundMix: SoundMixSettings;
   lastGoalCompletion?: { id: string; at: number };
   rankingRgb: boolean;
   rankingTextColor: string;
@@ -82,6 +99,8 @@ type AppState = {
   setHapticsEnabled: (enabled: boolean) => void;
   setHeadsUpNotifications: (enabled: boolean) => void;
   setSound: (slot: keyof SoundSettings, patch: Partial<SoundSettings[keyof SoundSettings]>) => void;
+  setSoundMix: (patch: Partial<SoundMixSettings>) => void;
+  applySoundProfile: (profile: SoundMixProfile) => void;
   setRankingRgb: (enabled: boolean) => void;
   setRankingTextColor: (color: string) => void;
   setRankingFont: (font: 'default' | 'rounded' | 'mono') => void;
@@ -201,6 +220,7 @@ export const useAppStore = create<AppState>()(
       hapticsEnabled: true,
       headsUpNotifications: true,
       soundSettings: defaultSounds,
+      soundMix: defaultSoundMix,
       rankingRgb: false,
       rankingTextColor: '#FFF7FC',
       rankingFont: 'default',
@@ -350,6 +370,25 @@ export const useAppStore = create<AppState>()(
             [slot]: { ...(state.soundSettings[slot] ?? defaultSounds[slot]), ...patch },
           },
         })),
+      setSoundMix: (patch) =>
+        set((state) => ({
+          soundMix: {
+            ...state.soundMix,
+            ...patch,
+            masterVolume:
+              patch.masterVolume === undefined
+                ? state.soundMix.masterVolume
+                : Math.max(0, Math.min(1, patch.masterVolume)),
+            duckMusicVolume:
+              patch.duckMusicVolume === undefined
+                ? state.soundMix.duckMusicVolume
+                : Math.max(0, Math.min(1, patch.duckMusicVolume)),
+          },
+        })),
+      applySoundProfile: (profile) =>
+        set((state) => ({
+          soundMix: { ...state.soundMix, ...soundProfiles[profile], profile },
+        })),
       setRankingRgb: (rankingRgb) => set({ rankingRgb }),
       setRankingTextColor: (rankingTextColor) => set({ rankingTextColor }),
       setRankingFont: (rankingFont) => set({ rankingFont }),
@@ -374,6 +413,7 @@ export const useAppStore = create<AppState>()(
             ...(saved.soundSettings ?? {}),
             fanSticker: legacyFanStickerSound ?? defaultSounds.fanSticker,
           },
+          soundMix: { ...defaultSoundMix, ...(saved.soundMix ?? {}) },
         };
       },
       partialize: (state) => ({
@@ -389,6 +429,7 @@ export const useAppStore = create<AppState>()(
         hapticsEnabled: state.hapticsEnabled,
         headsUpNotifications: state.headsUpNotifications,
         soundSettings: state.soundSettings,
+        soundMix: state.soundMix,
         rankingRgb: state.rankingRgb,
         rankingTextColor: state.rankingTextColor,
         rankingFont: state.rankingFont,

@@ -5,7 +5,7 @@ import { WebView } from 'react-native-webview';
 import { useAppStore } from '@/store/useAppStore';
 import { useMobileControlStore } from '@/store/useMobileControlStore';
 import { youtubeSearchUrl } from '@/services/music';
-import { subscribeTtsPlayback } from '@/services/audioCoordinator';
+import { subscribeSoundEffectPlayback, subscribeTtsPlayback } from '@/services/audioCoordinator';
 
 // A one-second silent MP3 keeps Expo Audio's MediaSessionService active while the
 // audible YouTube media remains in WebView. The foreground media session prevents
@@ -13,12 +13,14 @@ import { subscribeTtsPlayback } from '@/services/audioCoordinator';
 const BACKGROUND_KEEPER_URI =
   'data:audio/mpeg;base64,SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYxLjcuMTAzAAAAAAAAAAAAAAD/4zjAAAAAAAAAAAAASW5mbwAAAA8AAAAQAAAFWAA1NTU1NTVDQ0NDQ0NQUFBQUFBeXl5eXl5ra2tra2treXl5eXl5hoaGhoaGlJSUlJSUoaGhoaGhoa+vr6+vr7y8vLy8vMrKysrKytfX19fX19fl5eXl5eXy8vLy8vL///////8AAAAATGF2YzYxLjE5AAAAAAAAAAAAAAAAJAKAAAAAAAAABVgIAJWUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/4xjEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEOwAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEdgAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEsQAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=';
 
-function playerAutomation(volume: number, paused: boolean) {
+function playerAutomation(volume: number, paused: boolean, adBlockEnabled: boolean, autoSkipAds: boolean) {
   const safeVolume = Math.max(0, Math.min(1, volume));
   return `
 (() => {
   window.__luluDesiredVolume = ${safeVolume};
   window.__luluPlaybackPaused = ${paused ? 'true' : 'false'};
+  window.__luluAdBlockEnabled = ${adBlockEnabled ? 'true' : 'false'};
+  window.__luluAutoSkipAds = ${autoSkipAds ? 'true' : 'false'};
 
   const applyPlaybackState = () => {
     document.querySelectorAll('video, audio').forEach((media) => {
@@ -53,6 +55,7 @@ function playerAutomation(volume: number, paused: boolean) {
   };
 
   const removeAds = () => {
+    if (!window.__luluAdBlockEnabled) return;
     const selectors = [
       '#player-ads', '.ytp-ad-module', '.ytp-ad-overlay-container', '.ytp-ad-player-overlay',
       'ytd-display-ad-renderer', 'ytd-promoted-sparkles-web-renderer', 'ytd-ad-slot-renderer',
@@ -64,9 +67,16 @@ function playerAutomation(volume: number, paused: boolean) {
         try { node.remove(); } catch (_) {}
       });
     }
+    if (!document.getElementById('lulu-adblock-style')) {
+      const style = document.createElement('style');
+      style.id = 'lulu-adblock-style';
+      style.textContent = '#player-ads,.ytp-ad-module,.ytp-ad-overlay-container,[class*="promoted"],[class*="companion-ad"]{display:none!important;visibility:hidden!important}';
+      document.documentElement.appendChild(style);
+    }
   };
 
   const skipAds = () => {
+    if (!window.__luluAdBlockEnabled || !window.__luluAutoSkipAds) return;
     const skipSelectors = [
       '.ytp-skip-ad-button', '.ytp-ad-skip-button', '.ytp-ad-skip-button-modern',
       'button[class*="skip-ad"]', 'button[class*="skip-button"]'
@@ -162,6 +172,7 @@ export function MusicPlaybackHost() {
   const relayState = useAppStore((state) => state.relayState);
   const username = useAppStore((state) => state.username);
   const music = useMobileControlStore((state) => state.music);
+  const soundMix = useAppStore((state) => state.soundMix);
   const currentSong = useMobileControlStore((state) => state.currentSong);
   const playbackPaused = useMobileControlStore((state) => state.playbackPaused);
   const playNextSong = useMobileControlStore((state) => state.playNextSong);
@@ -169,26 +180,32 @@ export function MusicPlaybackHost() {
   const webRef = useRef<WebView>(null);
   const loadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [ttsActive, setTtsActive] = useState(false);
+  const [soundEffectActive, setSoundEffectActive] = useState(false);
   const keeper = useAudioPlayer(BACKGROUND_KEEPER_URI, { updateInterval: 1000 });
   const liveActive = relayState === 'connecting' || relayState === 'rotating' || relayState === 'connected';
   const musicActive = music.enabled && Boolean(currentSong);
-  const liveOnlyKeeper = liveActive && (!musicActive || playbackPaused);
+  const keepSessionActive = liveActive || (musicActive && music.backgroundPlayback);
+
+  const playbackVolume = ttsActive
+    ? Math.min(music.volume, music.ttsDuckingVolume)
+    : soundEffectActive && soundMix.duckMusic
+      ? Math.min(music.volume, soundMix.duckMusicVolume)
+      : music.volume;
 
   const sourceUrl = currentSong ? youtubeSearchUrl(currentSong.query) : '';
   const automation = useMemo(
-    () => playerAutomation(music.volume, playbackPaused || ttsActive),
-    [music.volume, playbackPaused, ttsActive],
+    () => playerAutomation(playbackVolume, playbackPaused, music.adBlockEnabled, music.autoSkipAds),
+    [music.adBlockEnabled, music.autoSkipAds, playbackPaused, playbackVolume],
   );
 
   useEffect(() => subscribeTtsPlayback(setTtsActive), []);
+  useEffect(() => subscribeSoundEffectPlayback(setSoundEffectActive), []);
 
   useEffect(() => {
     void setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: true,
-      // Expo exige foco exclusivo cuando se habilitan controles de pantalla de
-      // bloqueo; esa MediaSession es la que mantiene el LIVE vivo en Android.
-      interruptionMode: 'doNotMix',
+      interruptionMode: 'mixWithOthers',
     }).catch((error) => console.warn('[LuluFinity] background audio mode failed', error));
   }, []);
 
@@ -198,7 +215,7 @@ export function MusicPlaybackHost() {
   }, [keeper]);
 
   useEffect(() => {
-    if (!musicActive && !liveOnlyKeeper) {
+    if (!keepSessionActive) {
       keeper.pause();
       keeper.clearLockScreenControls();
       return;
@@ -220,35 +237,30 @@ export function MusicPlaybackHost() {
       { showSeekBackward: false, showSeekForward: false },
     );
 
-    if (ttsActive) keeper.pause();
-    else if (liveOnlyKeeper || !playbackPaused) keeper.play();
-  }, [currentSong?.id, keeper, liveOnlyKeeper, musicActive, playbackPaused, ttsActive, username]);
+    keeper.play();
+  }, [currentSong?.id, keepSessionActive, keeper, playbackPaused, username]);
 
   useEffect(() => {
     if (!music.enabled || !currentSong) return;
 
     webRef.current?.injectJavaScript(automation);
-    if (playbackPaused || ttsActive) keeper.pause();
-    else keeper.play();
-  }, [automation, currentSong?.id, keeper, liveOnlyKeeper, music.enabled, playbackPaused, ttsActive]);
+    if (keepSessionActive) keeper.play();
+  }, [automation, currentSong?.id, keepSessionActive, keeper, music.enabled]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (ttsActive) return;
-      if (liveOnlyKeeper) {
-        if (nextState === 'background' || nextState === 'inactive' || nextState === 'active') {
-          keeper.play();
-        }
+      if (keepSessionActive) keeper.play();
+      if (!music.enabled || !currentSong) return;
+      if ((nextState === 'background' || nextState === 'inactive') && !music.backgroundPlayback) {
+        webRef.current?.injectJavaScript(playerAutomation(playbackVolume, true, music.adBlockEnabled, music.autoSkipAds));
         return;
       }
-      if (!music.enabled || !currentSong || playbackPaused) return;
       if (nextState === 'background' || nextState === 'inactive' || nextState === 'active') {
-        keeper.play();
-        webRef.current?.injectJavaScript(playerAutomation(music.volume, false));
+        webRef.current?.injectJavaScript(playerAutomation(playbackVolume, playbackPaused, music.adBlockEnabled, music.autoSkipAds));
       }
     });
     return () => subscription.remove();
-  }, [currentSong?.id, keeper, liveOnlyKeeper, music.enabled, music.volume, playbackPaused, ttsActive]);
+  }, [currentSong?.id, keepSessionActive, keeper, music.adBlockEnabled, music.autoSkipAds, music.backgroundPlayback, music.enabled, playbackPaused, playbackVolume]);
 
   useEffect(
     () => () => {
@@ -287,6 +299,15 @@ export function MusicPlaybackHost() {
         userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
         injectedJavaScriptBeforeContentLoaded={automation}
         injectedJavaScript={automation}
+        onShouldStartLoadWithRequest={(request) => {
+          if (!music.adBlockEnabled || !music.blockExternalLinks) return true;
+          try {
+            const host = new URL(request.url).hostname.toLowerCase();
+            return host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be';
+          } catch {
+            return request.url === 'about:blank';
+          }
+        }}
         onLoadStart={() => {
           clearTimeout(loadTimer.current);
           setPlaybackStatus('loading', 'Cargando la canción…');
@@ -320,6 +341,10 @@ export function MusicPlaybackHost() {
         onError={() => {
           clearTimeout(loadTimer.current);
           setPlaybackStatus('error', 'No se pudo conectar con YouTube. Toca Reintentar.');
+        }}
+        onContentProcessDidTerminate={() => {
+          setPlaybackStatus('loading', 'Reactivando el reproductor…');
+          webRef.current?.reload();
         }}
       />
     </View>

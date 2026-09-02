@@ -25,6 +25,11 @@ export type MusicSettings = {
   perUserLimit: number;
   cooldownSeconds: number;
   volume: number;
+  backgroundPlayback: boolean;
+  adBlockEnabled: boolean;
+  autoSkipAds: boolean;
+  blockExternalLinks: boolean;
+  ttsDuckingVolume: number;
 };
 
 export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
@@ -75,6 +80,11 @@ const defaultMusic: MusicSettings = {
   perUserLimit: 3,
   cooldownSeconds: 20,
   volume: 0.75,
+  backgroundPlayback: true,
+  adBlockEnabled: true,
+  autoSkipAds: true,
+  blockExternalLinks: true,
+  ttsDuckingVolume: 0.22,
 };
 
 function normalizeCommand(value: string) {
@@ -132,6 +142,10 @@ export const useMobileControlStore = create<MobileControlState>()(
                 : Math.max(0, Math.min(300, Math.round(patch.cooldownSeconds))),
             volume:
               patch.volume === undefined ? state.music.volume : Math.max(0, Math.min(1, patch.volume)),
+            ttsDuckingVolume:
+              patch.ttsDuckingVolume === undefined
+                ? state.music.ttsDuckingVolume
+                : Math.max(0, Math.min(1, patch.ttsDuckingVolume)),
           },
         })),
       enqueueSong: (rawQuery, requestedBy, source = 'chat') => {

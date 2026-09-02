@@ -10,6 +10,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useUpdateStore } from '@/store/useUpdateStore';
 import { MOBILE_UPDATES_ENABLED } from '@/services/updates';
 import { configureNotifications } from '@/services/notifications';
+import { initializeBuiltinSoundDefaults } from '@/services/soundLibrary';
 
 type BoundaryState = { error?: Error };
 
@@ -58,6 +59,11 @@ export default function App() {
       clearTimeout(hydrationFallback);
     };
   }, [finishSplash, setHydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    initializeBuiltinSoundDefaults().catch((error) => console.warn('[LuluFinity] sound library setup skipped', error));
+  }, [hydrated]);
 
   useEffect(() => {
     // Desactivado temporalmente hasta migrar a un sistema de actualizaciones propio.
