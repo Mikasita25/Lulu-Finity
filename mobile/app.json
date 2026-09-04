@@ -28,7 +28,7 @@
       "expo-splash-screen"
     ],
     "extra": {
-      "relayUrl": "wss://lulu-finity-production.up.railway.app/v1/tiktok/live"
+      "relayUrl": "wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live"
     },
     "platforms": ["android"]
   }
