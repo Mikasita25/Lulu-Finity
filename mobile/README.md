@@ -38,7 +38,7 @@ El Historial muestra el nombre y el ID recibido para poder crear coincidencias e
 
 El cliente se conecta a:
 
-`wss://lulu-finity-production.up.railway.app/v1/tiktok/live?uniqueId=<usuario>`
+`wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live?uniqueId=<usuario>`
 
 El token de acceso del relay se lee de `EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN`. Las API keys del proveedor no se guardan en la app móvil.
 
