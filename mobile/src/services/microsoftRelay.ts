@@ -1,5 +1,5 @@
 export const DEFAULT_RELAY_LIVE_URL =
-  'wss://lulu-finity-production.up.railway.app/v1/tiktok/live';
+  'wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live';
 
 export function microsoftTtsUrl(liveUrl = DEFAULT_RELAY_LIVE_URL) {
   return `${liveUrl
