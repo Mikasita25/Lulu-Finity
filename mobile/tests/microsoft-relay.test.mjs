@@ -9,8 +9,8 @@ import {
 
 test('convierte la dirección LIVE en la ruta HTTPS de Microsoft TTS', () => {
   assert.equal(
-    microsoftTtsUrl('wss://lulu-finity-production.up.railway.app/v1/tiktok/live'),
-    'https://lulu-finity-production.up.railway.app/v1/tts/microsoft',
+    microsoftTtsUrl('wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live'),
+    'https://lulu-finity-production-6b8f.up.railway.app/v1/tts/microsoft',
   );
 });
 
