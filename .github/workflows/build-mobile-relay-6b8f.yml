@@ -1,0 +1,124 @@
+name: Lulu Finity Mobile - APK privado relay 6b8f
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/lulu-finity-mobile-relay-6b8f
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-mobile-relay-6b8f.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_PUBLIC_LULU_RELAY_URL: wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live
+      EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+      RELAY_HOST: lulu-finity-production-6b8f.up.railway.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validar relay y credencial
+        shell: bash
+        run: |
+          if [ "${#EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN}" -lt 32 ]; then
+            echo "LULU_RELAY_CLIENT_TOKEN no está configurado o es inválido."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error \
+            --request POST "https://${RELAY_HOST}/v1/tts/microsoft" \
+            --header "Authorization: Bearer ${EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN}" \
+            --header "x-lulu-client-token: ${EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN}" \
+            --header "content-type: application/json" \
+            --header "accept: audio/mpeg" \
+            --data '{"text":"Prueba real de Lulú Finity","voice":"es-MX-DaliaNeural","rate":1,"pitch":1}' \
+            --output /tmp/lulu-microsoft-test.mp3
+          python - <<'PY'
+          from pathlib import Path
+          audio = Path('/tmp/lulu-microsoft-test.mp3').read_bytes()
+          valid = audio.startswith(b'ID3') or (len(audio) > 1 and audio[0] == 0xFF and audio[1] & 0xE0 == 0xE0)
+          if len(audio) < 512 or not valid:
+              raise SystemExit('El relay no devolvió un MP3 real de Microsoft.')
+          print(f'Audio Microsoft verificado: {len(audio)} bytes.')
+          PY
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Alinear Expo 57
+        run: >-
+          npx expo install
+          expo@57.0.19
+          expo-asset@57.0.16
+          expo-audio@57.0.4
+          expo-file-system@57.0.6
+          expo-haptics@57.0.2
+          expo-notifications@57.0.16
+          expo-sharing@57.0.17
+          expo-splash-screen@57.0.8
+          expo-video@57.0.3
+          react-native@0.86.3
+
+      - name: Validar fuente móvil
+        shell: bash
+        run: |
+          npx expo install --check
+          npm run typecheck
+          npm run test:realtime
+          npm run test:tts-relay
+          npm run test:ui
+          npm run doctor
+          grep -R --fixed-strings "${RELAY_HOST}" app.json src
+          if grep -R --fixed-strings "lulu-finity-production.up.railway.app" app.json src; then
+            echo "La app todavía contiene el servidor anterior."
+            exit 1
+          fi
+
+      - name: Generar proyecto Android
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Compilar APK Release ARM64
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Preparar APK privado
+        shell: bash
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk "../Lulu-Finity-Mobile-1.4.0-Servidor-6b8f.apk"
+          test -s "../Lulu-Finity-Mobile-1.4.0-Servidor-6b8f.apk"
+
+      - name: Subir APK privado
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Mobile-1.4.0-Servidor-6b8f
+          path: Lulu-Finity-Mobile-1.4.0-Servidor-6b8f.apk
+          if-no-files-found: error
+          retention-days: 7
