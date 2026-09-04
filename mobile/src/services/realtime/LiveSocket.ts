@@ -4,7 +4,7 @@ import { socketPayloadToText } from './socketPayload';
 
 const RELAY_URL =
   process.env.EXPO_PUBLIC_LULU_RELAY_URL ||
-  'wss://lulu-finity-production.up.railway.app/v1/tiktok/live';
+  'wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live';
 
 const CLIENT_TOKEN = process.env.EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN || '';
 
