@@ -7,8 +7,6 @@ on:
     paths:
       - "build-v021/**"
       - "build-v022/**"
-      - "railway-relay/**"
-      - ".github/workflows/release-v021.yml"
 
 permissions:
   contents: write

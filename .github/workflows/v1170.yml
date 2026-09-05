@@ -5,14 +5,11 @@ on:
   pull_request:
     paths:
       - "build-v1170/**"
-      - "railway-relay/**"
       - ".github/workflows/v1170.yml"
   push:
     branches: [main]
     paths:
       - "build-v1170/**"
-      - "railway-relay/**"
-      - ".github/workflows/v1170.yml"
 
 permissions:
   contents: write
