@@ -14,6 +14,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Verify the deployed public LIVE endpoint
+        run: node build-v1200/check-public-relay.cjs
       - name: Reconstruct verified 1.1.8 source
         shell: pwsh
         run: |

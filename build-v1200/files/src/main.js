@@ -181,7 +181,8 @@ const UPDATE_REPOSITORY_URL = 'https://github.com/Mikasita25/Lulu-Finity';
 const UPDATE_RELEASES_URL = `${UPDATE_REPOSITORY_URL}/releases/latest`;
 const DEFAULT_RELAY_PATH = '/v1/tiktok/live';
 const EMBEDDED_RELAY_URL = 'wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live';
-const EMBEDDED_RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';
+// The deployed /v1/tiktok/live endpoint is public; upstream keys stay on Railway.
+const EMBEDDED_RELAY_CLIENT_TOKEN = '';
 const RELAY_USAGE_URL = 'https://lulu-finity-production-6b8f.up.railway.app/usage';
 const STABLE_OVERLAY_BASE_URL = 'https://lulu-finity-production-6b8f.up.railway.app';
 const YOUTUBE_PARTITION = 'persist:lulu-youtube';
@@ -3905,7 +3906,7 @@ function friendlyConnectionError(error) {
     return 'TikTok rechazó la consulta (403). Prueba otra red, desactiva temporalmente VPN/proxy y permite la app en el Firewall.';
   }
   if (/401|unauthorized|token.*inv[aá]lid/.test(lower)) {
-    return 'Railway rechazó el token de acceso. Revisa CLIENT_TOKENS y el token integrado en la compilación.';
+    return 'El servidor del LIVE rechazó la conexión (401). Contacta al administrador de Lulu Finity.';
   }
   if (/429|503|1013|ocupadas|enfriamiento|no hay api keys/.test(lower)) {
     return `El servidor Railway no tiene una API key disponible en este momento: ${raw}`;
@@ -4291,9 +4292,6 @@ async function disconnectLive(reason = 'manual') {
 async function createAndConnectLive(username, connectionNonce, attemptNumber) {
   const relayUrl = EMBEDDED_RELAY_URL;
   const relayClientToken = EMBEDDED_RELAY_CLIENT_TOKEN;
-  if (!relayClientToken || relayClientToken.startsWith('__LULU_RELAY_')) {
-    throw new Error('Esta compilación de Lulu Finity no incluye el token privado del relay.');
-  }
 
   const connection = new RailwayRelayConnection(username, relayUrl, relayClientToken, connectorModule);
   liveConnection = connection;
