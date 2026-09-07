@@ -1,0 +1,81 @@
+name: Lulu Finity 1.1.8 stability
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "build-v1180/**"
+      - ".github/workflows/v1180.yml"
+
+permissions:
+  contents: read
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.1.1/Lulu-Finity-Source-1.1.1.zip
+  BASE_SHA256: 8c66a6af88bc2cd4b91631eb8369014dc8e4b3877eeca38ced844ea1813d3f61
+
+jobs:
+  validate-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir Lulu Finity 1.1.8
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error "$BASE_URL" -o base.zip
+          echo "$BASE_SHA256  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v1170/apply-v1170.py app
+          python build-v1170/test-v1170.py app
+          python build-v1180/apply-v1180.py app
+          python build-v1180/test-v1180.py app
+      - name: Revisar sintaxis y pruebas
+        run: |
+          set -euo pipefail
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/music-recovery-policy.js
+          node --check app/src/command-matching-policy.js
+          cd app
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          cd railway-relay
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+          npm test
+
+  validate-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir Lulu Finity 1.1.8
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente 1.1.1 incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1170/apply-v1170.py app
+          python build-v1170/test-v1170.py app
+          python build-v1180/apply-v1180.py app
+          python build-v1180/test-v1180.py app
+      - name: Revisar runtime de Windows
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          node --check app/src/music-recovery-policy.js
+          node --check app/src/command-matching-policy.js
+          Push-Location app
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          Pop-Location
