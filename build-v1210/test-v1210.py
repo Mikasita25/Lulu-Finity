@@ -28,7 +28,8 @@ assert "const LuluWidgetDesign = require('./widget-design');" in main
 assert "EMBEDDED_RELAY_CLIENT_TOKEN = '';" in main
 assert 'lulu-finity-production-6b8f.up.railway.app' in main
 assert 'LuluWidgetDesign' in renderer
-assert 'data-widget-style-editor' in read('src/index.html')
+assert 'bindStreamWidgetStyleEditors' in renderer
+assert 'ensureStreamWidgetStyleEditors' in renderer
 
 # Music stability.
 assert 'lastPayloadAt:0' in main
