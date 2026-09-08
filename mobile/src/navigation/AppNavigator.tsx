@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, DarkTheme, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -40,16 +41,18 @@ function TabIcon({ route, color, size }: { route: string; color: string; size: n
 }
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
   const accentTheme = useAppStore((state) => state.accentTheme);
   const accent = accentByTheme[accentTheme];
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
+      tabBarHideOnKeyboard: true,
       tabBarShowLabel: true,
       tabBarActiveTintColor: accent,
-      tabBarInactiveTintColor: '#786B76',
+      tabBarInactiveTintColor: '#ABB2C9',
       tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginBottom: 8 },
-      tabBarStyle: { position: 'absolute', height: 76, paddingTop: 9, backgroundColor: '#151019FA', borderTopColor: 'rgba(255,255,255,0.08)', elevation: 14 },
+      tabBarStyle: { position: 'absolute', height: 68 + Math.max(insets.bottom, 12), paddingBottom: Math.max(insets.bottom, 12), paddingTop: 9, backgroundColor: '#151C2E', borderTopColor: 'rgba(255,255,255,0.08)', elevation: 14 },
       tabBarIcon: ({ color, size }) => <TabIcon route={route.name} color={color} size={size} />,
     })}>
       <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Inicio' }} />

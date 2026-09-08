@@ -1,6 +1,6 @@
 {
   "name": "lulu-finity-mobile",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "test:ui": "node tests/ui-contract.test.mjs",
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
-    "prebuild:android": "expo prebuild --platform android --clean"
+    "prebuild:android": "expo prebuild --platform android --clean",
+    "test:browser": "node --no-warnings --experimental-strip-types --test tests/browser.test.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Lulú Finity",
+    "name": "Lul\u00fa Finity",
     "slug": "lulu-finity-mobile",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.mikasita.lulufinity.mobile",
-      "versionCode": 20,
+      "versionCode": 21,
       "permissions": [
         "POST_NOTIFICATIONS",
         "VIBRATE",
@@ -22,14 +22,26 @@
       }
     },
     "plugins": [
-      ["expo-notifications", { "color": "#FF5FC8" }],
-      ["expo-audio", { "enableBackgroundPlayback": true }],
+      [
+        "expo-notifications",
+        {
+          "color": "#FF5FC8"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true
+        }
+      ],
       "expo-document-picker",
       "expo-splash-screen"
     ],
     "extra": {
-      "relayUrl": "wss://lulu-finity-production.up.railway.app/v1/tiktok/live"
+      "relayUrl": "wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live"
     },
-    "platforms": ["android"]
+    "platforms": [
+      "android"
+    ]
   }
 }

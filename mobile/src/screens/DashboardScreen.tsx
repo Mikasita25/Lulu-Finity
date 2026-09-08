@@ -40,7 +40,7 @@ function MainControl({
           </View>
           <View className="flex-1">
             <Text className="text-base font-black text-white">{title}</Text>
-            <Text className={`mt-1 text-xs font-bold ${active ? 'text-emerald-300' : 'text-white/35'}`}>{status}</Text>
+            <Text className={`mt-1 text-xs font-bold ${active ? 'text-emerald-300' : 'text-white/60'}`}>{status}</Text>
           </View>
           <Switch
             accessibilityLabel={`${active ? 'Desactivar' : 'Activar'} ${title}`}
@@ -50,7 +50,7 @@ function MainControl({
             thumbColor="#FFF7FC"
           />
         </View>
-        <Text className="mt-4 text-xs leading-5 text-white/40">{subtitle}</Text>
+        <Text className="mt-4 text-xs leading-5 text-white/60">{subtitle}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={onOpen}
@@ -69,7 +69,7 @@ function StatusRow({ label, value, active, last = false }: { label: string; valu
     <View className={`flex-row items-center gap-3 py-3.5 ${last ? '' : 'border-b border-white/[0.055]'}`}>
       <View className={`h-2.5 w-2.5 rounded-full ${active ? 'bg-emerald-400' : 'bg-white/20'}`} />
       <Text className="flex-1 text-sm font-bold text-white/65">{label}</Text>
-      <Text className={`text-xs font-black ${active ? 'text-emerald-300' : 'text-white/30'}`}>{value}</Text>
+      <Text className={`text-xs font-black ${active ? 'text-emerald-300' : 'text-white/55'}`}>{value}</Text>
     </View>
   );
 }
@@ -141,7 +141,7 @@ export function DashboardScreen({ navigation }: any) {
             <Gamepad2 size={15} color="#86EFAC" />
             <Text className="text-sm font-black text-white">Diseñado para segundo plano</Text>
           </View>
-          <Text className="mt-1 text-xs leading-5 text-white/40">
+          <Text className="mt-1 text-xs leading-5 text-white/60">
             Cuando el LIVE esté conectado, puedes cambiar de aplicación. La notificación de Lulú confirma que sigue activa.
           </Text>
         </View>

@@ -35,7 +35,7 @@ function ToggleRow({
     <View className="flex-row items-center gap-3 border-b border-white/[0.055] py-4">
       <View className="flex-1">
         <Text className="text-sm font-black text-white">{title}</Text>
-        <Text className="mt-1 text-xs leading-5 text-white/40">{subtitle}</Text>
+        <Text className="mt-1 text-xs leading-5 text-white/60">{subtitle}</Text>
       </View>
       <Switch
         value={value}
@@ -117,7 +117,7 @@ export function TtsScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-base font-black text-white">Leer comentarios en voz alta</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/40">
+              <Text className="mt-1 text-xs leading-5 text-white/60">
                 Mantiene una cola corta para no leer mensajes viejos ni quedarse atrás.
               </Text>
             </View>
@@ -190,18 +190,18 @@ export function TtsScreen() {
                 >
                   {voice.name}
                 </Text>
-                <Text className="mt-1 text-xs text-white/35">
+                <Text className="mt-1 text-xs text-white/60">
                   {voice.language} · {voice.quality}
                 </Text>
               </Pressable>
             );
           })}
-          {!voices.length ? <Text className="p-3 text-xs text-white/35">Cargando voces Microsoft…</Text> : null}
+          {!voices.length ? <Text className="p-3 text-xs text-white/60">Cargando voces Microsoft…</Text> : null}
         </View>
       </GlassCard>
 
       <SectionTitle title="Cómo debe hablar" />
-      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">Velocidad</Text>
+      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/55">Velocidad</Text>
       <View className="mb-4 flex-row flex-wrap gap-2">
         {[0.8, 1, 1.15, 1.3].map((rate) => (
           <Choice
@@ -213,7 +213,7 @@ export function TtsScreen() {
           />
         ))}
       </View>
-      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/30">Tono</Text>
+      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/55">Tono</Text>
       <View className="flex-row flex-wrap gap-2">
         {[0.85, 1, 1.15, 1.3].map((pitch) => (
           <Choice

@@ -44,13 +44,13 @@ export function UpdatesScreen() {
 
       <GlassCard className="mb-4">
         <View className="p-5">
-          <Text className="text-[10px] font-black uppercase tracking-[1.6px] text-white/30">Versión instalada</Text>
+          <Text className="text-[10px] font-black uppercase tracking-[1.6px] text-white/55">Versión instalada</Text>
           <Text className="mt-2 text-3xl font-black text-white">v{currentVersion}</Text>
-          <Text className="mt-1 text-xs font-bold text-white/35">Android build {currentBuild}</Text>
+          <Text className="mt-1 text-xs font-bold text-white/60">Android build {currentBuild}</Text>
           <View className="mt-4 rounded-2xl bg-white/[0.045] p-4">
             <View className="flex-row items-center gap-3">
               <ShieldCheck size={18} color="#FF9DDA" />
-              <Text className="flex-1 text-xs leading-5 text-white/45">El actualizador solo acepta releases con etiqueta <Text className="font-black text-lulu-200">mobile-vX.Y.Z</Text>. Las versiones Windows de Lulú Finity se ignoran.</Text>
+              <Text className="flex-1 text-xs leading-5 text-white/65">El actualizador solo acepta releases con etiqueta <Text className="font-black text-lulu-200">mobile-vX.Y.Z</Text>. Las versiones Windows de Lulú Finity se ignoran.</Text>
             </View>
           </View>
         </View>
@@ -61,11 +61,11 @@ export function UpdatesScreen() {
           <View className="flex-row items-center gap-3">
             <View className="flex-1">
               <Text className="text-sm font-black text-white">Buscar automáticamente</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/40">Al abrir la app revisa como máximo una vez cada 24 horas. Si encuentra una versión nueva, te muestra el aviso para descargarla.</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/60">Al abrir la app revisa como máximo una vez cada 24 horas. Si encuentra una versión nueva, te muestra el aviso para descargarla.</Text>
             </View>
             <Switch value={autoCheckEnabled} onValueChange={setAutoCheckEnabled} trackColor={{ false: '#342C34', true: '#FF5FC8' }} thumbColor="#FFF7FC" />
           </View>
-          <Text className="mt-3 text-[11px] leading-5 text-white/30">{checkedLabel(lastCheckedAt)}</Text>
+          <Text className="mt-3 text-[11px] leading-5 text-white/55">{checkedLabel(lastCheckedAt)}</Text>
           <Text className="mt-1 text-[11px] leading-5 text-white/25">Android siempre pedirá tu confirmación antes de instalar un APK nuevo.</Text>
         </View>
       </GlassCard>
@@ -82,7 +82,7 @@ export function UpdatesScreen() {
             </View>
             <View className="mt-4 rounded-2xl bg-black/20 p-4"><Text className="text-xs leading-5 text-white/55">{update.notes}</Text></View>
             <View className="mt-4"><Button label={update.downloadUrl ? 'Descargar APK' : 'Abrir release'} onPress={download} icon={<Download size={17} color="white" />} /></View>
-            <Text className="mt-3 text-[11px] leading-5 text-white/30">La descarga abre directamente el APK de la release móvil cuando está disponible.</Text>
+            <Text className="mt-3 text-[11px] leading-5 text-white/55">La descarga abre directamente el APK de la release móvil cuando está disponible.</Text>
           </View>
         </GlassCard>
       ) : update ? (
@@ -90,7 +90,7 @@ export function UpdatesScreen() {
           <View className="items-center p-6">
             <CheckCircle2 size={28} color="#5CE1A4" />
             <Text className="mt-3 text-base font-black text-white">Estás al día</Text>
-            <Text className="mt-1 text-center text-xs leading-5 text-white/40">La versión móvil más reciente es v{update.latestVersion}.</Text>
+            <Text className="mt-1 text-center text-xs leading-5 text-white/60">La versión móvil más reciente es v{update.latestVersion}.</Text>
           </View>
         </GlassCard>
       ) : null}

@@ -20,7 +20,7 @@ export function ConnectScreen({ navigation }: any) {
 
       <Text
         onPress={() => navigation.replace('Main')}
-        className="mt-2 text-center text-xs font-bold text-white/40"
+        className="mt-2 text-center text-xs font-bold text-white/60"
       >
         Ir al inicio
       </Text>

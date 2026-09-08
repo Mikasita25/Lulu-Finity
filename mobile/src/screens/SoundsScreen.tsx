@@ -70,11 +70,11 @@ export function SoundsScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-sm font-black text-white">Mezcla general</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/40">Ajusta todas las alertas sin editar una por una.</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/60">Ajusta todas las alertas sin editar una por una.</Text>
             </View>
           </View>
 
-          <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/30">Perfil</Text>
+          <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/55">Perfil</Text>
           <View className="flex-row gap-2">
             {profiles.map((profile) => {
               const active = soundMix.profile === profile.id;
@@ -92,7 +92,7 @@ export function SoundsScreen() {
             })}
           </View>
 
-          <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/30">Volumen maestro</Text>
+          <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/55">Volumen maestro</Text>
           <View className="flex-row gap-2">
             {[0.4, 0.6, 0.8, 1].map((volume) => (
               <Pressable
@@ -101,7 +101,7 @@ export function SoundsScreen() {
                 onPress={() => setSoundMix({ masterVolume: volume })}
                 className={`flex-1 rounded-xl py-2.5 ${Math.abs(soundMix.masterVolume - volume) < 0.01 ? 'bg-lulu-500' : 'bg-white/[0.06]'}`}
               >
-                <Text className={`text-center text-xs font-black ${Math.abs(soundMix.masterVolume - volume) < 0.01 ? 'text-white' : 'text-white/40'}`}>
+                <Text className={`text-center text-xs font-black ${Math.abs(soundMix.masterVolume - volume) < 0.01 ? 'text-white' : 'text-white/60'}`}>
                   {Math.round(volume * 100)}%
                 </Text>
               </Pressable>
@@ -112,7 +112,7 @@ export function SoundsScreen() {
             <Music2 size={18} color="#FF9DDA" />
             <View className="flex-1">
               <Text className="text-xs font-black text-white">Bajar música durante alertas</Text>
-              <Text className="mt-1 text-[10px] leading-4 text-white/35">La canción continúa; solo reduce su volumen temporalmente.</Text>
+              <Text className="mt-1 text-[10px] leading-4 text-white/60">La canción continúa; solo reduce su volumen temporalmente.</Text>
             </View>
             <Switch
               disabled={readonly}
@@ -127,7 +127,7 @@ export function SoundsScreen() {
             <Sparkles size={18} color="#C4B5FD" />
             <View className="flex-1">
               <Text className="text-xs font-black text-white">Permitir sonidos simultáneos</Text>
-              <Text className="mt-1 text-[10px] leading-4 text-white/35">Útil para LIVE rápidos; el perfil Impacto lo activa.</Text>
+              <Text className="mt-1 text-[10px] leading-4 text-white/60">Útil para LIVE rápidos; el perfil Impacto lo activa.</Text>
             </View>
             <Switch
               disabled={readonly}
@@ -141,12 +141,12 @@ export function SoundsScreen() {
       </GlassCard>
 
       {readonly ? (
-        <Text className="mb-4 mt-4 rounded-2xl bg-white/[0.05] p-4 text-xs leading-5 text-white/40">
+        <Text className="mb-4 mt-4 rounded-2xl bg-white/[0.05] p-4 text-xs leading-5 text-white/60">
           Modo Espectador: puedes probar los sonidos, pero la configuración solo se edita en modo Streamer.
         </Text>
       ) : null}
 
-      <Text className="mb-3 mt-6 text-xs font-black uppercase tracking-[1.5px] text-white/35">Sonido por evento</Text>
+      <Text className="mb-3 mt-6 text-xs font-black uppercase tracking-[1.5px] text-white/60">Sonido por evento</Text>
       {slots.map((slot) => {
         const setting = sounds[slot.id];
         return (
@@ -158,7 +158,7 @@ export function SoundsScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-sm font-black text-white">{slot.label}</Text>
-                  <Text className="mt-1 text-xs leading-5 text-white/40">{slot.hint}</Text>
+                  <Text className="mt-1 text-xs leading-5 text-white/60">{slot.hint}</Text>
                 </View>
                 <Switch
                   disabled={readonly}
@@ -180,7 +180,7 @@ export function SoundsScreen() {
 
               {!readonly ? (
                 <>
-                  <Text className="mb-2 mt-4 text-[10px] font-black uppercase tracking-[1.4px] text-white/30">Biblioteca incluida</Text>
+                  <Text className="mb-2 mt-4 text-[10px] font-black uppercase tracking-[1.4px] text-white/55">Biblioteca incluida</Text>
                   <View className="flex-row flex-wrap gap-2">
                     {BUILTIN_SOUNDS.map((preset) => {
                       const active = setting.presetId === preset.id;
@@ -198,7 +198,7 @@ export function SoundsScreen() {
                 </>
               ) : null}
 
-              <Text className="mb-2 mt-4 text-[10px] font-black uppercase tracking-[1.4px] text-white/30">Volumen del evento</Text>
+              <Text className="mb-2 mt-4 text-[10px] font-black uppercase tracking-[1.4px] text-white/55">Volumen del evento</Text>
               <View className="flex-row gap-2">
                 {[0.25, 0.5, 0.75, 1].map((volume) => (
                   <Pressable
@@ -207,7 +207,7 @@ export function SoundsScreen() {
                     onPress={() => setSound(slot.id, { volume })}
                     className={`flex-1 rounded-xl py-2.5 ${Math.abs(setting.volume - volume) < 0.01 ? 'bg-lulu-500' : 'bg-white/[0.06]'}`}
                   >
-                    <Text className={`text-center text-xs font-black ${Math.abs(setting.volume - volume) < 0.01 ? 'text-white' : 'text-white/40'}`}>
+                    <Text className={`text-center text-xs font-black ${Math.abs(setting.volume - volume) < 0.01 ? 'text-white' : 'text-white/60'}`}>
                       {Math.round(volume * 100)}%
                     </Text>
                   </Pressable>

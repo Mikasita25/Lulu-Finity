@@ -1,3 +1,14 @@
+## 1.5.0 — Navegador y servidor móvil
+
+- LIVE, Microsoft TTS y compilaciones apuntan al servidor Railway 6b8f.
+- Navegador YouTube visible con búsqueda, enlaces, historial de navegación, recarga y modo escritorio. Mantiene la misma WebView al minimizarse.
+- Preferencia de segundo plano aplicada a la visibilidad del documento y a la sesión multimedia existente; pausas manuales respetadas.
+- Tiempo límite de carga y diagnóstico del cierre del proceso Android; búsqueda manual separada de selección automática de solicitudes.
+- Superficies azul noche, tarjetas más amplias, contraste de textos mejorado en menús y barra inferior adaptada al área segura.
+- Ignora callbacks de apertura/error de conexiones LIVE reemplazadas.
+
+Validación física pendiente: reproducción prolongada con pantalla bloqueada, controles de notificación, llamadas y ahorro de batería. No se garantiza compatibilidad con todos los cambios del sitio de YouTube.
+
 # Lulú Finity Mobile
 
 ## 1.4.0

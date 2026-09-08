@@ -1,3 +1,4 @@
+import { useBrowserStore } from '@/store/useBrowserStore';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
 import { AlertCircle, ListMusic, Pause, Play, RefreshCw, ShieldCheck, SkipForward, Trash2 } from 'lucide-react-native';
@@ -17,7 +18,7 @@ function SongRow({ song, index, onPlay, onRemove }: { song: SongRequest; index: 
       </View>
       <View className="flex-1">
         <Text numberOfLines={1} className="text-sm font-black text-white">{song.query}</Text>
-        <Text className="mt-1 text-xs text-white/35">pedido por @{song.requestedBy}</Text>
+        <Text className="mt-1 text-xs text-white/60">pedido por @{song.requestedBy}</Text>
       </View>
       <Pressable onPress={onPlay} className="h-10 w-10 items-center justify-center rounded-xl bg-white/[0.07]">
         <Play size={16} color="#FF9DDA" fill="#FF9DDA" />
@@ -82,6 +83,7 @@ export function MusicScreen({ navigation }: any) {
   return (
     <Screen>
       <AppHeader title="Música" subtitle="Reproduce canciones y recibe solicitudes del chat." />
+      <View className="mb-4"><Button label="Explorar YouTube" onPress={useBrowserStore.getState().show} /></View>
 
       <GlassCard>
         <View className="p-5">
@@ -91,7 +93,7 @@ export function MusicScreen({ navigation }: any) {
             </View>
             <View className="flex-1">
               <Text className="text-sm font-black text-white">Permitir solicitudes del chat</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/40">{commands}</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/60">{commands}</Text>
             </View>
             <Switch
               value={music.enabled}
@@ -120,7 +122,7 @@ export function MusicScreen({ navigation }: any) {
         </View>
         <View className="flex-1">
           <Text className="text-sm font-black text-white">Reproducción tipo navegador en segundo plano</Text>
-          <Text className="mt-1 text-xs leading-5 text-white/40">
+          <Text className="mt-1 text-xs leading-5 text-white/60">
             {music.backgroundPlayback
               ? 'Activa: conserva la sesión multimedia al cambiar de app o bloquear la pantalla.'
               : 'Desactivada: la canción se pausa cuando Lulú deja de estar visible.'}
@@ -134,7 +136,7 @@ export function MusicScreen({ navigation }: any) {
           <View className="flex-row items-center gap-3">
             <View className="flex-1">
               <Text className="text-sm font-black text-white">Mantener música en segundo plano</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/40">Usa el servicio multimedia de Android y muestra controles en la notificación.</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/60">Usa el servicio multimedia de Android y muestra controles en la notificación.</Text>
             </View>
             <Switch
               value={music.backgroundPlayback}
@@ -147,7 +149,7 @@ export function MusicScreen({ navigation }: any) {
           <View className="mt-5 flex-row items-center gap-3 border-t border-white/[0.06] pt-4">
             <View className="flex-1">
               <Text className="text-sm font-black text-white">Bloquear anuncios del reproductor</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/40">Oculta promociones, overlays y destinos publicitarios dentro de Lulu‑finity.</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/60">Oculta promociones, overlays y destinos publicitarios dentro de Lulu‑finity.</Text>
             </View>
             <Switch
               value={music.adBlockEnabled}
@@ -162,7 +164,7 @@ export function MusicScreen({ navigation }: any) {
               <View className="mt-4 flex-row items-center gap-3">
                 <View className="flex-1">
                   <Text className="text-xs font-black text-white">Saltar anuncios de video automáticamente</Text>
-                  <Text className="mt-1 text-[10px] leading-4 text-white/35">Pulsa el botón de omitir y evita que el anuncio termine completo.</Text>
+                  <Text className="mt-1 text-[10px] leading-4 text-white/60">Pulsa el botón de omitir y evita que el anuncio termine completo.</Text>
                 </View>
                 <Switch
                   value={music.autoSkipAds}
@@ -174,7 +176,7 @@ export function MusicScreen({ navigation }: any) {
               <View className="mt-4 flex-row items-center gap-3">
                 <View className="flex-1">
                   <Text className="text-xs font-black text-white">Bloquear enlaces externos</Text>
-                  <Text className="mt-1 text-[10px] leading-4 text-white/35">No permite que un anuncio saque el reproductor fuera de YouTube.</Text>
+                  <Text className="mt-1 text-[10px] leading-4 text-white/60">No permite que un anuncio saque el reproductor fuera de YouTube.</Text>
                 </View>
                 <Switch
                   value={music.blockExternalLinks}
@@ -191,7 +193,7 @@ export function MusicScreen({ navigation }: any) {
       <SectionTitle title="Mezcla con la voz" />
       <GlassCard>
         <View className="p-5">
-          <Text className="text-xs leading-5 text-white/40">La música ya no se detiene cuando habla el TTS. Elige cuánto baja mientras se lee el comentario.</Text>
+          <Text className="text-xs leading-5 text-white/60">La música ya no se detiene cuando habla el TTS. Elige cuánto baja mientras se lee el comentario.</Text>
           <View className="mt-4 flex-row gap-2">
             {[0.12, 0.22, 0.38, 0.55].map((volume) => (
               <Pressable
@@ -199,7 +201,7 @@ export function MusicScreen({ navigation }: any) {
                 onPress={() => updateMusic({ ttsDuckingVolume: volume })}
                 className={`flex-1 rounded-xl py-2.5 ${Math.abs(music.ttsDuckingVolume - volume) < 0.01 ? 'bg-lulu-500' : 'bg-white/[0.06]'}`}
               >
-                <Text className={`text-center text-xs font-black ${Math.abs(music.ttsDuckingVolume - volume) < 0.01 ? 'text-white' : 'text-white/40'}`}>
+                <Text className={`text-center text-xs font-black ${Math.abs(music.ttsDuckingVolume - volume) < 0.01 ? 'text-white' : 'text-white/60'}`}>
                   {Math.round(volume * 100)}%
                 </Text>
               </Pressable>
@@ -211,7 +213,7 @@ export function MusicScreen({ navigation }: any) {
       <SectionTitle title="Volumen" />
       <GlassCard>
         <View className="p-5">
-          <Text className="text-xs leading-5 text-white/40">
+          <Text className="text-xs leading-5 text-white/60">
             El cambio se aplica al instante a la canción de YouTube que esté sonando y se recuerda para las siguientes.
           </Text>
           <MusicVolumeControl />
@@ -230,7 +232,7 @@ export function MusicScreen({ navigation }: any) {
             placeholderTextColor="#6D626C"
             className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-sm font-bold text-white"
           />
-          <Text className="mt-3 text-xs leading-5 text-white/35">
+          <Text className="mt-3 text-xs leading-5 text-white/60">
             También quedan activos !song y !sr. Ejemplo: {music.command} Die With A Smile
           </Text>
         </View>
@@ -260,7 +262,7 @@ export function MusicScreen({ navigation }: any) {
           {current ? (
             <>
               <Text className="text-lg font-black text-white">{current.query}</Text>
-              <Text className="mt-1 text-xs text-white/35">pedido por @{current.requestedBy}</Text>
+              <Text className="mt-1 text-xs text-white/60">pedido por @{current.requestedBy}</Text>
 
               <View className={`mt-4 flex-row items-center gap-2 rounded-2xl border p-3 ${playbackStatus === 'error' ? 'border-red-400/20 bg-red-500/[0.08]' : 'border-white/[0.07] bg-white/[0.035]'}`}>
                 {playbackStatus === 'error' ? <AlertCircle size={16} color="#FDA4AF" /> : <ShieldCheck size={16} color={playbackStatus === 'playing' ? '#86EFAC' : '#FCD34D'} />}
@@ -296,7 +298,7 @@ export function MusicScreen({ navigation }: any) {
           ) : (
             <>
               <Text className="text-sm font-black text-white">Esperando una solicitud</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/35">El próximo comando válido empezará a reproducirse automáticamente.</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/60">El próximo comando válido empezará a reproducirse automáticamente.</Text>
               <View className="mt-4">
                 <Button label="Reproducir siguiente" onPress={startNext} disabled={!queue.length} icon={<Play size={17} color="white" />} />
               </View>
@@ -311,7 +313,7 @@ export function MusicScreen({ navigation }: any) {
           {queue.map((song, index) => (
             <SongRow key={song.id} song={song} index={index} onPlay={() => startSong(song)} onRemove={() => removeSong(song.id)} />
           ))}
-          {!queue.length ? <Text className="py-8 text-center text-xs font-semibold text-white/30">Esperando solicitudes…</Text> : null}
+          {!queue.length ? <Text className="py-8 text-center text-xs font-semibold text-white/55">Esperando solicitudes…</Text> : null}
         </View>
       </GlassCard>
 

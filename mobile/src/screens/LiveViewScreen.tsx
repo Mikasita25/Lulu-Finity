@@ -60,10 +60,10 @@ function QuickControl({
     >
       <View className="mb-2 flex-row items-center justify-between">
         {icon}
-        <Text className={`text-[9px] font-black ${active ? 'text-lulu-200' : 'text-white/30'}`}>{active ? 'ON' : 'OFF'}</Text>
+        <Text className={`text-[9px] font-black ${active ? 'text-lulu-200' : 'text-white/55'}`}>{active ? 'ON' : 'OFF'}</Text>
       </View>
       <Text className="text-xs font-black text-white">{title}</Text>
-      <Text numberOfLines={1} className="mt-1 text-[10px] text-white/35">{subtitle}</Text>
+      <Text numberOfLines={1} className="mt-1 text-[10px] text-white/60">{subtitle}</Text>
     </Pressable>
   );
 }
@@ -150,7 +150,7 @@ export function LiveViewScreen({ navigation }: any) {
         <Pressable onPress={() => navigation.navigate('RecentActivity')} className="flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-3 py-3">
           <Filter size={17} color="#FF9DDA" />
           <Text className="mt-2 text-xs font-black text-white">Actividad</Text>
-          <Text className="mt-1 text-[10px] text-white/35">Configurar filtros</Text>
+          <Text className="mt-1 text-[10px] text-white/60">Configurar filtros</Text>
         </Pressable>
       </View>
 
@@ -168,7 +168,7 @@ export function LiveViewScreen({ navigation }: any) {
             key={id}
             onPress={() => setViewMode(id)}
             className={`flex-1 overflow-hidden rounded-xl px-2 py-3 text-center text-[11px] font-black ${
-              viewMode === id ? 'bg-lulu-500 text-white' : 'bg-white/[0.06] text-white/40'
+              viewMode === id ? 'bg-lulu-500 text-white' : 'bg-white/[0.06] text-white/60'
             }`}
           >
             {label}
@@ -200,7 +200,7 @@ export function LiveViewScreen({ navigation }: any) {
                 {currentSong ? (
                   <>
                     <Text numberOfLines={1} className="mt-4 text-base font-black text-white">{currentSong.query}</Text>
-                    <Text className="mt-1 text-xs text-white/35">@{currentSong.requestedBy} · {songQueue.length} en cola</Text>
+                    <Text className="mt-1 text-xs text-white/60">@{currentSong.requestedBy} · {songQueue.length} en cola</Text>
 
                     <MusicVolumeControl compact />
 
@@ -233,7 +233,7 @@ export function LiveViewScreen({ navigation }: any) {
                     </Pressable>
                   </>
                 ) : (
-                  <Text className="py-6 text-center text-xs font-semibold text-white/30">Sin canción activa.</Text>
+                  <Text className="py-6 text-center text-xs font-semibold text-white/55">Sin canción activa.</Text>
                 )}
                 <Pressable onPress={() => navigation.navigate('Music')} className="mt-3 rounded-2xl bg-lulu-500/15 px-3 py-3">
                   <Text className="text-center text-xs font-black text-lulu-200">Abrir cola y solicitudes</Text>
@@ -251,7 +251,7 @@ export function LiveViewScreen({ navigation }: any) {
                 <View className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
                   <GoalProgressBar ratio={progress.ratio} />
                 </View>
-                <Text className="mt-2 text-right text-xs font-bold text-white/40">{compactNumber(progress.current)} / {compactNumber(goal.target)}</Text>
+                <Text className="mt-2 text-right text-xs font-bold text-white/60">{compactNumber(progress.current)} / {compactNumber(goal.target)}</Text>
               </View>
             ) : null}
 
@@ -263,7 +263,7 @@ export function LiveViewScreen({ navigation }: any) {
                   <Pressable onPress={() => navigation.navigate('RecentActivity')}><Filter size={16} color="#FF9DDA" /></Pressable>
                 </View>
                 {visibleEvents.slice(0, viewMode === 'events' ? 8 : 4).map((event) => <EventRow key={event.id} event={event} />)}
-                {!visibleEvents.length ? <Text className="py-8 text-center text-xs font-semibold text-white/30">Esperando actividad visible…</Text> : null}
+                {!visibleEvents.length ? <Text className="py-8 text-center text-xs font-semibold text-white/55">Esperando actividad visible…</Text> : null}
               </View>
             ) : null}
 
@@ -275,12 +275,12 @@ export function LiveViewScreen({ navigation }: any) {
                 </View>
                 {top.map((entry, index) => (
                   <View key={entry.uniqueId} className="mb-2 flex-row items-center rounded-2xl bg-white/[0.045] px-3 py-3">
-                    <Text className="w-8 text-sm font-black text-white/40">#{index + 1}</Text>
+                    <Text className="w-8 text-sm font-black text-white/60">#{index + 1}</Text>
                     <Text className="flex-1 text-sm font-extrabold text-white" numberOfLines={1}>{entry.nickname}</Text>
                     <Text className="text-xs font-black text-lulu-200">{compactNumber(entry.diamonds)} 💎</Text>
                   </View>
                 ))}
-                {!top.length ? <Text className="py-5 text-center text-xs font-semibold text-white/30">El ranking aparecerá con la actividad del LIVE.</Text> : null}
+                {!top.length ? <Text className="py-5 text-center text-xs font-semibold text-white/55">El ranking aparecerá con la actividad del LIVE.</Text> : null}
               </View>
             ) : null}
           </View>

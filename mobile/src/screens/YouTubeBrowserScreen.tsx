@@ -1,3 +1,4 @@
+import { useBrowserStore } from '@/store/useBrowserStore';
 import { Pressable, Text, View } from 'react-native';
 import { AlertCircle, CheckCircle2, LoaderCircle, Pause, Play, RefreshCw, SkipForward } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
@@ -30,8 +31,9 @@ export function YouTubeBrowserScreen({ route }: any) {
 
   return (
     <Screen>
-      <AppHeader title="Reproductor" subtitle="La música se controla aquí sin abrir otra ventana de YouTube." />
+      <AppHeader title="Reproductor" subtitle="Tus canciones, YouTube y la cola en un solo lugar." />
 
+      <View className="mb-4"><Button label="Abrir navegador YouTube" onPress={useBrowserStore.getState().show} /></View>
       <GlassCard>
         <View className="p-5">
           <View className="flex-row items-center gap-3">
@@ -43,7 +45,7 @@ export function YouTubeBrowserScreen({ route }: any) {
               <Text numberOfLines={2} className="mt-1 text-lg font-black text-white">
                 {currentSong?.query || requestedQuery || 'Nada en reproducción'}
               </Text>
-              {currentSong ? <Text className="mt-1 text-xs text-white/35">Pedido por @{currentSong.requestedBy}</Text> : null}
+              {currentSong ? <Text className="mt-1 text-xs text-white/60">Pedido por @{currentSong.requestedBy}</Text> : null}
             </View>
           </View>
 
@@ -53,7 +55,7 @@ export function YouTubeBrowserScreen({ route }: any) {
 
           <View className="mt-4 flex-row gap-2">
             <Pressable
-              disabled={!currentSong}
+              disabled={!currentSong && !useBrowserStore.getState().initialized}
               onPress={() => setPaused(!paused)}
               className={`flex-1 flex-row items-center justify-center gap-2 rounded-2xl px-3 py-3.5 ${currentSong ? 'bg-lulu-500/20' : 'bg-white/[0.03]'}`}
             >
@@ -61,7 +63,7 @@ export function YouTubeBrowserScreen({ route }: any) {
               <Text className="text-xs font-black text-white">{paused ? 'Continuar' : 'Pausar'}</Text>
             </Pressable>
             <Pressable
-              disabled={!queue.length}
+              disabled={!currentSong}
               onPress={skip}
               className={`flex-1 flex-row items-center justify-center gap-2 rounded-2xl px-3 py-3.5 ${queue.length ? 'bg-white/[0.07]' : 'bg-white/[0.03]'}`}
             >
@@ -80,13 +82,13 @@ export function YouTubeBrowserScreen({ route }: any) {
 
       <View className="mt-4 rounded-[20px] border border-emerald-400/15 bg-emerald-500/[0.07] p-4">
         <Text className="text-sm font-black text-white">Un solo reproductor</Text>
-        <Text className="mt-1 text-xs leading-5 text-white/45">
-          Lulú ya no abre una segunda página de YouTube. Así evita que dos videos compitan por el audio y se cancelen entre sí.
+        <Text className="mt-1 text-xs leading-5 text-white/65">
+          Busca videos o pega un enlace. Al cerrar el navegador, el audio continúa si activaste segundo plano en Música.
         </Text>
       </View>
 
       <MusicVolumeControl />
-      <Text className="mt-5 text-center text-xs font-bold text-white/30">{queue.length} canciones esperando</Text>
+      <Text className="mt-5 text-center text-xs font-bold text-white/55">{queue.length} canciones esperando</Text>
     </Screen>
   );
 }

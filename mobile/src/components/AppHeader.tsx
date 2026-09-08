@@ -16,7 +16,7 @@ export function AppHeader({ title, subtitle }: { title: string; subtitle?: strin
   const mainRoutes = ['Dashboard', 'TTS', 'Music', 'Interactions', 'More'];
   const secondary = !mainRoutes.includes(route.name) && navigation.canGoBack();
   return (
-    <View className="mb-5 mt-1">
+    <View className="mb-6 mt-2">
       <View className="mb-3 flex-row items-center justify-between">
         {secondary ? (
           <Pressable
@@ -38,8 +38,8 @@ export function AppHeader({ title, subtitle }: { title: string; subtitle?: strin
       </View>
       <View className="flex-row items-end justify-between gap-3">
       <View className="flex-1">
-        <Text className="text-[28px] font-black tracking-tight text-white">{title}</Text>
-        {subtitle ? <Text className="mt-1.5 text-[13px] leading-5 text-white/45">{subtitle}</Text> : null}
+        <Text className="text-[30px] font-black tracking-tight text-white">{title}</Text>
+        {subtitle ? <Text className="mt-1.5 text-[13px] leading-5 text-white/65">{subtitle}</Text> : null}
       </View>
       </View>
     </View>

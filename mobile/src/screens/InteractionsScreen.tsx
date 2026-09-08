@@ -149,11 +149,11 @@ export function InteractionsScreen() {
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-lulu-500/20"><Zap size={20} color="#FF9DDA" /></View>
             <View className="flex-1">
               <Text className="text-sm font-black text-white">Crea una reacción</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/45">Por ejemplo: al recibir un regalo, reproduce un sonido y di “Gracias”.</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/65">Por ejemplo: al recibir un regalo, reproduce un sonido y di “Gracias”.</Text>
             </View>
           </View>
           <View className="mt-4 rounded-2xl bg-white/[0.045] p-4">
-            <Text className="text-xs font-bold leading-5 text-white/45">Variables TTS: {'{name}'} · {'{user}'} · {'{comment}'} · {'{fanSticker}'} · {'{gift}'} · {'{count}'}</Text>
+            <Text className="text-xs font-bold leading-5 text-white/65">Variables TTS: {'{name}'} · {'{user}'} · {'{comment}'} · {'{fanSticker}'} · {'{gift}'} · {'{count}'}</Text>
           </View>
         </View>
       </GlassCard>
@@ -162,14 +162,14 @@ export function InteractionsScreen() {
         <GlassCard className="mb-5">
           <View className="p-5">
             <Text className="text-base font-black text-white">{editingId ? 'Editar automatización' : 'Nueva automatización'}</Text>
-            <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/30">Nombre</Text>
+            <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/55">Nombre</Text>
             <TextInput value={draft.name} onChangeText={(value) => patchDraft('name', value)} placeholder="Ej. Fan Sticker corazón" placeholderTextColor="#625965" className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3.5 text-sm font-bold text-white" />
 
-            <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/30">Disparador</Text>
+            <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/55">Disparador</Text>
             <View className="flex-row flex-wrap gap-2">
               {triggerOptions.map((option) => (
                 <Pressable key={option.id} onPress={() => patchDraft('triggerType', option.id)} className={`rounded-xl px-3.5 py-2.5 ${draft.triggerType === option.id ? 'bg-lulu-500' : 'bg-white/[0.06]'}`}>
-                  <Text className={`text-xs font-black ${draft.triggerType === option.id ? 'text-white' : 'text-white/45'}`}>{option.label}</Text>
+                  <Text className={`text-xs font-black ${draft.triggerType === option.id ? 'text-white' : 'text-white/65'}`}>{option.label}</Text>
                 </Pressable>
               ))}
             </View>
@@ -187,7 +187,7 @@ export function InteractionsScreen() {
                 {draft.triggerType === 'fanSticker' ? (
                   <View className="mt-3 flex-row gap-2 rounded-2xl bg-lulu-500/10 p-3">
                     <Sparkles size={16} color="#FF9DDA" />
-                    <Text className="flex-1 text-xs leading-5 text-white/45">Conecta el LIVE y abre Historial → Fan Stickers para ver el nombre e ID exactos que TikTok envía.</Text>
+                    <Text className="flex-1 text-xs leading-5 text-white/65">Conecta el LIVE y abre Historial → Fan Stickers para ver el nombre e ID exactos que TikTok envía.</Text>
                   </View>
                 ) : null}
                 <View className="mt-3 flex-row gap-2">
@@ -200,7 +200,7 @@ export function InteractionsScreen() {
               </>
             ) : null}
 
-            <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/30">Acción</Text>
+            <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/55">Acción</Text>
             <View className="flex-row gap-2">
               {actionOptions.map((option) => (
                 <Pressable key={option.id} onPress={() => patchDraft('actionType', option.id)} className={`flex-1 rounded-xl px-2 py-3 ${draft.actionType === option.id ? 'bg-lulu-500' : 'bg-white/[0.06]'}`}>
@@ -228,7 +228,7 @@ export function InteractionsScreen() {
 
             {wantsTts ? <TextInput value={draft.ttsText} onChangeText={(value) => patchDraft('ttsText', value)} multiline placeholder="Gracias {name} por usar {fanSticker}" placeholderTextColor="#625965" className="mt-4 min-h-[88px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3.5 text-sm font-bold text-white" /> : null}
 
-            <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/30">Cooldown</Text>
+            <Text className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[1.4px] text-white/55">Cooldown</Text>
             <View className="flex-row gap-2">
               {[0, 3, 5, 10, 30].map((seconds) => (
                 <Pressable key={seconds} onPress={() => patchDraft('cooldownSeconds', seconds)} className={`flex-1 rounded-xl py-2.5 ${draft.cooldownSeconds === seconds ? 'bg-white/15' : 'bg-white/[0.045]'}`}>
@@ -245,7 +245,7 @@ export function InteractionsScreen() {
         </GlassCard>
       ) : null}
 
-      <Text className="mb-3 text-xs font-black uppercase tracking-[1.5px] text-white/30">Reglas activas · {rules.length}</Text>
+      <Text className="mb-3 text-xs font-black uppercase tracking-[1.5px] text-white/55">Reglas activas · {rules.length}</Text>
       {rules.map((rule) => (
         <GlassCard key={rule.id} className="mb-3">
           <View className="p-4">
