@@ -24,7 +24,7 @@ jobs:
       run:
         working-directory: mobile
     env:
-      EXPO_PUBLIC_LULU_RELAY_URL: wss://lulu-finity-production.up.railway.app/v1/tiktok/live
+      EXPO_PUBLIC_LULU_RELAY_URL: wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live
       EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
 
     steps:
@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           curl --fail-with-body --silent --show-error \
-            --request POST https://lulu-finity-production.up.railway.app/v1/tts/microsoft \
+            --request POST https://lulu-finity-production-6b8f.up.railway.app/v1/tts/microsoft \
             --header "Authorization: Bearer $EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN" \
             --header "x-lulu-client-token: $EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN" \
             --header "content-type: application/json" \
@@ -74,13 +74,13 @@ jobs:
       - name: Alinear parches Expo 57
         run: >-
           npx expo install
-          expo@57.0.19
+          expo@57.0.21
           expo-asset@57.0.16
           expo-audio@57.0.4
           expo-file-system@57.0.6
           expo-haptics@57.0.2
-          expo-notifications@57.0.16
-          expo-sharing@57.0.17
+          expo-notifications@57.0.17
+          expo-sharing@57.0.18
           expo-splash-screen@57.0.8
           expo-video@57.0.3
           react-native@0.86.3
@@ -92,6 +92,8 @@ jobs:
         run: npm run test:realtime
       - name: Pruebas del relay Microsoft
         run: npm run test:tts-relay
+      - name: Pruebas del navegador
+        run: npm run test:browser
       - name: Pruebas de interfaz móvil
         run: npm run test:ui
       - name: Expo Doctor

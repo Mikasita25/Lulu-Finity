@@ -34,7 +34,7 @@ export function EventRow({ event }: { event: LiveEvent }) {
           <Text className="flex-1 text-sm font-extrabold text-white" numberOfLines={1}>
             {event.nickname || `@${event.uniqueId}`}
           </Text>
-          <Text className="text-[10px] font-semibold text-white/30">{relativeTime(event.timestamp)}</Text>
+          <Text className="text-[10px] font-semibold text-white/55">{relativeTime(event.timestamp)}</Text>
         </View>
         <Text
           selectable={event.type === 'fanSticker'}

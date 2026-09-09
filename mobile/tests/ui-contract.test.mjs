@@ -136,7 +136,7 @@ assert.match(youtubeBrowser, /playbackStatus/);
 assert.match(youtubeBrowser, /skipCurrentSong/);
 assert.doesNotMatch(youtubeBrowser, /react-native-webview/);
 
-const playbackHost = read('src/components/MusicPlaybackHost.tsx');
+const playbackHost = read('src/components/MusicPlaybackHost.tsx') + read('src/services/playerAutomation.ts');
 assert.match(playbackHost, /setAudioModeAsync/);
 assert.match(playbackHost, /shouldPlayInBackground: true/);
 assert.match(playbackHost, /setActiveForLockScreen/);
@@ -155,14 +155,14 @@ assert.match(playbackHost, /TTS Bot activo/);
 assert.match(playbackHost, /keepSessionActive/);
 assert.match(playbackHost, /interruptionMode: 'mixWithOthers'/);
 assert.match(playbackHost, /subscribeSoundEffectPlayback/);
-assert.match(playbackHost, /blockExternalLinks/);
+assert.match(playbackHost, /isYouTubeUrl/);
 assert.match(playbackHost, /onShouldStartLoadWithRequest/);
 assert.match(playbackHost, /onContentProcessDidTerminate/);
 assert.match(playbackHost, /video\.paused && !video\.ended/);
 assert.match(playbackHost, /setInterval\(tick, 1000\)/);
 assert.match(playbackHost, /subscribeTtsPlayback/);
 assert.match(playbackHost, /setPlaybackStatus\('playing'/);
-assert.doesNotMatch(playbackHost, /remotePauseTimer|setPlaybackPaused/);
+assert.doesNotMatch(playbackHost, /remotePauseTimer/);
 
 const ttsRuntime = read('src/services/tts.ts');
 assert.match(ttsRuntime, /MAX_PENDING_AGE_MS/);
@@ -206,7 +206,7 @@ assert.match(musicRuntime, /state\.musicPaused/);
 assert.match(musicRuntime, /enqueueSong/);
 assert.match(musicRuntime, /const wasIdle = !state\.currentSong/);
 assert.match(musicRuntime, /playSong\(result\.song\)/);
-assert.match(musicRuntime, /https:\/\/m\.youtube\.com\/results/);
+assert.match(read('src/services/browserUrl.ts'), /https:\/\/m\.youtube\.com\/results/);
 
 assert.match(liveRuntime, /handleMusicEvent\(message\.event\)/);
 assert.match(liveRuntime, /clearMusicCooldowns/);

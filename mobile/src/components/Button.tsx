@@ -15,10 +15,10 @@ export function Button({ label, onPress, icon, variant = 'primary', disabled = f
   const animatedStyle = useAnimatedStyle(() => ({ opacity: 1 - pressed.value * 0.12, transform: [{ scale: 1 - pressed.value * 0.025 }] }));
   const colors = variant === 'danger' ? 'bg-red-500/20 border border-red-400/30' : variant === 'secondary' ? 'bg-white/10 border border-white/10' : '';
   return (
-    <Pressable disabled={disabled} onPressIn={() => { pressed.value = withTiming(1, { duration: 90 }); }} onPressOut={() => { pressed.value = withTiming(0, { duration: 120 }); }} onPress={() => { if (hapticsEnabled) Haptics.selectionAsync().catch(() => {}); void onPress(); }} className={disabled ? 'opacity-40' : ''}>
-      <Animated.View style={[animatedStyle, variant === 'primary' ? { backgroundColor: accent } : undefined]} className={`flex-row items-center justify-center gap-2 rounded-2xl ${compact ? 'px-4 py-3' : 'px-5 py-4'} ${colors}`}>
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPressIn={() => { pressed.value = withTiming(1, { duration: 90 }); }} onPressOut={() => { pressed.value = withTiming(0, { duration: 120 }); }} onPress={() => { if (hapticsEnabled) Haptics.selectionAsync().catch(() => {}); void onPress(); }} className={disabled ? 'opacity-40' : ''}>
+      <Animated.View style={[animatedStyle, variant === 'primary' ? { backgroundColor: accent, minHeight: compact ? 44 : 52 } : undefined]} className={`flex-row items-center justify-center gap-2 rounded-2xl ${compact ? 'px-4 py-3' : 'px-5 py-4'} ${colors}`}>
         {icon ? <View>{icon}</View> : null}
-        <Text className="text-[15px] font-extrabold text-white">{label}</Text>
+        <Text style={variant === 'primary' ? { color: '#171123' } : undefined} className="text-[15px] font-extrabold text-white">{label}</Text>
       </Animated.View>
     </Pressable>
   );

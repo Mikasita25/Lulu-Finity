@@ -16,7 +16,9 @@ import {
 const MAX_QUEUE = 5;
 const MAX_PENDING_AGE_MS = 10_000;
 const MAX_SPEECH_CHARS = 240;
-const SYNTHESIS_TIMEOUT_MS = 20_000;
+const SYNTHESIS_TIMEOUT_MS = 9_000;
+const SYNTHESIS_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 140;
 const RELAY_LIVE_URL = process.env.EXPO_PUBLIC_LULU_RELAY_URL || DEFAULT_RELAY_LIVE_URL;
 const RELAY_TTS_URL = microsoftTtsUrl(RELAY_LIVE_URL);
 const CLIENT_TOKEN = process.env.EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN || '';
@@ -24,6 +26,12 @@ const CLIENT_TOKEN = process.env.EXPO_PUBLIC_LULU_RELAY_CLIENT_TOKEN || '';
 type PendingSpeech = {
   text: string;
   queuedAt: number;
+  voice: string;
+  rate: number;
+  pitch: number;
+  prepared?: Promise<File>;
+  preparedGeneration?: number;
+  controllers?: Set<AbortController>;
   resolve?: () => void;
   reject?: (error: Error) => void;
 };
@@ -31,9 +39,10 @@ type Player = ReturnType<typeof createAudioPlayer>;
 type Subscription = { remove: () => void };
 
 const pending: PendingSpeech[] = [];
+const activeSynthesisControllers = new Set<AbortController>();
 let speaking = false;
+let playbackActive = false;
 let generation = 0;
-let synthesisController: AbortController | null = null;
 let activePlayer: Player | null = null;
 let activePlaybackFinish: (() => void) | null = null;
 
@@ -59,51 +68,107 @@ function safeDelete(file: File) {
   } catch {}
 }
 
-async function synthesizeMicrosoftAudio(text: string, currentGeneration: number) {
-  const settings = useTtsStore.getState();
-  const controller = new AbortController();
-  synthesisController = controller;
-  const timeout = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
+function delay(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
 
-  try {
-    const response = await expoFetch(RELAY_TTS_URL, {
-      method: 'POST',
-      headers: microsoftTtsHeaders(CLIENT_TOKEN),
-      body: JSON.stringify({
-        text,
-        voice: normalizeMicrosoftVoice(settings.voice, settings.language),
-        rate: Math.max(0.6, Math.min(1.5, settings.rate)),
-        pitch: Math.max(0.7, Math.min(1.3, settings.pitch)),
-      }),
-      signal: controller.signal,
-    });
+function shouldRetryStatus(status: number) {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
 
-    if (!response.ok) {
-      let detail = '';
-      try {
-        const payload = (await response.json()) as { error?: unknown };
-        detail = typeof payload.error === 'string' ? payload.error : '';
-      } catch {}
-      throw microsoftTtsFailure(response.status, detail);
-    }
+function cancelSpeech(item: PendingSpeech, reason: Error) {
+  for (const controller of item.controllers ?? []) controller.abort();
+  item.controllers?.clear();
+  item.reject?.(reason);
+}
 
-    const bytes = await response.bytes();
-    if (!isMicrosoftMp3(bytes)) throw new Error('El servidor no devolvió un MP3 válido de Microsoft.');
+async function synthesizeMicrosoftAudio(item: PendingSpeech, currentGeneration: number) {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < SYNTHESIS_ATTEMPTS; attempt += 1) {
     if (currentGeneration !== generation) throw new Error('Audio TTS descartado');
 
-    const file = new File(Paths.cache, `lulu-microsoft-tts-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`);
-    file.write(bytes);
-    return file;
-  } finally {
-    clearTimeout(timeout);
-    if (synthesisController === controller) synthesisController = null;
+    const controller = new AbortController();
+    item.controllers ??= new Set<AbortController>();
+    item.controllers.add(controller);
+    activeSynthesisControllers.add(controller);
+    const timeout = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
+    let retryable = true;
+
+    try {
+      const response = await expoFetch(RELAY_TTS_URL, {
+        method: 'POST',
+        headers: microsoftTtsHeaders(CLIENT_TOKEN),
+        body: JSON.stringify({
+          text: item.text,
+          voice: item.voice,
+          rate: item.rate,
+          pitch: item.pitch,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const payload = (await response.json()) as { error?: unknown };
+          detail = typeof payload.error === 'string' ? payload.error : '';
+        } catch {}
+        retryable = shouldRetryStatus(response.status);
+        throw microsoftTtsFailure(response.status, detail);
+      }
+
+      const bytes = await response.bytes();
+      if (!isMicrosoftMp3(bytes)) {
+        retryable = true;
+        throw new Error('El servidor no devolvió un MP3 válido de Microsoft.');
+      }
+      if (currentGeneration !== generation) throw new Error('Audio TTS descartado');
+
+      const file = new File(Paths.cache, `lulu-microsoft-tts-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`);
+      file.write(bytes);
+      return file;
+    } catch (error) {
+      const normalized = error instanceof Error ? error : new Error('Microsoft TTS no pudo generar el audio.');
+      if (currentGeneration !== generation) throw normalized;
+      lastError = normalized;
+      if (!retryable || attempt >= SYNTHESIS_ATTEMPTS - 1) throw normalized;
+      await delay(RETRY_DELAY_MS * (attempt + 1));
+    } finally {
+      clearTimeout(timeout);
+      item.controllers.delete(controller);
+      activeSynthesisControllers.delete(controller);
+    }
   }
+
+  throw lastError ?? new Error('Microsoft TTS no pudo generar el audio.');
+}
+
+function prepareSpeech(item: PendingSpeech, currentGeneration: number) {
+  if (item.prepared && item.preparedGeneration === currentGeneration) return item.prepared;
+  item.preparedGeneration = currentGeneration;
+  const prepared = synthesizeMicrosoftAudio(item, currentGeneration);
+  // El catch adjunto evita una promesa no atendida si la preparación termina
+  // antes de que la voz llegue al frente de la cola.
+  void prepared.catch(() => undefined);
+  item.prepared = prepared;
+  return prepared;
+}
+
+function nextFreshPending() {
+  return pending.find((item) => Date.now() - item.queuedAt <= MAX_PENDING_AGE_MS);
+}
+
+function prefetchNext(currentGeneration: number) {
+  if (!playbackActive || currentGeneration !== generation) return;
+  const next = nextFreshPending();
+  if (next && !next.prepared) void prepareSpeech(next, currentGeneration);
 }
 
 function playAudioFile(file: File, volume: number, currentGeneration: number) {
   const player = createAudioPlayer(file.uri, {
     updateInterval: 200,
-    preferredForwardBufferDuration: 2,
+    preferredForwardBufferDuration: 0,
   });
   activePlayer = player;
   let subscription: Subscription | null = null;
@@ -156,13 +221,15 @@ async function processNext(item: PendingSpeech) {
   const currentGeneration = generation;
   speaking = true;
   try {
-    const file = await synthesizeMicrosoftAudio(item.text, currentGeneration);
+    const file = await prepareSpeech(item, currentGeneration);
     if (currentGeneration !== generation) {
       safeDelete(file);
       return;
     }
     const { volume } = useTtsStore.getState();
     setTtsPlaybackActive(true);
+    playbackActive = true;
+    prefetchNext(currentGeneration);
     await playAudioFile(file, volume, currentGeneration);
     item.resolve?.();
   } catch (error) {
@@ -171,6 +238,7 @@ async function processNext(item: PendingSpeech) {
     }
     item.reject?.(error instanceof Error ? error : new Error('Microsoft TTS no pudo generar el audio.'));
   } finally {
+    playbackActive = false;
     setTtsPlaybackActive(false);
     if (currentGeneration === generation) {
       speaking = false;
@@ -183,7 +251,7 @@ function runNext() {
   if (speaking) return;
   let item = pending.shift();
   while (item && Date.now() - item.queuedAt > MAX_PENDING_AGE_MS) {
-    item.reject?.(new Error('La prueba caducó antes de reproducirse.'));
+    cancelSpeech(item, new Error('La prueba caducó antes de reproducirse.'));
     item = pending.shift();
   }
   if (item) void processNext(item);
@@ -197,10 +265,22 @@ function speak(text: string, completion?: Pick<PendingSpeech, 'resolve' | 'rejec
     // El chat nuevo reemplaza al pendiente más antiguo para que el audio nunca
     // quede varios minutos detrás del LIVE.
     if (!pending.length) return false;
-    pending.shift()?.reject?.(new Error('La prueba fue reemplazada por un comentario más reciente.'));
+    const replaced = pending.shift();
+    if (replaced) cancelSpeech(replaced, new Error('La prueba fue reemplazada por un comentario más reciente.'));
   }
-  pending.push({ text: value, queuedAt: Date.now(), ...completion });
+
+  const settings = useTtsStore.getState();
+  const item: PendingSpeech = {
+    text: value,
+    queuedAt: Date.now(),
+    voice: normalizeMicrosoftVoice(settings.voice, settings.language),
+    rate: Math.max(0.6, Math.min(1.5, settings.rate)),
+    pitch: Math.max(0.7, Math.min(1.3, settings.pitch)),
+    ...completion,
+  };
+  pending.push(item);
   runNext();
+  prefetchNext(generation);
   return true;
 }
 
@@ -239,11 +319,12 @@ export async function previewTts(text: string) {
 export async function stopTts() {
   generation += 1;
   for (const item of pending.splice(0)) {
-    item.reject?.(new Error('La lectura TTS fue detenida.'));
+    cancelSpeech(item, new Error('La lectura TTS fue detenida.'));
   }
+  for (const controller of activeSynthesisControllers) controller.abort();
+  activeSynthesisControllers.clear();
   speaking = false;
-  synthesisController?.abort();
-  synthesisController = null;
+  playbackActive = false;
   activePlaybackFinish?.();
   activePlaybackFinish = null;
   setTtsPlaybackActive(false);

@@ -28,7 +28,7 @@ export function Screen({ children, scroll = true, contentClassName = '', scrollP
 
   return (
     <LinearGradient
-      colors={['#0B0810', '#120B16', '#0B0810']}
+      colors={['#101527', '#19162C', '#0C1120']}
       locations={[0, 0.42, 1]}
       style={{ flex: 1 }}
     >

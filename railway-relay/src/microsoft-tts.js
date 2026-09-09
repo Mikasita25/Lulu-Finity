@@ -5,6 +5,9 @@ const { createHash } = require('node:crypto');
 const MAX_TEXT_LENGTH = 240;
 const CACHE_TTL_MS = 60_000;
 const MAX_CACHE_ITEMS = 48;
+const PROVIDER_TIMEOUT_MS = 7_000;
+const QUICK_RETRY_WINDOW_MS = 2_500;
+const PROVIDER_RETRY_DELAY_MS = 120;
 
 const MICROSOFT_VOICES = Object.freeze([
   { identifier: 'es-MX-DaliaNeural', name: 'Dalia', language: 'es-MX' },
@@ -24,6 +27,7 @@ const MICROSOFT_VOICES = Object.freeze([
 
 const voiceIds = new Set(MICROSOFT_VOICES.map((voice) => voice.identifier));
 const audioCache = new Map();
+const inFlightAudio = new Map();
 let edgeModulePromise = null;
 
 function requestError(statusCode, message) {
@@ -76,12 +80,67 @@ function pruneCache(now = Date.now()) {
   while (audioCache.size > MAX_CACHE_ITEMS) audioCache.delete(audioCache.keys().next().value);
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function edgeTtsClass() {
-  edgeModulePromise ||= import('edge-tts-universal');
+  edgeModulePromise ||= import('edge-tts-universal').catch((error) => {
+    edgeModulePromise = null;
+    throw error;
+  });
   const loaded = await edgeModulePromise;
   const EdgeTTS = loaded.EdgeTTS || loaded.default?.EdgeTTS || loaded.default;
   if (typeof EdgeTTS !== 'function') throw new Error('El proveedor Microsoft TTS no está disponible.');
   return EdgeTTS;
+}
+
+async function synthesizeProviderOnce(EdgeTTS, normalized) {
+  const synthesizer = new EdgeTTS(normalized.text, normalized.voice, normalized.edgeOptions);
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(requestError(504, 'Microsoft TTS tardó demasiado en responder.')),
+      PROVIDER_TIMEOUT_MS
+    );
+    timer.unref?.();
+  });
+
+  try {
+    return await Promise.race([synthesizer.synthesize(), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function synthesizeProviderWithRecovery(EdgeTTS, normalized) {
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const startedAt = Date.now();
+    try {
+      return await synthesizeProviderOnce(EdgeTTS, normalized);
+    } catch (error) {
+      lastError = error;
+      const statusCode = Number(error?.statusCode || 0);
+      const failedQuickly = Date.now() - startedAt <= QUICK_RETRY_WINDOW_MS;
+      const transient = statusCode === 0 || statusCode >= 500;
+      if (attempt > 0 || !failedQuickly || !transient) throw error;
+      await sleep(PROVIDER_RETRY_DELAY_MS);
+    }
+  }
+  throw lastError || new Error('Microsoft TTS no respondió.');
+}
+
+async function synthesizeUncached(normalized) {
+  const EdgeTTS = await edgeTtsClass();
+  const result = await synthesizeProviderWithRecovery(EdgeTTS, normalized);
+  const arrayBuffer = await result.audio.arrayBuffer();
+  const audio = Buffer.from(arrayBuffer);
+  if (!audio.length) throw new Error('Microsoft TTS devolvió audio vacío.');
+  if (audio.length > 3 * 1024 * 1024) {
+    throw requestError(502, 'Microsoft TTS devolvió un audio demasiado grande.');
+  }
+  return audio;
 }
 
 async function synthesizeMicrosoftSpeech(input) {
@@ -94,28 +153,21 @@ async function synthesizeMicrosoftSpeech(input) {
     return { audio: Buffer.from(cached.audio), voice: normalized.voice, cacheHit: true };
   }
 
-  const EdgeTTS = await edgeTtsClass();
-  const synthesizer = new EdgeTTS(normalized.text, normalized.voice, normalized.edgeOptions);
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(requestError(504, 'Microsoft TTS tardó demasiado en responder.')), 12_000);
-    timer.unref?.();
-  });
-
-  let result;
-  try {
-    result = await Promise.race([synthesizer.synthesize(), timeout]);
-  } finally {
-    clearTimeout(timer);
+  let synthesis = inFlightAudio.get(cacheKey);
+  if (!synthesis) {
+    synthesis = synthesizeUncached(normalized)
+      .then((audio) => {
+        audioCache.set(cacheKey, { audio: Buffer.from(audio), createdAt: Date.now() });
+        pruneCache();
+        return audio;
+      })
+      .finally(() => {
+        inFlightAudio.delete(cacheKey);
+      });
+    inFlightAudio.set(cacheKey, synthesis);
   }
 
-  const arrayBuffer = await result.audio.arrayBuffer();
-  const audio = Buffer.from(arrayBuffer);
-  if (!audio.length) throw new Error('Microsoft TTS devolvió audio vacío.');
-  if (audio.length > 3 * 1024 * 1024) throw requestError(502, 'Microsoft TTS devolvió un audio demasiado grande.');
-
-  audioCache.set(cacheKey, { audio, createdAt: Date.now() });
-  pruneCache();
+  const audio = await synthesis;
   return { audio: Buffer.from(audio), voice: normalized.voice, cacheHit: false };
 }
 

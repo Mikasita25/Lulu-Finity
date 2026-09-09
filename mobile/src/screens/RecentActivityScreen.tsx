@@ -45,7 +45,7 @@ export function RecentActivityScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-sm font-black text-white">{enabledCount} tipos activos</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/40">
+              <Text className="mt-1 text-xs leading-5 text-white/60">
                 Estos filtros también se aplican a la Vista en Vivo.
               </Text>
             </View>
@@ -70,7 +70,7 @@ export function RecentActivityScreen() {
             <View key={item.type} className="flex-row items-center gap-3 border-b border-white/[0.055] py-4">
               <View className="flex-1">
                 <Text className="text-sm font-black text-white">{item.label}</Text>
-                <Text className="mt-1 text-xs leading-5 text-white/40">{item.subtitle}</Text>
+                <Text className="mt-1 text-xs leading-5 text-white/60">{item.subtitle}</Text>
               </View>
               <Switch
                 value={filters[item.type]}
@@ -91,7 +91,7 @@ export function RecentActivityScreen() {
             onPress={() => setMaxItems(value)}
             className={`flex-1 rounded-2xl px-3 py-3 ${maxItems === value ? 'bg-lulu-500' : 'bg-white/[0.06]'}`}
           >
-            <Text className={`text-center text-xs font-black ${maxItems === value ? 'text-white' : 'text-white/45'}`}>
+            <Text className={`text-center text-xs font-black ${maxItems === value ? 'text-white' : 'text-white/65'}`}>
               {value}
             </Text>
           </Pressable>
@@ -103,7 +103,7 @@ export function RecentActivityScreen() {
         <View className="px-5">
           {visible.slice(0, 12).map((event) => <EventRow key={event.id} event={event} />)}
           {!visible.length ? (
-            <Text className="py-8 text-center text-xs font-semibold text-white/30">
+            <Text className="py-8 text-center text-xs font-semibold text-white/55">
               No hay eventos visibles con los filtros actuales.
             </Text>
           ) : null}

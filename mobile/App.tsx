@@ -31,7 +31,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, BoundaryState>
       <View style={styles.errorRoot}>
         <Text style={styles.errorEyebrow}>LULÚ FINITY</Text>
         <Text style={styles.errorTitle}>La interfaz encontró un error</Text>
-        <Text style={styles.errorBody}>Ya no ocultamos los errores detrás de una pantalla negra. Toma una captura de este mensaje si vuelve a ocurrir.</Text>
+        <Text style={styles.errorBody}>Intenta abrir la interfaz de nuevo. Si el problema continúa, guarda este mensaje para revisarlo.</Text>
         <View style={styles.errorBox}><Text selectable style={styles.errorMessage}>{this.state.error.message || String(this.state.error)}</Text></View>
         <Pressable style={styles.retryButton} onPress={() => this.setState({ error: undefined })}><Text style={styles.retryText}>Intentar de nuevo</Text></Pressable>
       </View>

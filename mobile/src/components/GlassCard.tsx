@@ -9,8 +9,8 @@ type Props = PropsWithChildren<{
 export function GlassCard({ children, className = '', style }: Props) {
   return (
     <View
-      className={`overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#17121B] ${className}`}
-      style={[{ shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 3 }, style]}
+      className={`overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#191F32] ${className}`}
+      style={[{ shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 7 }, elevation: 2 }, style]}
     >
       <View>{children}</View>
     </View>

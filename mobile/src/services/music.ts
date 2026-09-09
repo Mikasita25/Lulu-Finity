@@ -1,6 +1,8 @@
 import type { LiveEvent } from '@/types/live';
 import { useMobileControlStore } from '@/store/useMobileControlStore';
 
+import { browserSearchUrl } from './browserUrl';
+
 const lastRequestAt = new Map<string, number>();
 
 function normalizedCommands() {
@@ -51,5 +53,5 @@ export function clearMusicCooldowns() {
 }
 
 export function youtubeSearchUrl(query: string) {
-  return `https://m.youtube.com/results?search_query=${encodeURIComponent(query.trim())}`;
+  return browserSearchUrl(query);
 }

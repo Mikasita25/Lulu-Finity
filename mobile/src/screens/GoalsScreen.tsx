@@ -47,7 +47,7 @@ export function GoalsScreen() {
               <Text className="text-base font-black text-white">Nueva meta</Text>
             </View>
 
-            <Text className="mb-2 text-xs font-black uppercase tracking-[1.5px] text-white/40">Título</Text>
+            <Text className="mb-2 text-xs font-black uppercase tracking-[1.5px] text-white/60">Título</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
@@ -56,7 +56,7 @@ export function GoalsScreen() {
               className="h-14 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-bold text-white"
             />
 
-            <Text className="mb-2 mt-5 text-xs font-black uppercase tracking-[1.5px] text-white/40">
+            <Text className="mb-2 mt-5 text-xs font-black uppercase tracking-[1.5px] text-white/60">
               Tipo
             </Text>
             <View className="flex-row flex-wrap gap-2">
@@ -65,7 +65,7 @@ export function GoalsScreen() {
                   key={item.id}
                   onPress={() => setKind(item.id)}
                   className={`overflow-hidden rounded-xl px-3 py-2.5 text-xs font-black ${
-                    kind === item.id ? 'bg-lulu-500 text-white' : 'bg-white/[0.07] text-white/40'
+                    kind === item.id ? 'bg-lulu-500 text-white' : 'bg-white/[0.07] text-white/60'
                   }`}
                 >
                   {item.label}
@@ -73,7 +73,7 @@ export function GoalsScreen() {
               ))}
             </View>
 
-            <Text className="mb-2 mt-5 text-xs font-black uppercase tracking-[1.5px] text-white/40">
+            <Text className="mb-2 mt-5 text-xs font-black uppercase tracking-[1.5px] text-white/60">
               Objetivo
             </Text>
             <TextInput
@@ -108,7 +108,7 @@ export function GoalsScreen() {
         <GlassCard>
           <View className="items-center px-5 py-10">
             <Sparkles size={30} color="#6F6170" />
-            <Text className="mt-3 text-sm font-bold text-white/40">Aún no hay metas.</Text>
+            <Text className="mt-3 text-sm font-bold text-white/60">Aún no hay metas.</Text>
           </View>
         </GlassCard>
       )}

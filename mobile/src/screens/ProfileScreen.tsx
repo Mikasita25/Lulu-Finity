@@ -38,7 +38,7 @@ export function ProfileScreen() {
 
       <GlassCard>
         <View className="p-5">
-          <Text className="mb-2 text-xs font-black uppercase tracking-[1.4px] text-white/40">TikTok</Text>
+          <Text className="mb-2 text-xs font-black uppercase tracking-[1.4px] text-white/60">TikTok</Text>
           <TextInput
             value={username}
             onChangeText={setUsername}
@@ -49,7 +49,7 @@ export function ProfileScreen() {
             className="h-14 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-bold text-white"
           />
 
-          <Text className="mb-2 mt-5 text-xs font-black uppercase tracking-[1.4px] text-white/40">
+          <Text className="mb-2 mt-5 text-xs font-black uppercase tracking-[1.4px] text-white/60">
             Nombre visible
           </Text>
           <TextInput
@@ -60,7 +60,7 @@ export function ProfileScreen() {
             className="h-14 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-bold text-white"
           />
 
-          <Text className="mb-3 mt-6 text-xs font-black uppercase tracking-[1.4px] text-white/40">Modo</Text>
+          <Text className="mb-3 mt-6 text-xs font-black uppercase tracking-[1.4px] text-white/60">Modo</Text>
           <View className="flex-row gap-3">
             <Pressable
               onPress={() => setMode('streamer')}
@@ -69,7 +69,7 @@ export function ProfileScreen() {
               }`}
             >
               <ShieldCheck size={15} color={mode === 'streamer' ? 'white' : '#91858F'} />
-              <Text className={`text-xs font-black ${mode === 'streamer' ? 'text-white' : 'text-white/40'}`}>
+              <Text className={`text-xs font-black ${mode === 'streamer' ? 'text-white' : 'text-white/60'}`}>
                 Streamer
               </Text>
             </Pressable>
@@ -80,7 +80,7 @@ export function ProfileScreen() {
               }`}
             >
               <UserRound size={15} color={mode === 'spectator' ? 'white' : '#91858F'} />
-              <Text className={`text-xs font-black ${mode === 'spectator' ? 'text-white' : 'text-white/40'}`}>
+              <Text className={`text-xs font-black ${mode === 'spectator' ? 'text-white' : 'text-white/60'}`}>
                 Espectador
               </Text>
             </Pressable>

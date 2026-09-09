@@ -81,7 +81,7 @@ export function LeaderboardScreen() {
       <AppHeader title="Top Fans" subtitle="Ranking en tiempo real de tu comunidad, incluido Fan Stickers." />
       <View className="mb-5 flex-row flex-wrap gap-2">
         {metrics.map((item) => (
-          <Text key={item.id} onPress={() => setMetric(item.id)} className={`overflow-hidden rounded-xl px-3 py-2.5 text-xs font-black ${metric === item.id ? 'bg-lulu-500 text-white' : 'bg-white/[0.06] text-white/40'}`}>
+          <Text key={item.id} onPress={() => setMetric(item.id)} className={`overflow-hidden rounded-xl px-3 py-2.5 text-xs font-black ${metric === item.id ? 'bg-lulu-500 text-white' : 'bg-white/[0.06] text-white/60'}`}>
             {item.label}
           </Text>
         ))}
@@ -90,7 +90,7 @@ export function LeaderboardScreen() {
         <View className="p-5">
           <View className="items-center">
             <Trophy size={24} color="#FFE07D" />
-            <Text className="mt-2 text-[10px] font-black uppercase tracking-[2.2px] text-white/30">PODIO DEL LIVE</Text>
+            <Text className="mt-2 text-[10px] font-black uppercase tracking-[2.2px] text-white/55">PODIO DEL LIVE</Text>
           </View>
           <View className="mt-7 flex-row items-end justify-center gap-2">
             {[top[1], top[0], top[2]].map((entry, slot) => {
@@ -116,11 +116,11 @@ export function LeaderboardScreen() {
         {rest.map((entry, index) => (
           <GlassCard key={entry.uniqueId} className="mb-2">
             <View className="flex-row items-center gap-3 px-4 py-3.5">
-              <Text className="w-8 text-sm font-black text-white/30">#{index + 4}</Text>
+              <Text className="w-8 text-sm font-black text-white/55">#{index + 4}</Text>
               <Avatar entry={entry} size={40} />
               <View className="flex-1">
                 {rankingRgb ? <RgbName fontFamily={fontFamily} className="text-sm font-black">{entry.nickname}</RgbName> : <Text style={{ color: rankingTextColor, fontFamily }} className="text-sm font-black" numberOfLines={1}>{entry.nickname}</Text>}
-                <Text className="mt-1 text-[10px] text-white/30">@{entry.uniqueId}</Text>
+                <Text className="mt-1 text-[10px] text-white/55">@{entry.uniqueId}</Text>
               </View>
               <Text className="text-sm font-black text-lulu-200">{compactNumber(valueFor(entry, metric))}</Text>
             </View>
@@ -130,7 +130,7 @@ export function LeaderboardScreen() {
       {!entries.length ? (
         <View className="items-center py-12">
           <Trophy size={34} color="#655965" />
-          <Text className="mt-3 text-sm font-bold text-white/30">Aún no hay actividad para este ranking.</Text>
+          <Text className="mt-3 text-sm font-bold text-white/55">Aún no hay actividad para este ranking.</Text>
         </View>
       ) : null}
     </Screen>

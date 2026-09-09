@@ -26,7 +26,7 @@ export function StatCard({
           >
             {value}
           </Text>
-          <Text className="mt-1 text-xs font-semibold text-white/40">{label}</Text>
+          <Text className="mt-1 text-xs font-semibold text-white/60">{label}</Text>
         </View>
       </GlassCard>
     </Animated.View>

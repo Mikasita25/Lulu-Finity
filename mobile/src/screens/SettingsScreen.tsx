@@ -28,7 +28,7 @@ function SettingSwitch({
       <View className="h-10 w-10 items-center justify-center rounded-2xl bg-lulu-500/10">{icon}</View>
       <View className="flex-1">
         <Text className="text-sm font-black text-white">{title}</Text>
-        <Text className="mt-1 text-xs leading-5 text-white/40">{subtitle}</Text>
+        <Text className="mt-1 text-xs leading-5 text-white/60">{subtitle}</Text>
       </View>
       <Switch
         value={value}
@@ -98,12 +98,12 @@ export function SettingsScreen() {
             <Cable size={20} color="#FF9DDA" />
             <View className="flex-1">
               <Text className="text-sm font-black text-white">Conexión con TikTok</Text>
-              <Text className="mt-1 text-xs text-white/40">
+              <Text className="mt-1 text-xs text-white/60">
                 {username ? `@${username}` : 'Sin cuenta configurada'} · {relayState === 'connected' ? 'conectado' : 'sin conexión'}
               </Text>
             </View>
           </View>
-          {relayMessage ? <Text className="mt-4 text-xs leading-5 text-white/40">{relayMessage}</Text> : null}
+          {relayMessage ? <Text className="mt-4 text-xs leading-5 text-white/60">{relayMessage}</Text> : null}
           {mode === 'streamer' ? (
             <View className="mt-5 gap-3">
               <Button label="Reconectar" onPress={reconnect} icon={<RotateCcw size={17} color="white" />} />
@@ -117,7 +117,7 @@ export function SettingsScreen() {
       <GlassCard>
         <View className="flex-row items-start gap-3 p-5">
           <Smartphone size={21} color="#FF9DDA" />
-          <Text className="flex-1 text-xs leading-5 text-white/40">
+          <Text className="flex-1 text-xs leading-5 text-white/60">
             Lulú mantiene la voz y la música activas cuando cambias de aplicación. En algunos teléfonos debes permitir el uso de batería en segundo plano desde los ajustes de Android.
           </Text>
         </View>

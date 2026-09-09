@@ -29,7 +29,7 @@ export function AppearanceScreen() {
             <Palette size={20} color="#FF9DDA" />
             <View className="flex-1">
               <Text className="text-sm font-black text-white">Tema oscuro</Text>
-              <Text className="mt-1 text-xs leading-5 text-white/40">Activo siempre para reducir distracciones.</Text>
+              <Text className="mt-1 text-xs leading-5 text-white/60">Activo siempre para reducir distracciones.</Text>
             </View>
             <Text className="rounded-full bg-emerald-400/20 px-3 py-2 text-[10px] font-black text-emerald-300">ACTIVO</Text>
           </View>
@@ -41,7 +41,7 @@ export function AppearanceScreen() {
                 onPress={() => setAccentTheme(theme.id)}
                 style={{ borderColor: accentTheme === theme.id ? theme.color : 'rgba(255,255,255,0.08)' }}
                 className={`w-[47%] overflow-hidden rounded-2xl border p-4 text-center text-xs font-black ${
-                  accentTheme === theme.id ? 'bg-white/10 text-white' : 'bg-white/[0.035] text-white/40'
+                  accentTheme === theme.id ? 'bg-white/10 text-white' : 'bg-white/[0.035] text-white/60'
                 }`}
               >
                 ● {theme.label}

@@ -41,7 +41,7 @@ export function HistoryScreen() {
             key={item.id}
             onPress={() => setFilter(item.id)}
             className={`overflow-hidden rounded-xl px-3 py-2.5 text-xs font-black ${
-              filter === item.id ? 'bg-lulu-500 text-white' : 'bg-white/[0.06] text-white/40'
+              filter === item.id ? 'bg-lulu-500 text-white' : 'bg-white/[0.06] text-white/60'
             }`}
           >
             {item.label}
@@ -54,7 +54,7 @@ export function HistoryScreen() {
           {!filtered.length ? (
             <View className="items-center py-12">
               <History size={30} color="#685D67" />
-              <Text className="mt-3 text-sm font-bold text-white/30">No hay eventos con este filtro.</Text>
+              <Text className="mt-3 text-sm font-bold text-white/55">No hay eventos con este filtro.</Text>
             </View>
           ) : null}
         </View>
