@@ -53,3 +53,20 @@ test('user pause is reported and repeated injection does not force play', () => 
   vm.runInNewContext(playerAutomation(.2, true, false, false), p.context);
   assert.equal(p.plays(), 1); assert.equal(p.video.paused, true);
 });
+
+test('native service receives actual playback and background preference', () => {
+  const p = page();
+  const report = p.messages.find(m => m.type === 'lulu-native-playback');
+  assert.equal(report.enabled, true);
+  assert.equal(report.playing, true);
+  assert.equal(report.paused, false);
+  vm.runInNewContext(playerAutomation(.2, true, false, false, false, false), p.context);
+  const disabled = p.messages.filter(m => m.type === 'lulu-native-playback').at(-1);
+  assert.equal(disabled.enabled, false);
+  assert.equal(disabled.paused, true);
+});
+test('native pulse respects an explicit pause while JavaScript timers are suspended', () => {
+  const p = page({ paused: true });
+  p.window.__luluNativeTick();
+  assert.equal(p.plays(), 0);
+});

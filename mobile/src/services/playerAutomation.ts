@@ -10,6 +10,19 @@ export function playerAutomation(volume: number, paused: boolean, adBlockEnabled
   window.__luluAdBlockEnabled = ${adBlockEnabled ? 'true' : 'false'};
   window.__luluAutoSkipAds = ${autoSkipAds ? 'true' : 'false'};
 
+  window.__luluNativeReport = () => {
+    const media = document.querySelector('video');
+    const state = { type: 'lulu-native-playback', enabled: window.__luluBackground,
+      hasMedia: Boolean(media && !media.ended), playing: Boolean(media && !media.paused),
+      paused: window.__luluPlaybackPaused, title: document.title || 'YouTube' };
+    const encoded = JSON.stringify(state);
+    const now = Date.now();
+    if (encoded !== window.__luluLastNativeState || now - (window.__luluLastNativeAt || 0) > 10000) {
+      window.__luluLastNativeState = encoded; window.__luluLastNativeAt = now;
+      window.ReactNativeWebView?.postMessage(encoded);
+    }
+  };
+
   if (!window.__luluVisibilityInstalled) {
     window.__luluVisibilityInstalled = true;
     const hidden = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden');
@@ -38,6 +51,7 @@ export function playerAutomation(volume: number, paused: boolean, adBlockEnabled
 
   if (window.__luluAutoPlayerInstalled) {
     applyPlaybackState();
+    window.__luluNativeReport();
     return true;
   }
 
@@ -122,6 +136,7 @@ export function playerAutomation(volume: number, paused: boolean, adBlockEnabled
     if (video.dataset.luluAutoBound !== '1') {
       video.dataset.luluAutoBound = '1';
       video.addEventListener('playing', () => {
+        window.__luluNativeReport();
         send({ type: 'playing', title: document.title || '', url: location.href });
       });
       video.addEventListener('pause', () => {
@@ -167,6 +182,12 @@ export function playerAutomation(volume: number, paused: boolean, adBlockEnabled
     removeAds();
     skipAds();
     if (!openFirstResult()) bindAndPlay();
+    window.__luluNativeReport();
+  };
+
+  window.__luluNativeTick = () => {
+    if (window.__luluBackground && !window.__luluPlaybackPaused) bindAndPlay();
+    window.__luluNativeReport();
   };
 
   document.addEventListener('pointerdown', () => { window.__luluUserGesture = Date.now(); }, true);

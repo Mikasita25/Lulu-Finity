@@ -12,9 +12,7 @@ import { useMobileControlStore } from '@/store/useMobileControlStore';
 import { youtubeSearchUrl } from '@/services/music';
 import { subscribeSoundEffectPlayback, subscribeTtsPlayback } from '@/services/audioCoordinator';
 
-// A one-second silent MP3 keeps Expo Audio's MediaSessionService active while the
-// audible YouTube media remains in WebView. The foreground media session prevents
-// Android from treating Lulú as an ordinary background process during playback.
+// Legacy LIVE-only keeper. Browser music uses LuluBrowserService and its own MediaSession.
 const BACKGROUND_KEEPER_URI =
   'data:audio/mpeg;base64,SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYxLjcuMTAzAAAAAAAAAAAAAAD/4zjAAAAAAAAAAAAASW5mbwAAAA8AAAAQAAAFWAA1NTU1NTVDQ0NDQ0NQUFBQUFBeXl5eXl5ra2tra2treXl5eXl5hoaGhoaGlJSUlJSUoaGhoaGhoa+vr6+vr7y8vLy8vMrKysrKytfX19fX19fl5eXl5eXy8vLy8vL///////8AAAAATGF2YzYxLjE5AAAAAAAAAAAAAAAAJAKAAAAAAAAABVgIAJWUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/4xjEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEOwAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEdgAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjEsQAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjExAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=';
 
@@ -44,7 +42,7 @@ export function MusicPlaybackHost() {
   const keeper = useAudioPlayer(BACKGROUND_KEEPER_URI, { updateInterval: 1000 });
   const liveActive = relayState === 'connecting' || relayState === 'rotating' || relayState === 'connected';
   const musicActive = music.enabled && (Boolean(currentSong) || browser.playing);
-  const keepSessionActive = liveActive || (musicActive && music.backgroundPlayback && !playbackPaused);
+  const keepSessionActive = liveActive && !currentSong && !browser.initialized;
 
   const playbackVolume = ttsActive
     ? Math.min(music.volume, music.ttsDuckingVolume)
@@ -109,17 +107,11 @@ export function MusicPlaybackHost() {
 
     keeper.setActiveForLockScreen(
       true,
-      currentSong
-        ? {
-            title: currentSong.query,
-            artist: `Pedido por @${currentSong.requestedBy}`,
-            albumTitle: 'Lulú Finity',
-          }
-        : {
-            title: browser.playing ? browser.title : 'TTS Bot activo',
-            artist: username ? `Escuchando @${username}` : 'Escuchando el LIVE',
-            albumTitle: 'Lulú Finity',
-          },
+      {
+        title: 'TTS Bot activo',
+        artist: username ? `Escuchando @${username}` : 'Escuchando el LIVE',
+        albumTitle: 'Lulú Finity',
+      },
       { showSeekBackward: false, showSeekForward: false },
     );
 
@@ -183,7 +175,7 @@ export function MusicPlaybackHost() {
           <Pressable onPress={() => webRef.current?.reload()} accessibilityLabel="Recargar" style={{ padding: 12 }}><RefreshCw color="white" size={20} /></Pressable>
           <Pressable onPress={() => useMobileControlStore.getState().setPlaybackPaused(!playbackPaused)} accessibilityLabel={playbackPaused ? 'Continuar' : 'Pausar'} style={{ padding: 12 }}>{playbackPaused ? <Play color="#C5B5FF" size={20} /> : <Pause color="#C5B5FF" size={20} />}</Pressable>
           <Pressable accessibilityLabel="Cambiar modo de escritorio" onPress={() => { setDesktop(!desktop); }} style={{ padding: 10 }}><Text style={{ color: '#C5B5FF', fontSize: 11 }}>{desktop ? 'Escritorio' : 'Móvil'}</Text></Pressable>
-          <Text style={{ color: '#ADB4CE', fontSize: 11 }}>{pageLoading ? 'Cargando…' : music.backgroundPlayback ? 'Segundo plano activo' : 'Solo en pantalla'}</Text>
+          <Text style={{ color: '#ADB4CE', fontSize: 11 }}>{pageLoading ? 'Cargando…' : music.backgroundPlayback ? 'Segundo plano habilitado' : 'Solo en pantalla'}</Text>
         </View>
         {browserError ? <Text accessibilityRole="alert" style={{ color: '#FFABBA' }}>{browserError}</Text> : null}
       </View>
@@ -238,6 +230,7 @@ export function MusicPlaybackHost() {
         onMessage={(event) => {
           try {
             const message = JSON.parse(event.nativeEvent.data);
+            if (message?.type === 'native-background-error') setBrowserError('Android no permitió iniciar el audio en segundo plano. Vuelve a abrir la app y pulsa reproducir.');
             if (message?.type === 'user-pause' || message?.type === 'user-play') {
               useMobileControlStore.getState().setPlaybackPaused(message.type === 'user-pause');
               browser.setPlaying(message.type === 'user-play');

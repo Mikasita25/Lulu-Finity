@@ -2,13 +2,13 @@
   "expo": {
     "name": "Lul\u00fa Finity",
     "slug": "lulu-finity-mobile",
-    "version": "1.5.0",
+    "version": "1.5.1",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.mikasita.lulufinity.mobile",
-      "versionCode": 21,
+      "versionCode": 22,
       "permissions": [
         "POST_NOTIFICATIONS",
         "VIBRATE",
@@ -35,7 +35,8 @@
         }
       ],
       "expo-document-picker",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "./plugins/withBackgroundBrowser"
     ],
     "extra": {
       "relayUrl": "wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live"

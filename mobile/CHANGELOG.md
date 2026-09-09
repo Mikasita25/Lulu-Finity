@@ -1,3 +1,11 @@
+## 1.5.1 — Audio nativo del navegador
+
+- Servicio Android mediaPlayback vinculado al navegador y a sus controles reales de pausa, continuar y detener.
+- Mantiene la visibilidad de Chromium durante reproducción autorizada en segundo plano y protege el proceso mediante sesión multimedia y wake lock acotado.
+- Elimina la pista silenciosa como soporte de música. La voz conserva su configuración independiente.
+- Gestiona pérdida de foco de audio, desconexión de auriculares y liberación de recursos al detener o cerrar completamente la tarea.
+- La reproducción al cambiar de aplicación y bloquear pantalla requiere verificación en dispositivo; cerrar forzosamente la app detiene la reproducción.
+
 ## 1.5.0 — Navegador y servidor móvil
 
 - LIVE, Microsoft TTS y compilaciones apuntan al servidor Railway 6b8f.
