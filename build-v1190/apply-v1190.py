@@ -13,6 +13,11 @@ def replace(old, new):
         raise RuntimeError(f'Expected one match: {old[:100]}')
     main = main.replace(old, new, 1)
 
+# The previous deployment now returns HTTP 404; use the user's active relay.
+for prefix, suffix in (('wss://', '/v1/tiktok/live'), ('https://', '/usage'), ('https://', '')):
+    replace(f"'{prefix}lulu-finity-production.up.railway.app{suffix}'",
+            f"'{prefix}lulu-finity-production-6b8f.up.railway.app{suffix}'")
+
 replace('  if (liveReconnectAttempt >= LIVE_RECONNECT_DELAYS_MS.length) {\n    const username = liveReconnectUsername;\n    stopLiveReconnectSession();\n    send(\'live:status\', {\n      status: \'error\',\n      username,\n      message: \'Lulu no pudo recuperar el LIVE después de varios intentos. Pulsa Conectar para volver a intentarlo.\'\n    });\n    return false;\n  }',
         '  // Temporary outages keep retrying at the capped policy delay.\n  // Manual stop, ended streams and terminal errors still stop above.')
 

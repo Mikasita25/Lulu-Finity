@@ -5,6 +5,14 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const source = fs.readFileSync(require('node:path').join(__dirname, 'main.js'), 'utf8');
+test('LIVE, usage and overlays use the active user relay', () => {
+  assert.doesNotMatch(source, /lulu-finity-production\.up\.railway\.app/);
+  for (const [name, expected] of [
+    ['EMBEDDED_RELAY_URL', 'wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live'],
+    ['RELAY_USAGE_URL', 'https://lulu-finity-production-6b8f.up.railway.app/usage'],
+    ['STABLE_OVERLAY_BASE_URL', 'https://lulu-finity-production-6b8f.up.railway.app']
+  ]) assert.equal(source.match(new RegExp(`const ${name} = '([^']+)'`))?.[1], expected);
+});
 function harness(extra = {}) {
   const timers = new Map();
   let now = 100000;
