@@ -2,13 +2,13 @@
   "expo": {
     "name": "Lul\u00fa Finity",
     "slug": "lulu-finity-mobile",
-    "version": "1.5.1",
+    "version": "1.5.2",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.mikasita.lulufinity.mobile",
-      "versionCode": 22,
+      "versionCode": 23,
       "permissions": [
         "POST_NOTIFICATIONS",
         "VIBRATE",
