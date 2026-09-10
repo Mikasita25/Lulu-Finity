@@ -2,8 +2,16 @@ $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
 
 $project = Split-Path $PSScriptRoot -Parent
+$packagePath = Join-Path $project "package.json"
+if (!(Test-Path $packagePath -PathType Leaf)) { throw "Falta package.json" }
+$package = Get-Content $packagePath -Raw | ConvertFrom-Json
+$version = [string]$package.version
+if ([string]::IsNullOrWhiteSpace($version) -or $version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+  throw "La versión de package.json no es válida: $version"
+}
+
 $source = Join-Path $project "dist/win-unpacked"
-$target = Join-Path $project "dist/Lulu-Music-1.0.2-x64.zip"
+$target = Join-Path $project ("dist/Lulu-Music-{0}-x64.zip" -f $version)
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ("lulu-music-portable-" + [Guid]::NewGuid().ToString("N"))
 
 foreach ($required in @(
