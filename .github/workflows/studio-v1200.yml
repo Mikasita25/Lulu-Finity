@@ -1,0 +1,71 @@
+name: Lulu Finity Studio 1.2.0 - build
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/lulu-finity-studio-1.2.0]
+    paths: ['build-v1200/**', '.github/workflows/studio-v1200.yml']
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify the deployed public LIVE endpoint
+        run: node build-v1200/check-public-relay.cjs
+      - name: Reconstruct verified 1.1.8 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest 'https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.1.8/Lulu-Finity-Source-1.1.8.zip' -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne 'e630ddb1c3ea130ef13510733131612556092ecf7ce6a91d37bdd92c0f5466ee') { throw 'Source checksum mismatch' }
+          Expand-Archive base.zip app
+          python build-v1200/apply-v1200.py app
+          Compress-Archive app/* Lulu-Finity-Source-1.2.0.zip
+      - name: Validate and package Windows
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location app
+          npm ci --no-audit --no-fund
+          npm test
+          npm ci --prefix railway-relay --no-audit --no-fund
+          npm test --prefix railway-relay
+          npm run build:win -- --publish never
+      - name: Run packaged startup and navigation checks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $profile = Join-Path $env:RUNNER_TEMP 'lulu-studio-validation'
+          $env:LULU_STARTUP_SMOKE_MARKER = Join-Path $env:RUNNER_TEMP 'lulu-studio-ready.txt'
+          $env:LULU_NAVIGATION_SMOKE_MARKER = Join-Path $env:RUNNER_TEMP 'lulu-studio-navigation.json'
+          New-Item -ItemType Directory $profile -Force | Out-Null
+          $process = Start-Process -FilePath (Resolve-Path 'app/dist/win-unpacked/Lulu Finity.exe') -ArgumentList "--user-data-dir=$profile" -PassThru
+          try {
+            for ($i=0;$i -lt 120;$i++) {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+              if ($process.HasExited) { throw 'App exited before verification' }
+              if (Test-Path $env:LULU_NAVIGATION_SMOKE_MARKER) { break }
+            }
+            if (!(Test-Path $env:LULU_STARTUP_SMOKE_MARKER)) { throw 'Renderer not ready' }
+            $result = Get-Content $env:LULU_NAVIGATION_SMOKE_MARKER -Raw | ConvertFrom-Json
+            if (!$result.ok -or $result.results.Count -lt 12 -or $result.widgetEditors.count -ne 6) { throw 'Navigation or editors failed' }
+            Copy-Item $env:LULU_NAVIGATION_SMOKE_MARKER 'navigation-validation.json'
+          } finally { Stop-Process -Name 'Lulu Finity' -Force -ErrorAction SilentlyContinue }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Studio-1.2.0
+          path: |
+            app/dist/Lulu-Finity-Setup-1.2.0.exe
+            app/dist/Lulu-Finity-1.2.0-x64.zip
+            Lulu-Finity-Source-1.2.0.zip
+            navigation-validation.json
+          if-no-files-found: error
+          retention-days: 30

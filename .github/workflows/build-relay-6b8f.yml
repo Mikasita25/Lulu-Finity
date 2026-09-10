@@ -1,0 +1,99 @@
+name: Lulu Finity - compilacion privada relay 6b8f
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/lulu-finity-relay-6b8f
+    paths:
+      - "build-v1170/**"
+      - ".github/workflows/build-relay-6b8f.yml"
+
+permissions:
+  contents: read
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.1.1/Lulu-Finity-Source-1.1.1.zip
+  BASE_SHA256: 8c66a6af88bc2cd4b91631eb8369014dc8e4b3877eeca38ced844ea1813d3f61
+  CLOUDFLARED_VERSION: 2026.8.2
+  CLOUDFLARED_SHA256: c29eee2b121f5436a642eed69fd9767da7e7b8c510fa50aaa130337f931357b5
+  RELAY_HOST: lulu-finity-production-6b8f.up.railway.app
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir Lulu Finity 1.1.7
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente base incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1170/apply-v1170.py app
+          python build-v1170/test-v1170.py app
+          $main = Get-Content "app/src/main.js" -Raw
+          if (!$main.Contains($env:RELAY_HOST)) { throw "La app no contiene el relay 6b8f" }
+          if ($main.Contains("lulu-finity-production.up.railway.app")) { throw "La app conserva el relay anterior" }
+
+      - name: Preparar Cloudflared verificado
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory "app/resources/tools" -Force | Out-Null
+          $binary = "app/resources/tools/cloudflared.exe"
+          Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/download/$env:CLOUDFLARED_VERSION/cloudflared-windows-amd64.exe" -OutFile $binary
+          if ((Get-FileHash $binary -Algorithm SHA256).Hash.ToLower() -ne $env:CLOUDFLARED_SHA256) { throw "Cloudflared no coincide con el SHA-256 oficial" }
+
+      - name: Inyectar credencial privada del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Falta LULU_RELAY_CLIENT_TOKEN" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta el marcador privado" }
+          [IO.File]::WriteAllText($path, $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN), [Text.UTF8Encoding]::new($false))
+
+      - name: Probar y compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build:win -- --publish never
+
+      - name: Verificar instalador privado
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-1.1.7.exe"
+          $zip = "app/dist/Lulu-Finity-1.1.7-x64.zip"
+          if (!(Test-Path $installer) -or !(Test-Path $zip)) { throw "No se generaron los ejecutables" }
+          Expand-Archive $zip -DestinationPath verify -Force
+          $asar = Get-ChildItem verify -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          if (!$text.Contains($env:RELAY_HOST)) { throw "El ejecutable no contiene el relay 6b8f" }
+          if ($text.Contains("lulu-finity-production.up.railway.app")) { throw "El ejecutable conserva el relay anterior" }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "La credencial privada no fue integrada" }
+          Copy-Item $installer "Lulu-Finity-Setup-1.1.7-Servidor-6b8f.exe" -Force
+          Copy-Item $zip "Lulu-Finity-1.1.7-Servidor-6b8f-x64.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Servidor-6b8f
+          path: |
+            Lulu-Finity-Setup-1.1.7-Servidor-6b8f.exe
+            Lulu-Finity-1.1.7-Servidor-6b8f-x64.zip
+          if-no-files-found: error
+          retention-days: 7

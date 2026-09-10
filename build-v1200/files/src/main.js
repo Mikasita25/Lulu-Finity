@@ -2,6 +2,7 @@
 
 const { app, BrowserWindow, ipcMain, shell, dialog, clipboard, session, utilityProcess, powerSaveBlocker, powerMonitor } = require('electron');
 const path = require('path');
+const LuluWidgetDesign = require('./widget-design');
 const { pathToFileURL } = require('url');
 const { randomUUID, createHash } = require('crypto');
 const fs = require('fs');
@@ -180,7 +181,8 @@ const UPDATE_REPOSITORY_URL = 'https://github.com/Mikasita25/Lulu-Finity';
 const UPDATE_RELEASES_URL = `${UPDATE_REPOSITORY_URL}/releases/latest`;
 const DEFAULT_RELAY_PATH = '/v1/tiktok/live';
 const EMBEDDED_RELAY_URL = 'wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live';
-const EMBEDDED_RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';
+// The deployed /v1/tiktok/live endpoint is public; upstream keys stay on Railway.
+const EMBEDDED_RELAY_CLIENT_TOKEN = '';
 const RELAY_USAGE_URL = 'https://lulu-finity-production-6b8f.up.railway.app/usage';
 const STABLE_OVERLAY_BASE_URL = 'https://lulu-finity-production-6b8f.up.railway.app';
 const YOUTUBE_PARTITION = 'persist:lulu-youtube';
@@ -495,7 +497,11 @@ async function stableOverlaySourcePayload(kind, name, identity) {
     const themes = normalizeStreamWidgetThemes(runtimeResourceSettings?.streamWidgetThemes);
     const backgrounds = normalizeStreamWidgetBackgrounds(runtimeResourceSettings?.streamWidgetBackgrounds);
     const styles = normalizeStreamWidgetStyles(runtimeResourceSettings?.streamWidgetStyles);
-    return { ...snapshot, theme: themes[name], background: backgrounds[name], style: styles[name] };
+    const style = { ...styles[name] };
+    for (const field of ['backgroundImage', 'logoImage']) {
+      if (style[field]?.startsWith('/overlay-media/')) style[field] = await uploadStableOverlayAsset(identity.publicId, identity.secret, style[field]);
+    }
+    return { ...snapshot, theme: themes[name], background: backgrounds[name], style };
   }
   if (kind === 'ranking') return rankingSnapshot(Number(name), false);
   const state = { ...overlayStateSnapshot(Number(name)) };
@@ -706,7 +712,8 @@ function normalizeStreamWidgetStyle(value, fallback) {
     backgroundColor: safeWidgetColor(source.backgroundColor, fallback.backgroundColor),
     backgroundOpacity: boundedWidgetNumber(source.backgroundOpacity, 0, 100, fallback.backgroundOpacity),
     borderRadius: boundedWidgetNumber(source.borderRadius, 0, 48, fallback.borderRadius),
-    goalBarHeight: boundedWidgetNumber(source.goalBarHeight, 4, 40, fallback.goalBarHeight)
+    goalBarHeight: boundedWidgetNumber(source.goalBarHeight, 4, 40, fallback.goalBarHeight),
+    ...LuluWidgetDesign.normalize(source)
   };
 }
 
@@ -1209,7 +1216,7 @@ function streamWidgetHtml(type, token, preview = false, theme = 'lulu', backgrou
   const previewFlag = preview ? '1' : '0';
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${streamWidgetThemeCss(normalizedTheme)}
   *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Segoe UI,Arial,sans-serif;color:#fff}body{display:flex;align-items:flex-start;justify-content:flex-start;padding:14px}.hidden{display:none!important}.card{--pink:#ff4f9b;--cyan:#25f4ee;position:relative;background:linear-gradient(135deg,rgba(24,14,36,.94),rgba(67,29,72,.9));border:1px solid rgba(255,255,255,.16);box-shadow:0 18px 50px rgba(0,0,0,.4);backdrop-filter:blur(16px);overflow:hidden}.card:before{content:'';position:absolute;inset:0 0 auto;height:3px;background:linear-gradient(90deg,var(--cyan),var(--pink))}.playlist{width:min(560px,100%);border-radius:22px;padding:18px}.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}.head strong{font-size:22px;letter-spacing:.02em}.badge{font-size:11px;font-weight:800;padding:6px 9px;border-radius:999px;background:rgba(255,79,155,.17);border:1px solid rgba(255,79,155,.35)}.now{display:grid;grid-template-columns:46px minmax(0,1fr);gap:12px;align-items:center;padding:12px;border-radius:16px;background:linear-gradient(90deg,rgba(255,79,155,.2),rgba(37,244,238,.09));border:1px solid rgba(255,255,255,.11);margin-bottom:10px}.disc{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--pink),#8a5cff);font-size:20px;box-shadow:0 0 18px rgba(255,79,155,.28)}.copy strong,.copy small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.copy strong{font-size:17px}.copy small{margin-top:4px;color:rgba(255,255,255,.66)}.queue{display:flex;flex-direction:column;gap:7px}.song{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:center;padding:9px 11px;border-radius:13px;background:rgba(255,255,255,.065);border:1px solid rgba(255,255,255,.07)}.song>span{font-weight:900;color:#ff9fc5;text-align:center}.empty{padding:18px;text-align:center;color:rgba(255,255,255,.65)}.wallet{width:min(470px,100%);min-height:112px;border-radius:999px;display:grid;grid-template-columns:72px minmax(0,1fr) auto;align-items:center;gap:13px;padding:12px 22px 12px 12px}.avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--pink);background:linear-gradient(135deg,var(--pink),var(--cyan));display:grid;place-items:center;font-size:26px;font-weight:900;box-shadow:0 0 20px rgba(255,79,155,.28)}.wallet-name{min-width:0}.wallet-name strong,.wallet-name small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wallet-name strong{font-size:20px}.wallet-name small{color:rgba(255,255,255,.62);margin-top:3px}.balance{text-align:right;white-space:nowrap}.balance strong{display:block;font-size:25px;color:#ffe07d;text-shadow:0 0 12px rgba(255,224,125,.25)}.balance small{font-size:11px;color:rgba(255,255,255,.65)}.game{width:min(620px,100%);border-radius:24px;padding:18px}.game-player{display:flex;align-items:center;justify-content:space-between;gap:14px}.game-copy strong,.game-copy small{display:block}.game-copy strong{font-size:22px}.game-copy small{margin-top:4px;color:rgba(255,255,255,.65)}.game-result{margin-top:13px;padding:15px;border-radius:17px;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.1);font-size:22px;font-weight:850;letter-spacing:.02em}.game-result.win{box-shadow:inset 0 0 0 1px rgba(81,255,166,.22)}.game-result.loss{box-shadow:inset 0 0 0 1px rgba(255,89,122,.24)}.game-meta{display:flex;justify-content:space-between;gap:12px;margin-top:11px;color:rgba(255,255,255,.73);font-size:13px}.game-payout{font-weight:900;color:#ffe07d}.lulu-alert{width:min(660px,100%);padding:18px 20px;display:flex;align-items:center;gap:15px}.alert-icon{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:linear-gradient(135deg,rgba(255,112,180,.34),rgba(144,92,255,.30));font-size:30px;box-shadow:0 0 32px rgba(255,104,190,.18)}.alert-copy strong,.alert-copy span{display:block}.alert-copy strong{font-size:23px}.alert-copy span{margin-top:5px;color:rgba(255,255,255,.78);font-size:16px}.lulu-goal{width:min(660px,100%);padding:18px}.goal-track{height:14px;margin-top:14px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.goal-track span{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#ff70b5,#a667ff,#65dcff)}.goal-meta{display:flex;align-items:center;justify-content:space-between;margin-top:10px}.goal-meta strong{font-size:19px}.goal-meta small{color:rgba(255,255,255,.62);letter-spacing:.12em}.lulu-gifts{width:min(720px,100%);padding:18px}.gift-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.gift-grid>div{padding:13px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)}.gift-grid small,.gift-grid strong,.gift-grid span{display:block}.gift-grid small{font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.12em}.gift-grid strong{margin-top:5px;font-size:17px}.gift-grid span{margin-top:3px;color:rgba(255,255,255,.72)}.gift-last{margin-top:11px;color:rgba(255,255,255,.72);font-size:13px}@media(max-width:420px){.wallet{grid-template-columns:58px minmax(0,1fr);border-radius:24px}.avatar{width:58px;height:58px}.balance{grid-column:2;text-align:left}.playlist{padding:14px}}
-  ${streamWidgetBackgroundCss(normalizedBackground)}${streamWidgetCustomCss(normalizedStyle)}</style></head><body><section id="playlistCard" class="card playlist hidden"><div class="head"><strong>Lista de reproducción</strong><span class="badge" id="provider">LIVE</span></div><div id="now"></div><div class="queue" id="queue"></div></section><section id="walletCard" class="card wallet hidden"><div id="avatar" class="avatar">L</div><div class="wallet-name"><strong id="displayName">Esperando usuario</strong><small id="username">@usuario</small></div><div class="balance"><strong id="balance">0</strong><small id="currency">Lunitas</small></div></section><section id="gameCard" class="card game hidden"><div class="head"><strong id="gameTitle">Juegos del LIVE</strong><span class="badge" id="gameBadge">LIVE</span></div><div class="game-player"><div class="game-copy"><strong id="gamePlayer">Esperando jugador</strong><small id="gameUser">@usuario</small></div><div class="game-payout" id="gamePayout">🌙 0</div></div><div class="game-result" id="gameResult">Usa un comando de juego en el chat.</div><div class="game-meta"><span id="gameBet">Apuesta: —</span><span id="gameStatus">Esperando</span></div></section><section id="alertCard" class="card lulu-alert hidden"><div class="alert-icon" id="alertIcon">✦</div><div class="alert-copy"><strong id="alertTitle">Alertas de Lulu</strong><span id="alertText">Esperando un evento del LIVE.</span></div></section><section id="goalCard" class="card lulu-goal hidden"><div class="head"><strong id="goalTitle">Meta del LIVE</strong><span class="badge" id="goalPercent">0%</span></div><div class="goal-track"><span id="goalBar"></span></div><div class="goal-meta"><strong id="goalText">0 / 100</strong><small id="goalType">LIKES</small></div></section><section id="giftCard" class="card lulu-gifts hidden"><div class="head"><strong>Regalos del LIVE</strong><span class="badge" id="giftTotal">0 regalos</span></div><div class="gift-grid"><div><small>TOP REGALO</small><strong id="topGiftName">Esperando</strong><span id="topGiftDetail">—</span></div><div><small>MEJOR RACHA</small><strong id="topStreakName">Esperando</strong><span id="topStreakDetail">—</span></div></div><div class="gift-last" id="lastGiftText">Esperando regalos…</div></section><script>
+  ${streamWidgetBackgroundCss(normalizedBackground)}${streamWidgetCustomCss(normalizedStyle)}${LuluWidgetDesign.css(normalizedStyle)}</style></head><body><section id="playlistCard" class="card playlist hidden"><div class="head"><strong>Lista de reproducción</strong><span class="badge" id="provider">LIVE</span></div><div id="now"></div><div class="queue" id="queue"></div></section><section id="walletCard" class="card wallet hidden"><div id="avatar" class="avatar">L</div><div class="wallet-name"><strong id="displayName">Esperando usuario</strong><small id="username">@usuario</small></div><div class="balance"><strong id="balance">0</strong><small id="currency">Lunitas</small></div></section><section id="gameCard" class="card game hidden"><div class="head"><strong id="gameTitle">Juegos del LIVE</strong><span class="badge" id="gameBadge">LIVE</span></div><div class="game-player"><div class="game-copy"><strong id="gamePlayer">Esperando jugador</strong><small id="gameUser">@usuario</small></div><div class="game-payout" id="gamePayout">🌙 0</div></div><div class="game-result" id="gameResult">Usa un comando de juego en el chat.</div><div class="game-meta"><span id="gameBet">Apuesta: —</span><span id="gameStatus">Esperando</span></div></section><section id="alertCard" class="card lulu-alert hidden"><div class="alert-icon" id="alertIcon">✦</div><div class="alert-copy"><strong id="alertTitle">Alertas de Lulu</strong><span id="alertText">Esperando un evento del LIVE.</span></div></section><section id="goalCard" class="card lulu-goal hidden"><div class="head"><strong id="goalTitle">Meta del LIVE</strong><span class="badge" id="goalPercent">0%</span></div><div class="goal-track"><span id="goalBar"></span></div><div class="goal-meta"><strong id="goalText">0 / 100</strong><small id="goalType">LIKES</small></div></section><section id="giftCard" class="card lulu-gifts hidden"><div class="head"><strong>Regalos del LIVE</strong><span class="badge" id="giftTotal">0 regalos</span></div><div class="gift-grid"><div><small>TOP REGALO</small><strong id="topGiftName">Esperando</strong><span id="topGiftDetail">—</span></div><div><small>MEJOR RACHA</small><strong id="topStreakName">Esperando</strong><span id="topStreakDetail">—</span></div></div><div class="gift-last" id="lastGiftText">Esperando regalos…</div></section><script>
   const widget=${safeType},preview='${previewFlag}'==='1',activeTheme=${safeTheme},activeBackground=${safeBackground},activeStyle=${safeStyle},clientId=(globalThis.crypto?.randomUUID?.()||('lf-'+Date.now()+'-'+Math.random().toString(16).slice(2)));let last='',hideTimer=0;
   const playlistCard=document.getElementById('playlistCard'),walletCard=document.getElementById('walletCard'),gameCard=document.getElementById('gameCard'),alertCard=document.getElementById('alertCard'),goalCard=document.getElementById('goalCard'),giftCard=document.getElementById('giftCard');
   const text=(v,f='')=>String(v??f);function hideAll(){clearTimeout(hideTimer);hideTimer=0;[playlistCard,walletCard,gameCard,alertCard,goalCard,giftCard].forEach((card)=>card&&card.classList.add('hidden'))}function timedActivityVisible(data,ready){if(preview)return true;const expiresAt=Number(data.expiresAt||0);return data.visible!==false&&Boolean(ready)&&expiresAt>Date.now()}function armActivityExpiry(data){if(preview)return;const expiresAt=Number(data.expiresAt||0);if(expiresAt>Date.now())hideTimer=setTimeout(hideAll,Math.max(250,expiresAt-Date.now()))}
@@ -3899,7 +3906,7 @@ function friendlyConnectionError(error) {
     return 'TikTok rechazó la consulta (403). Prueba otra red, desactiva temporalmente VPN/proxy y permite la app en el Firewall.';
   }
   if (/401|unauthorized|token.*inv[aá]lid/.test(lower)) {
-    return 'Railway rechazó el token de acceso. Revisa CLIENT_TOKENS y el token integrado en la compilación.';
+    return 'El servidor del LIVE rechazó la conexión (401). Contacta al administrador de Lulu Finity.';
   }
   if (/429|503|1013|ocupadas|enfriamiento|no hay api keys/.test(lower)) {
     return `El servidor Railway no tiene una API key disponible en este momento: ${raw}`;
@@ -4285,9 +4292,6 @@ async function disconnectLive(reason = 'manual') {
 async function createAndConnectLive(username, connectionNonce, attemptNumber) {
   const relayUrl = EMBEDDED_RELAY_URL;
   const relayClientToken = EMBEDDED_RELAY_CLIENT_TOKEN;
-  if (!relayClientToken || relayClientToken.startsWith('__LULU_RELAY_')) {
-    throw new Error('Esta compilación de Lulu Finity no incluye el token privado del relay.');
-  }
 
   const connection = new RailwayRelayConnection(username, relayUrl, relayClientToken, connectorModule);
   liveConnection = connection;
@@ -4809,6 +4813,26 @@ ipcMain.handle('overlay:clear', async (_event, details) => {
   const stable = await stableOverlaySourceStatus('screen', String(screen), false);
   if (stable.ok) await syncStableOverlaySource('screen', String(screen)).catch(() => {});
   return { ok: overlayClientCount(screen) > 0 || stable.ok, delivered:Math.max(delivered, stable.ok ? 1 : 0), screen };
+});
+
+ipcMain.handle('widget:import-image', async () => {
+  const selected = await dialog.showOpenDialog(mainWindow || undefined, { title:'Elegir imagen para el widget', properties:['openFile'], filters:[{name:'Imágenes', extensions:['png','jpg','jpeg','webp','bmp']}] });
+  if (selected.canceled || !selected.filePaths?.[0]) return null;
+  const source = selected.filePaths[0];
+  const stats = await fsp.stat(source);
+  if (!stats.isFile() || stats.size > 12 * 1024 * 1024) throw new Error('Elige una imagen de hasta 12 MB.');
+  const { nativeImage } = require('electron');
+  let image = nativeImage.createFromPath(source);
+  if (image.isEmpty()) throw new Error('No se pudo abrir esta imagen.');
+  const size = image.getSize();
+  if (Math.max(size.width, size.height) > 1920) image = image.resize(size.width >= size.height ? {width:1920} : {height:1920});
+  const bytes = image.toPNG();
+  if (bytes.length > 12 * 1024 * 1024) throw new Error('La imagen es demasiado grande; elige otra.');
+  const name = createHash('sha256').update(bytes).digest('hex') + '.png';
+  const media = getDataPaths().media;
+  await fsp.mkdir(media, {recursive:true});
+  await fsp.writeFile(path.join(media,name),bytes);
+  return {url:'/overlay-media/' + name, name:path.basename(source)};
 });
 
 ipcMain.handle('media:pick', async (_event, kind) => pickAndCopyMedia(kind));
