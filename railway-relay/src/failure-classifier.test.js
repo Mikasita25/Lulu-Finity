@@ -15,3 +15,8 @@ test('separa claves inválidas, configuración y LIVE offline', () => {
   assert.equal(classifyUpstreamFailure(4400, 'invalid configuration'), 'configuration');
   assert.equal(classifyUpstreamFailure(4404, 'not live'), 'offline');
 });
+
+test('los fallos de firma/plan se muestran como configuración y no como conexión válida', () => {
+  assert.equal(classifyUpstreamFailure(1006, 'Failed to sign a request. Business plan. Purchase one.'), 'configuration');
+  assert.equal(classifyUpstreamFailure(1006, 'TikTok LIVE Signature Access required'), 'configuration');
+});
