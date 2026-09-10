@@ -6,6 +6,7 @@ const WebSocket = require('ws');
 const { WebSocketServer } = WebSocket;
 const { KeyPool, parseList } = require('./key-pool');
 const { classifyUpstreamFailure } = require('./failure-classifier');
+const { inspectUpstreamFrame } = require('./upstream-frame');
 const { DailyUsageMeter } = require('./usage-meter');
 const { MICROSOFT_VOICES, synthesizeMicrosoftSpeech } = require('./microsoft-tts');
 const { MAX_ASSET_BYTES, MAX_SOURCE_BYTES, OverlayStore, safePublicId, safeSource } = require('./overlay-store');
@@ -21,8 +22,9 @@ const MAX_CLIENTS = Math.max(1, Number(process.env.MAX_CLIENTS || 50));
 const MAX_ATTEMPTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_CONNECTION_ATTEMPTS_PER_MINUTE || 30));
 const MAX_TTS_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.MAX_TTS_REQUESTS_PER_MINUTE || 90));
 const MAX_TTS_CONCURRENT = Math.max(1, Number(process.env.MAX_TTS_CONCURRENT || 4));
-const RELAY_BUILD = 'microsoft-tts-on-demand-music-widget-v4';
+const RELAY_BUILD = 'microsoft-tts-on-demand-music-widget-live-validation-v5';
 const UPSTREAM_OPEN_TIMEOUT_MS = Math.max(3000, Number(process.env.UPSTREAM_OPEN_TIMEOUT_MS || 18000));
+const UPSTREAM_VALIDATE_TIMEOUT_MS = Math.max(3000, Number(process.env.UPSTREAM_VALIDATE_TIMEOUT_MS || 12000));
 const DAILY_USAGE_LIMIT = Math.max(1, Number(process.env.DAILY_USAGE_LIMIT || 7500));
 const USAGE_PER_CONNECTION = Math.max(0.1, Number(process.env.USAGE_PER_CONNECTION || 2));
 const USER_DAILY_CONNECTION_LIMIT = Math.max(1, Number(process.env.USER_DAILY_CONNECTION_LIMIT || 600));
@@ -150,6 +152,21 @@ function sendJson(socket, payload) {
   try { socket.send(JSON.stringify(payload)); } catch {}
 }
 
+function buildUpstreamUrl(uniqueId, apiKey) {
+  const url = new URL(UPSTREAM_WS_URL);
+  url.searchParams.set('uniqueId', uniqueId);
+  url.searchParams.set('apiKey', apiKey);
+  url.searchParams.set('features.bundleEvents', 'true');
+  url.searchParams.set('features.rawMessages', 'false');
+  url.searchParams.set('features.normalizeUniqueId', 'true');
+  url.searchParams.set('features.syntheticPresence', 'true');
+  url.searchParams.delete('features.schemaVersion');
+  if (url.protocol === 'wss:' && url.hostname.toLowerCase() === 'ws.eulerstream.com') {
+    url.searchParams.set('schemaVersion', 'v1');
+  }
+  return url.toString();
+}
+
 class RelaySession {
   constructor(client, request, uniqueId) {
     this.client = client;
@@ -211,23 +228,23 @@ class RelaySession {
       data: { state: this.rotationCount === 1 ? 'connecting' : 'rotating', attempt: this.rotationCount, keyId: selected.id }
     });
 
-    const params = new URLSearchParams({
-      uniqueId: this.uniqueId,
-      apiKey: selected.secret,
-      'features.bundleEvents': 'true',
-      'features.rawMessages': 'false',
-      'features.normalizeUniqueId': 'true',
-      'features.schemaVersion': 'v2',
-      'features.syntheticPresence': 'true'
-    });
-    const separator = UPSTREAM_WS_URL.includes('?') ? '&' : '?';
-    const upstreamUrl = `${UPSTREAM_WS_URL}${separator}${params.toString()}`;
+    let upstreamUrl;
+    try {
+      upstreamUrl = buildUpstreamUrl(this.uniqueId, selected.secret);
+    } catch (error) {
+      this.releaseCurrentKey();
+      sendJson(this.client, { type:'lulu.relay.error', data:{ message:'UPSTREAM_WS_URL no es una URL WebSocket válida.', classification:'configuration' } });
+      this.client.close(4400, 'UPSTREAM_WS_URL inválida');
+      return;
+    }
+
     const upstream = new WebSocket(upstreamUrl, {
       handshakeTimeout: UPSTREAM_OPEN_TIMEOUT_MS,
       headers: { 'User-Agent': 'Lulu-Finity-Railway-Relay/1.0' }
     });
     this.upstream = upstream;
     let opened = false;
+    let validated = false;
     let handledFailure = false;
 
     const rotate = (code, reason, error = null) => {
@@ -236,15 +253,16 @@ class RelaySession {
       clearTimeout(this.openTimer);
       const classification = classifyUpstreamFailure(code, reason, error);
       const detail = String(reason || error?.message || error || `código ${code || 0}`).slice(0, 180);
+      console.warn(`[live] @${this.uniqueId} intento ${this.rotationCount}, key ${selected.id}: ${classification} - ${detail}`);
       if (classification === 'offline' || classification === 'normal' || classification === 'configuration') {
         this.releaseCurrentKey();
         const message = classification === 'offline'
           ? 'TikTok no detecta un LIVE activo para esta cuenta.'
           : classification === 'configuration'
-            ? 'La configuración enviada al proveedor no es válida; rotar claves no resolvería este error.'
+            ? `El proveedor rechazó la conexión LIVE: ${detail}`
             : 'La conexión terminó normalmente.';
         sendJson(this.client, { type: 'lulu.relay.error', data: { message, classification } });
-        this.client.close(classification === 'offline' ? 4404 : classification === 'configuration' ? 4400 : 1000, message);
+        this.client.close(classification === 'offline' ? 4404 : classification === 'configuration' ? 4400 : 1000, message.slice(0, 120));
         return;
       }
       if (classification === 'quota') keyPool.markQuotaLimit(selected.id, detail);
@@ -258,15 +276,34 @@ class RelaySession {
     upstream.on('open', () => {
       opened = true;
       clearTimeout(this.openTimer);
-      keyPool.markSuccess(selected.id);
-      sendJson(this.client, { type: 'lulu.relay.status', data: { state: 'connected', attempt: this.rotationCount, keyId: selected.id } });
+      sendJson(this.client, { type:'lulu.relay.status', data:{ state:'verifying', attempt:this.rotationCount, keyId:selected.id } });
+      this.openTimer = setTimeout(
+        () => rotate(1006, 'EulerStream abrió el WebSocket pero no envió ningún evento LIVE válido.'),
+        UPSTREAM_VALIDATE_TIMEOUT_MS
+      );
     });
     upstream.on('message', (data, isBinary) => {
       if (this.closed || this.client.readyState !== WebSocket.OPEN) return;
+      const inspection = inspectUpstreamFrame(data, isBinary);
+      if (inspection.failureDetail) {
+        rotate(1006, inspection.failureDetail);
+        return;
+      }
+      if (!validated) {
+        if (!inspection.valid) {
+          console.warn(`[live] @${this.uniqueId} recibió frame previo no utilizable (${inspection.kind}); esperando evento válido.`);
+          return;
+        }
+        validated = true;
+        clearTimeout(this.openTimer);
+        keyPool.markSuccess(selected.id);
+        console.info(`[live] @${this.uniqueId} LIVE validado con key ${selected.id}; los eventos ya están fluyendo.`);
+        sendJson(this.client, { type:'lulu.relay.status', data:{ state:'connected', attempt:this.rotationCount, keyId:selected.id } });
+      }
       try { this.client.send(data, { binary: isBinary }); } catch {}
     });
     upstream.on('error', (error) => {
-      if (!opened) rotate(1006, '', error);
+      rotate(1006, opened ? 'Error del WebSocket upstream' : '', error);
     });
     upstream.on('close', (code, reasonBuffer) => {
       const reason = Buffer.isBuffer(reasonBuffer) ? reasonBuffer.toString('utf8') : String(reasonBuffer || '');
