@@ -1,0 +1,83 @@
+name: Compilar Lulu Finity Mobile APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, android-mobile]
+    paths:
+      - "build-mobile-v010/**"
+      - "ANDROID_MOBILE.md"
+      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Instalar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Reconstruir fuente Android
+        shell: bash
+        run: |
+          cat \
+            build-mobile-v010/source/part-00.txt \
+            build-mobile-v010/source/part-01.txt \
+            build-mobile-v010/source/part-02.txt \
+            build-mobile-v010/source/part-03.txt \
+            build-mobile-v010/source/part-04.txt \
+            | base64 --decode > Lulu-Finity-Mobile-Source-0.1.0.zip
+          echo "d9a641b1b50054ddbbce09fc650a976d56e2424528a6767bad503f3a4d7b0d07  Lulu-Finity-Mobile-Source-0.1.0.zip" | sha256sum -c -
+          unzip -q Lulu-Finity-Mobile-Source-0.1.0.zip
+          patch -p1 -d android < build-mobile-v010/patches/001-java-compat.patch
+
+      - name: Compilar APK instalable
+        run: gradle -p android --stacktrace assembleDebug
+
+      - name: Preparar APK
+        shell: bash
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk Lulu-Finity-Mobile-0.1.0-beta.apk
+          sha256sum Lulu-Finity-Mobile-0.1.0-beta.apk > Lulu-Finity-Mobile-0.1.0-beta.sha256
+
+      - name: Subir artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Mobile-APK
+          path: |
+            Lulu-Finity-Mobile-0.1.0-beta.apk
+            Lulu-Finity-Mobile-0.1.0-beta.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publicar beta móvil
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="mobile-v0.1.0-beta"
+          notes="Primera beta Android: TikTok LIVE, TTS, solicitudes !cancion, rankings persistentes y enlace local para OBS."
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" Lulu-Finity-Mobile-0.1.0-beta.apk Lulu-Finity-Mobile-0.1.0-beta.sha256 --clobber
+            gh release edit "$tag" --title "Lulu Finity Mobile 0.1.0 Beta" --notes "$notes"
+          else
+            gh release create "$tag" Lulu-Finity-Mobile-0.1.0-beta.apk Lulu-Finity-Mobile-0.1.0-beta.sha256 --target "$GITHUB_SHA" --title "Lulu Finity Mobile 0.1.0 Beta" --notes "$notes"
+          fi
