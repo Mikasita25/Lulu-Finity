@@ -29,7 +29,7 @@ jobs:
           curl --fail --location --silent --show-error "$BASE_URL" -o base.zip
           echo "$BASE_SHA256  base.zip" | sha256sum --check
           unzip -q base.zip -d app
-          python build-v1230/apply-v1230.py app
+          python build-v1230/apply-v1230-runner.py app
           python build-v1230/test-v1230.py app
       - name: Validar JavaScript y pruebas existentes
         run: |
