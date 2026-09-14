@@ -21,14 +21,19 @@ old_load = '''renderer = replace_once(
     "  try { await loadDefaultSounds(); }\\n  try { await loadTikTokGiftCatalog(); } catch {}",
     "carga del catálogo en init",
 )'''
-new_load = '''load_catalog_inserted = False
-for load_anchor in ("  try { await loadDefaultSounds(); }", "  await loadDefaultSounds();"):
-    if load_anchor in renderer:
-        renderer = renderer.replace(load_anchor, load_anchor + "\\n  try { await loadTikTokGiftCatalog(); } catch {}", 1)
-        load_catalog_inserted = True
-        break
-if not load_catalog_inserted:
-    raise RuntimeError("carga del catálogo en init: no se encontró loadDefaultSounds")'''
+new_load = '''load_try_anchor = "  try { await loadDefaultSounds(); }"
+load_pos = renderer.find(load_try_anchor)
+if load_pos < 0:
+    raise RuntimeError("carga del catálogo en init: no se encontró loadDefaultSounds")
+line_end = renderer.find("\\n", load_pos + len(load_try_anchor))
+if line_end < 0:
+    raise RuntimeError("carga del catálogo en init: bloque de sonidos incompleto")
+next_line_end = renderer.find("\\n", line_end + 1)
+next_line = renderer[line_end + 1: next_line_end if next_line_end >= 0 else len(renderer)]
+insert_at = line_end
+if next_line.lstrip().startswith("catch"):
+    insert_at = next_line_end if next_line_end >= 0 else len(renderer)
+renderer = renderer[:insert_at] + "\\n  try { await loadTikTokGiftCatalog(); } catch (error) { console.warn('El catálogo de regalos TikTok se cargará después:', error?.message || error); }" + renderer[insert_at:]'''
 
 for old, new, label in ((old_init, new_init, 'init'), (old_load, new_load, 'carga')):
     count = source.count(old)
