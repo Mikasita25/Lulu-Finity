@@ -29,6 +29,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: lulu-music/package-lock.json
+      - name: Sincronizar versión del lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm test
@@ -56,6 +58,7 @@ jobs:
           cache-dependency-path: lulu-music/package-lock.json
       - name: Instalar y probar
         run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm ci --no-audit --no-fund
           npm run check
           npm test
@@ -80,11 +83,14 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $exe = "dist/win-unpacked/Lulu Music.exe"
           $asar = "dist/win-unpacked/resources/app.asar"
-          foreach ($file in @($exe,$asar,"dist/Lulu-Music-Setup-1.0.2.exe","dist/Lulu-Music-1.0.2-x64.zip")) {
+          foreach ($file in @($exe,$asar,"dist/Lulu-Music-Setup-1.0.3.exe","dist/Lulu-Music-1.0.3-x64.zip")) {
             if (!(Test-Path $file)) { throw "No se generó $file" }
           }
           $listing = & node_modules/.bin/asar list $asar
           $appSource = ($listing | Where-Object { $_ -like "\src\*" }) -join "`n"
+          foreach ($required in @("src\main.js", "src\main-v103-final.js", "src\playback-recovery-policy.js", "src\playback-guard.js")) {
+            if (!$appSource.Contains($required)) { throw "El paquete no contiene $required" }
+          }
           foreach ($forbidden in @("src\local-tts", "src\local-voice", "src\live-games", "src\automation-engine", "src\economy", ".test.js")) {
             if ($appSource.Contains($forbidden)) { throw "El paquete contiene un módulo prohibido: $forbidden" }
           }
@@ -94,20 +100,34 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $profile = Join-Path $env:RUNNER_TEMP "lulu-music-profile"
           $marker = Join-Path $env:RUNNER_TEMP "lulu-music-smoke.json"
+          $stdout = Join-Path $env:RUNNER_TEMP "lulu-music-smoke.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "lulu-music-smoke.stderr.log"
           New-Item -ItemType Directory $profile -Force | Out-Null
-          Remove-Item $marker -Force -ErrorAction SilentlyContinue
+          Remove-Item $marker,$stdout,$stderr -Force -ErrorAction SilentlyContinue
           $env:LULU_MUSIC_SMOKE_TEST = "1"
           $env:LULU_MUSIC_PLAYER_SMOKE_TEST = "1"
           $env:LULU_MUSIC_SMOKE_MARKER = $marker
-          $process = Start-Process -FilePath "dist/win-unpacked/Lulu Music.exe" -ArgumentList "--user-data-dir=$profile" -PassThru
+          $process = Start-Process -FilePath "dist/win-unpacked/Lulu Music.exe" -ArgumentList "--user-data-dir=$profile" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
           try {
             for ($attempt = 0; $attempt -lt 60 -and !(Test-Path $marker); $attempt++) {
               Start-Sleep -Milliseconds 500
               $process.Refresh()
-              if ($process.HasExited -and !(Test-Path $marker)) { throw "Lulu Music se cerró antes de confirmar su renderer" }
+              if ($process.HasExited -and !(Test-Path $marker)) {
+                Write-Host "Lulu Music terminó con código $($process.ExitCode)."
+                if (Test-Path $stdout) { Write-Host "--- STDOUT ---"; Get-Content $stdout -Raw | Write-Host }
+                if (Test-Path $stderr) { Write-Host "--- STDERR ---"; Get-Content $stderr -Raw | Write-Host }
+                throw "Lulu Music se cerró antes de confirmar su renderer"
+              }
             }
-            if (!(Test-Path $marker)) { throw "El renderer no respondió en 30 segundos" }
+            if (!(Test-Path $marker)) {
+              Write-Host "Proceso principal: PID=$($process.Id) HasExited=$($process.HasExited)"
+              Get-Process | Where-Object { $_.ProcessName -like '*Lulu*' -or $_.ProcessName -like '*electron*' } | Select-Object Id,ProcessName,WorkingSet64 | Format-Table | Out-String | Write-Host
+              if (Test-Path $stdout) { Write-Host "--- STDOUT ---"; Get-Content $stdout -Raw | Write-Host }
+              if (Test-Path $stderr) { Write-Host "--- STDERR ---"; Get-Content $stderr -Raw | Write-Host }
+              throw "El renderer no respondió en 30 segundos"
+            }
             $result = Get-Content $marker -Raw | ConvertFrom-Json
+            if ($result.error) { throw "El smoke interno falló: $($result.error)" }
             if ($result.title -ne "Lulu Music" -or !$result.hasQueue -or !$result.hasPlayer -or !$result.hasSettings -or $result.hasSidebar -or $result.hasIframe -or $result.panels -lt 4) {
               throw "La pantalla única no pasó la prueba: $($result | ConvertTo-Json -Compress)"
             }
@@ -127,10 +147,10 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: Lulu-Music-1.0.2-Windows
+          name: Lulu-Music-1.0.3-Windows
           path: |
-            lulu-music/dist/Lulu-Music-Setup-1.0.2.exe
-            lulu-music/dist/Lulu-Music-1.0.2-x64.zip
+            lulu-music/dist/Lulu-Music-Setup-1.0.3.exe
+            lulu-music/dist/Lulu-Music-1.0.3-x64.zip
           if-no-files-found: error
 
   release:
@@ -142,20 +162,21 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: Lulu-Music-1.0.2-Windows
+          name: Lulu-Music-1.0.3-Windows
           path: release-assets
-      - name: Publicar Lulu Music 1.0.2
+      - name: Publicar Lulu Music 1.0.3
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_NOTES: |
-            - La barra de Lulu controla de forma permanente el volumen de YouTube y Audius.
-            - El reproductor ya no restaura el volumen anterior después de mover la barra.
-            - El volumen en 0% se conserva correctamente al reiniciar.
+            - Corrige canciones que podían quedarse pausadas solas después de buffering o un corte temporal.
+            - YouTube diferencia la pausa manual de una pausa accidental, intenta reanudar y recarga la misma canción hasta 3 veces antes de saltarla.
+            - Audius detecta waiting/stalled, recupera el audio directo y vuelve a resolver el stream una vez antes de cambiar de proveedor o avanzar la cola.
+            - Se conserva el volumen persistente de Lulu Music 1.0.2 y el reproductor sigue funcionando en segundo plano.
         run: |
-          gh release create "lulu-music-v1.0.2" \
-            "release-assets/Lulu-Music-Setup-1.0.2.exe#Instalador de Lulu Music 1.0.2" \
-            "release-assets/Lulu-Music-1.0.2-x64.zip#Lulu Music 1.0.2 portable" \
+          gh release create "lulu-music-v1.0.3" \
+            "release-assets/Lulu-Music-Setup-1.0.3.exe#Instalador de Lulu Music 1.0.3" \
+            "release-assets/Lulu-Music-1.0.3-x64.zip#Lulu Music 1.0.3 portable" \
             --target "$GITHUB_SHA" \
-            --title "Lulu Music 1.0.2" \
+            --title "Lulu Music 1.0.3" \
             --notes "$RELEASE_NOTES"
