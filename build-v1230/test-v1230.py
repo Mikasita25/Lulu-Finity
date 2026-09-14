@@ -70,7 +70,7 @@ for token in (
     require(token in index, f"falta interfaz: {token}")
 
 styles = read("src/styles.css")
-for token in (".tiktok-gift-catalog{", ".tiktok-gift-catalog-results{", ".detected-tiktok-gifts{"):
+for token in (".tiktok-gift-catalog,.detected-gifts-wrap{", ".tiktok-gift-catalog-results{", ".detected-tiktok-gifts{"):
     require(token in styles, f"falta estilo: {token}")
 
 changelog = read("CHANGELOG.md")
