@@ -1,0 +1,21 @@
+name: Lulu Finity Latest Release Guard
+
+on:
+  workflow_run:
+    workflows: ["Lulu Finity 1.1.9", "Lulu Finity 1.2.2"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  keep-122-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mantener 1.2.2 como versión pública más reciente
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.2.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit v1.2.2 --repo "$GITHUB_REPOSITORY" --latest
+          fi
