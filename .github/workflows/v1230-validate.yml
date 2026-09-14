@@ -1,0 +1,42 @@
+name: Validate Lulu Finity 1.2.3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "build-v1230/**"
+      - ".github/workflows/v1230-validate.yml"
+
+permissions:
+  contents: read
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.2.2/Lulu-Finity-Source-1.2.2.zip
+  BASE_SHA256: 57f14613ad4a89719d4929e43ca6e9aa6426b6495a6f2714a49f2573f87ff5fe
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reconstruir y parchear 1.2.3
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error "$BASE_URL" -o base.zip
+          echo "$BASE_SHA256  base.zip" | sha256sum --check
+          unzip -q base.zip -d app
+          python build-v1230/apply-v1230.py app
+          python build-v1230/test-v1230.py app
+      - name: Validar JavaScript y pruebas existentes
+        run: |
+          set -euo pipefail
+          node --check app/src/main.js
+          node --check app/src/preload.js
+          node --check app/src/renderer.js
+          cd app
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
