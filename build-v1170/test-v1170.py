@@ -121,7 +121,7 @@ for token in ("cleanCommandText", "parseCommandText", "commandKey", "matchComman
 assert (ROOT / "src" / "command-matching-policy.test.js").is_file()
 
 for token in (
-    "STABLE_OVERLAY_BASE_URL = 'https://lulu-finity-production.up.railway.app'",
+    "STABLE_OVERLAY_BASE_URL = 'https://lulu-finity-production-6b8f.up.railway.app'",
     "overlayRelaySecret", "activeHttpsSources", "stableOverlayPublicId",
     "syncStableOverlaySource", "flushStableOverlaySync(true)", "uploadStableOverlayAsset",
     "delete rendererSettings.overlayRelaySecret", "ensureOverlayHttpsTunnel(true)",
