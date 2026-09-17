@@ -69,6 +69,8 @@ jobs:
           java-version: "17"
       - name: Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Dependencias
         run: npm ci --prefix "$GITHUB_WORKSPACE/mobile" --no-audit --no-fund
       - name: Alinear parches Expo 57
