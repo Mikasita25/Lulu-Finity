@@ -22,7 +22,7 @@ export async function configureNotifications() {
       name: 'Eventos importantes del LIVE',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 120, 70, 150],
-      lightColor: '#FF5FC8',
+      lightColor: '#A762FF',
       sound: 'default',
     });
   }
@@ -54,7 +54,7 @@ export async function notifyImportantEvent(event: LiveEvent) {
     content: {
       ...content,
       sound: 'default',
-      color: '#FF5FC8',
+      color: '#A762FF',
       data: { liveEventId: event.id, type: event.type },
     },
     trigger: Platform.OS === 'android' ? { channelId: 'lulu-live' } : null,
@@ -67,7 +67,7 @@ export async function notifyGoalCompleted(title: string) {
       title: '🎉 ¡Meta completada!',
       body: title,
       sound: 'default',
-      color: '#FF5FC8',
+      color: '#A762FF',
     },
     trigger: Platform.OS === 'android' ? { channelId: 'lulu-live' } : null,
   });

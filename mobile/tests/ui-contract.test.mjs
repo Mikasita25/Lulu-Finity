@@ -3,11 +3,16 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const fromMobile = (path) => fileURLToPath(new URL(`../${path}`, import.meta.url));
+const fromMobile = (path) =>
+  fileURLToPath(new URL(`../${path}`, import.meta.url));
 const read = (path) => readFileSync(fromMobile(path), 'utf8');
 
 const video = readFileSync(fromMobile('assets/startup-lulu.mp4'));
-assert.equal(video.length, 234_033, 'El video de inicio no debe sustituirse ni truncarse.');
+assert.equal(
+  video.length,
+  234_033,
+  'El video de inicio no debe sustituirse ni truncarse.',
+);
 assert.equal(
   createHash('sha256').update(video).digest('hex'),
   'b49dad313d93f90a665b9b260640cc225e8aaa7ac5666e9084065b1ac6106955',
@@ -32,7 +37,10 @@ assert.match(dashboard, /Antes de volver al juego/);
 assert.match(dashboard, /Diseñado para segundo plano/);
 assert.match(dashboard, /navigation\.navigate\('TTS'\)/);
 assert.match(dashboard, /navigation\.navigate\('Music'\)/);
-assert.doesNotMatch(dashboard, /Resumen del LIVE|Meta principal|Ranking|Top Fans/);
+assert.doesNotMatch(
+  dashboard,
+  /Resumen del LIVE|Meta principal|Ranking|Top Fans/,
+);
 
 const connection = read('src/components/LiveConnectionCard.tsx');
 assert.match(connection, /Conectar al LIVE/);
@@ -51,10 +59,16 @@ assert.match(onboarding, /Logo de Lulú Finity/);
 
 const appConfig = JSON.parse(read('app.json'));
 assert.equal(appConfig.expo.icon, './assets/icon.png');
-assert.equal(appConfig.expo.android.adaptiveIcon.foregroundImage, './assets/adaptive-icon.png');
+assert.equal(
+  appConfig.expo.android.adaptiveIcon.foregroundImage,
+  './assets/adaptive-icon.png',
+);
 assert.ok(
   appConfig.expo.plugins.some(
-    (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-audio' && plugin[1]?.enableBackgroundPlayback === true,
+    (plugin) =>
+      Array.isArray(plugin) &&
+      plugin[0] === 'expo-audio' &&
+      plugin[1]?.enableBackgroundPlayback === true,
   ),
   'expo-audio debe declarar enableBackgroundPlayback para mantener la sesión multimedia en Android.',
 );
@@ -62,10 +76,17 @@ assert.ok(
 const packageJson = JSON.parse(read('package.json'));
 assert.equal(packageJson.dependencies['react-native-webview'], '13.16.1');
 assert.ok(packageJson.dependencies['expo-audio']);
-assert.equal(packageJson.dependencies['expo-speech'], undefined, 'Android ya no debe usar el motor TTS local.');
+assert.equal(
+  packageJson.dependencies['expo-speech'],
+  undefined,
+  'Android ya no debe usar el motor TTS local.',
+);
 
 const navigator = read('src/navigation/AppNavigator.tsx');
-assert.match(navigator, /const initial = !onboardingDone \? 'Onboarding' : 'Main'/);
+assert.match(
+  navigator,
+  /const initial = !onboardingDone \? 'Onboarding' : 'Main'/,
+);
 assert.match(navigator, /name="Music"/);
 assert.match(navigator, /name="TTS"/);
 assert.match(navigator, /name="Interactions"/);
@@ -75,13 +96,22 @@ assert.match(navigator, /title: 'Voz'/);
 assert.match(navigator, /title: 'Música'/);
 assert.match(navigator, /title: 'Automatiza'/);
 assert.match(navigator, /title: 'Ajustes'/);
-assert.doesNotMatch(navigator, /name="LiveView"|name="Goals"|name="Leaderboard"|title: 'Ranking'/);
+assert.match(navigator, /animation: 'shift'/);
+assert.match(navigator, /duration: 220/);
+assert.match(navigator, /animationDuration: 240/);
+assert.doesNotMatch(
+  navigator,
+  /name="LiveView"|name="Goals"|name="Leaderboard"|title: 'Ranking'/,
+);
 
 const menu = read('src/screens/MoreScreen.tsx');
 assert.match(menu, /Actividad y alertas/);
 assert.match(menu, /Aplicación/);
 assert.match(menu, /siempre visibles abajo/);
-assert.doesNotMatch(menu, /route: 'TTS'|route: 'Music'|route: 'Interactions'|ranking/i);
+assert.doesNotMatch(
+  menu,
+  /route: 'TTS'|route: 'Music'|route: 'Interactions'|ranking/i,
+);
 
 const appearance = read('src/screens/AppearanceScreen.tsx');
 assert.match(appearance, /Color principal/);
@@ -136,7 +166,9 @@ assert.match(youtubeBrowser, /playbackStatus/);
 assert.match(youtubeBrowser, /skipCurrentSong/);
 assert.doesNotMatch(youtubeBrowser, /react-native-webview/);
 
-const playbackHost = read('src/components/MusicPlaybackHost.tsx') + read('src/services/playerAutomation.ts');
+const playbackHost =
+  read('src/components/MusicPlaybackHost.tsx') +
+  read('src/services/playerAutomation.ts');
 assert.match(playbackHost, /setAudioModeAsync/);
 assert.match(playbackHost, /shouldPlayInBackground: true/);
 assert.match(playbackHost, /setActiveForLockScreen/);
@@ -185,7 +217,7 @@ assert.match(relayTts, /isMicrosoftMp3/);
 const ttsScreen = read('src/screens/TtsScreen.tsx');
 assert.match(ttsScreen, /voces de Microsoft/);
 assert.match(ttsScreen, /mismo motor Microsoft que la versión de PC/);
-assert.match(ttsScreen, /motor Microsoft de Lulú para PC/);
+assert.match(ttsScreen, /motor Microsoft de Lulú para\s+PC/);
 assert.match(ttsScreen, /No se pudo reproducir la voz/);
 assert.doesNotMatch(ttsScreen, /Predeterminada del sistema|voces instaladas/);
 
@@ -206,7 +238,10 @@ assert.match(musicRuntime, /state\.musicPaused/);
 assert.match(musicRuntime, /enqueueSong/);
 assert.match(musicRuntime, /const wasIdle = !state\.currentSong/);
 assert.match(musicRuntime, /playSong\(result\.song\)/);
-assert.match(read('src/services/browserUrl.ts'), /https:\/\/m\.youtube\.com\/results/);
+assert.match(
+  read('src/services/browserUrl.ts'),
+  /https:\/\/m\.youtube\.com\/results/,
+);
 
 assert.match(liveRuntime, /handleMusicEvent\(message\.event\)/);
 assert.match(liveRuntime, /clearMusicCooldowns/);
@@ -253,14 +288,61 @@ assert.match(updateStore, /update: state\.update/);
 assert.match(updateStore, /currentMobileVersion/);
 assert.match(updateStore, /currentMobileBuild/);
 assert.match(updateStore, /staleSnapshot/);
-assert.doesNotMatch(updateStore, /error: message, lastCheckedAt: Date\.now\(\)/);
+assert.doesNotMatch(
+  updateStore,
+  /error: message, lastCheckedAt: Date\.now\(\)/,
+);
 
 const app = read('App.tsx');
-assert.match(app, /Alert\.alert/);
+assert.match(app, /showLuluDialog/);
+assert.match(app, /LuluDialogHost/);
 assert.match(app, /dismissedVersion/);
 assert.match(app, /update\.downloadUrl \|\| update\.releaseUrl/);
 assert.match(app, /AppState\.addEventListener/);
 assert.match(app, /nextState === 'active'/);
 assert.match(app, /MusicPlaybackHost/);
 
-console.log('Interfaz móvil: música automática, volumen, segundo plano, navegador interno y actualizador verificados.');
+const designSystem = [
+  'src/components/GlassCard.tsx',
+  'src/components/Button.tsx',
+  'src/components/LuluSwitch.tsx',
+  'src/components/LuluSlider.tsx',
+  'src/components/LuluInput.tsx',
+  'src/components/StatusBadge.tsx',
+  'src/components/SettingRow.tsx',
+  'src/components/BottomNavigation.tsx',
+  'src/components/LuluDialog.tsx',
+]
+  .map(read)
+  .join('\n');
+assert.match(designSystem, /luluGradients/);
+assert.match(designSystem, /accessibilityRole="switch"/);
+assert.match(designSystem, /PanResponder/);
+assert.match(designSystem, /BlurView/);
+const bottomNavigation = read('src/components/BottomNavigation.tsx');
+assert.match(bottomNavigation, /Animated\.timing/);
+assert.match(bottomNavigation, /useNativeDriver: true/);
+assert.match(bottomNavigation, /scaleX: indicatorScale/);
+const slider = read('src/components/LuluSlider.tsx');
+assert.match(slider, /pendingValue/);
+assert.match(slider, /onPanResponderRelease: finishSliding/);
+assert.match(slider, /onPanResponderTerminationRequest: \(\) => false/);
+assert.match(slider, /width: Math\.max\(0, ratio \* width\)/);
+assert.doesNotMatch(
+  slider,
+  /onPanResponderMove:[\s\S]{0,100}onValueChange/,
+  'El slider no debe redibujar toda la pantalla durante cada movimiento.',
+);
+assert.match(read('src/navigation/AppNavigator.tsx'), /BottomNavigation/);
+assert.match(read('src/screens/TtsScreen.tsx'), /LuluSlider/);
+assert.match(read('src/screens/InteractionsScreen.tsx'), /AutomationCard/);
+assert.doesNotMatch(
+  read('src/screens/TtsScreen.tsx') +
+    read('src/screens/MusicScreen.tsx') +
+    read('src/screens/InteractionsScreen.tsx'),
+  /Alert\.alert|<Switch/,
+);
+
+console.log(
+  'Interfaz móvil: música automática, volumen, segundo plano, navegador interno y actualizador verificados.',
+);

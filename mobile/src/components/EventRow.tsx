@@ -4,7 +4,7 @@ import type { LiveEvent } from '@/types/live';
 import { eventText, relativeTime } from '@/utils/format';
 
 function EventIcon({ event }: { event: LiveEvent }) {
-  const props = { size: 16, color: '#FF9DDA', strokeWidth: 2.5 };
+  const props = { size: 16, color: '#F2B7FF', strokeWidth: 2.5 };
   if (event.type === 'gift') return <Gift {...props} />;
   if (event.type === 'comment') return <MessageCircle {...props} />;
   if (event.type === 'fanSticker') return <Sparkles {...props} />;

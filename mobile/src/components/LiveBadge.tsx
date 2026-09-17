@@ -1,13 +1,21 @@
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import type { RelayState } from '@/types/live';
+import { palette } from '@/theme/palette';
 
 export function LiveBadge({ state }: { state: RelayState }) {
   const connected = state === 'connected';
   const pulse = useSharedValue(0);
   useEffect(() => {
-    pulse.value = connected ? withRepeat(withTiming(1, { duration: 650 }), -1, true) : withTiming(0);
+    pulse.value = connected
+      ? withRepeat(withTiming(1, { duration: 650 }), -1, true)
+      : withTiming(0);
   }, [connected, pulse]);
   const dotStyle = useAnimatedStyle(() => ({
     opacity: connected ? 0.45 + pulse.value * 0.55 : 0.55,
@@ -17,7 +25,7 @@ export function LiveBadge({ state }: { state: RelayState }) {
     state === 'connected'
       ? 'LIVE'
       : state === 'connecting'
-          ? 'CONECTANDO'
+        ? 'CONECTANDO'
         : state === 'rotating'
           ? 'RECONECTANDO'
           : state === 'offline'
@@ -27,12 +35,19 @@ export function LiveBadge({ state }: { state: RelayState }) {
               : 'SIN LIVE';
 
   return (
-    <View className={`flex-row items-center gap-2 rounded-full border px-3 py-2 ${connected ? 'border-emerald-400/20 bg-emerald-500/10' : 'border-white/[0.08] bg-white/[0.04]'}`}>
+    <View
+      className={`flex-row items-center gap-2 rounded-full border px-3 py-2 ${connected ? 'border-emerald-400/20 bg-emerald-500/10' : 'border-white/[0.08] bg-white/[0.04]'}`}
+    >
       <Animated.View
         style={dotStyle}
         className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-white/30'}`}
       />
-      <Text className="text-[10px] font-black tracking-[1.5px] text-white/80">{label}</Text>
+      <Text
+        style={{ color: connected ? palette.success : palette.mutedStrong }}
+        className="text-[10px] font-black tracking-[1.5px]"
+      >
+        {label}
+      </Text>
     </View>
   );
 }

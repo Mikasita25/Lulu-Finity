@@ -44,7 +44,7 @@ function RgbName({ children, fontFamily, className = '' }: { children: string; f
     phase.value = withRepeat(withTiming(3, { duration: 2700 }), -1, false);
   }, [phase]);
   const style = useAnimatedStyle(() => ({
-    color: interpolateColor(phase.value, [0, 1, 2, 3], ['#FF79CF', '#A96CFF', '#66E4FF', '#FF79CF']),
+    color: interpolateColor(phase.value, [0, 1, 2, 3], ['#D685FF', '#A762FF', '#66E4FF', '#D685FF']),
     fontFamily,
   }));
   return <Animated.Text style={style} className={className} numberOfLines={1}>{children}</Animated.Text>;

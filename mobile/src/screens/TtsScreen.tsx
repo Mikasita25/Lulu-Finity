@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
-import { AudioLines, Bot, MessageCircle, RotateCcw, Square } from 'lucide-react-native';
+import { Pressable, Text, View } from 'react-native';
+import {
+  AudioLines,
+  Bot,
+  MessageCircle,
+  RotateCcw,
+  Square,
+} from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { AppHeader } from '@/components/AppHeader';
 import { GlassCard } from '@/components/GlassCard';
@@ -11,6 +17,12 @@ import { getTtsVoices, previewTts, stopTts } from '@/services/tts';
 import { defaultMicrosoftVoice } from '@/services/microsoftVoices';
 import { useAppStore } from '@/store/useAppStore';
 import { accentByTheme } from '@/theme/palette';
+import { LuluSwitch } from '@/components/LuluSwitch';
+import { LuluInput } from '@/components/LuluInput';
+import { LuluSlider } from '@/components/LuluSlider';
+import { SettingRow } from '@/components/SettingRow';
+import { StatusBadge } from '@/components/StatusBadge';
+import { showLuluDialog } from '@/components/LuluDialog';
 
 type Voice = Awaited<ReturnType<typeof getTtsVoices>>[number];
 
@@ -32,18 +44,12 @@ function ToggleRow({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <View className="flex-row items-center gap-3 border-b border-white/[0.055] py-4">
-      <View className="flex-1">
-        <Text className="text-sm font-black text-white">{title}</Text>
-        <Text className="mt-1 text-xs leading-5 text-white/60">{subtitle}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: '#342C34', true: '#FF5FC8' }}
-        thumbColor="#FFF7FC"
-      />
-    </View>
+    <SettingRow
+      title={title}
+      subtitle={subtitle}
+      value={value}
+      onValueChange={onChange}
+    />
   );
 }
 
@@ -61,12 +67,18 @@ function Choice({
   return (
     <Pressable
       onPress={onPress}
-      style={active ? { borderColor: accent, backgroundColor: `${accent}20` } : undefined}
+      style={
+        active
+          ? { borderColor: accent, backgroundColor: `${accent}20` }
+          : undefined
+      }
       className={`rounded-xl border px-3 py-2 ${active ? '' : 'border-white/10 bg-white/[0.04]'}`}
     >
       <Text
         style={active ? { color: accent } : undefined}
-        className={active ? 'text-xs font-black' : 'text-xs font-bold text-white/55'}
+        className={
+          active ? 'text-xs font-black' : 'text-xs font-bold text-white/55'
+        }
       >
         {label}
       </Text>
@@ -79,7 +91,9 @@ export function TtsScreen() {
   const accentTheme = useAppStore((state) => state.accentTheme);
   const accent = accentByTheme[accentTheme];
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [preview, setPreview] = useState('Hola, soy el TTS de Lulú Finity. Ya puedo leer los comentarios del LIVE.');
+  const [preview, setPreview] = useState(
+    'Hola, soy el TTS de Lulú Finity. Ya puedo leer los comentarios del LIVE.',
+  );
   const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
@@ -96,7 +110,10 @@ export function TtsScreen() {
 
   const matchingVoices = useMemo(() => {
     const prefix = (settings.language.split('-')[0] ?? 'es').toLowerCase();
-    const exact = voices.filter((voice) => voice.language.toLowerCase() === settings.language.toLowerCase());
+    const exact = voices.filter(
+      (voice) =>
+        voice.language.toLowerCase() === settings.language.toLowerCase(),
+    );
     const related = voices.filter(
       (voice) =>
         voice.language.toLowerCase().startsWith(prefix) &&
@@ -107,25 +124,51 @@ export function TtsScreen() {
 
   return (
     <Screen>
-      <AppHeader title="Voz del chat" subtitle="Haz que Lulú lea los comentarios con voces de Microsoft." />
+      <AppHeader
+        title="Voz del chat"
+        subtitle="Haz que Lulú lea los comentarios con voces de Microsoft."
+      />
 
-      <GlassCard>
+      <GlassCard variant="hero">
         <View className="p-5">
           <View className="flex-row items-center gap-3">
-            <View className="h-12 w-12 items-center justify-center rounded-2xl bg-lulu-500/10">
-              <Bot size={22} color={accent} />
+            <View
+              style={{ borderColor: `${accent}45` }}
+              className="h-14 w-14 items-center justify-center rounded-[20px] border bg-lulu-500/10"
+            >
+              <Bot size={24} color={accent} />
             </View>
             <View className="flex-1">
-              <Text className="text-base font-black text-white">Leer comentarios en voz alta</Text>
+              <Text className="text-base font-black text-white">Tu voz ✦</Text>
               <Text className="mt-1 text-xs leading-5 text-white/60">
-                Mantiene una cola corta para no leer mensajes viejos ni quedarse atrás.
+                Mantiene una cola corta para no leer mensajes viejos ni quedarse
+                atrás.
               </Text>
             </View>
-            <Switch
+            <LuluSwitch
               value={settings.enabled}
               onValueChange={(enabled) => settings.updateTts({ enabled })}
-              trackColor={{ false: '#342C34', true: accent }}
-              thumbColor="#FFF7FC"
+              accessibilityLabel="Leer comentarios en voz alta"
+            />
+          </View>
+          <View className="mt-4 flex-row items-center justify-between rounded-2xl border border-white/[0.07] bg-white/[0.035] px-4 py-3">
+            <View className="flex-row items-end gap-[3px]">
+              {[10, 20, 14, 27, 18, 23, 12, 18, 9].map((height, index) => (
+                <View
+                  key={index}
+                  style={{
+                    width: 3,
+                    height,
+                    borderRadius: 2,
+                    backgroundColor: index % 2 ? '#D685FF' : '#F2B7FF',
+                    opacity: settings.enabled ? 0.9 : 0.25,
+                  }}
+                />
+              ))}
+            </View>
+            <StatusBadge
+              label={settings.enabled ? 'TTS activo' : 'TTS apagado'}
+              tone={settings.enabled ? 'success' : 'neutral'}
             />
           </View>
         </View>
@@ -138,7 +181,9 @@ export function TtsScreen() {
             title="Decir el nombre"
             subtitle="Ejemplo: “LuluFan dice: hola”."
             value={settings.announceUsername}
-            onChange={(announceUsername) => settings.updateTts({ announceUsername })}
+            onChange={(announceUsername) =>
+              settings.updateTts({ announceUsername })
+            }
           />
           <ToggleRow
             title="Ignorar comandos"
@@ -149,7 +194,10 @@ export function TtsScreen() {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Idioma" subtitle="Elige la región de las voces Microsoft que quieres escuchar." />
+      <SectionTitle
+        title="Idioma"
+        subtitle="Elige la región de las voces Microsoft que quieres escuchar."
+      />
       <View className="flex-row flex-wrap gap-2">
         {LANGUAGE_CHOICES.map(([value, label]) => (
           <Choice
@@ -167,7 +215,10 @@ export function TtsScreen() {
         ))}
       </View>
 
-      <SectionTitle title="Elige una voz" subtitle="Usa el mismo motor Microsoft que la versión de PC." />
+      <SectionTitle
+        title="Elige una voz"
+        subtitle="Usa el mismo motor Microsoft que la versión de PC."
+      />
       <GlassCard>
         <View className="p-4">
           {matchingVoices.map((voice) => {
@@ -181,12 +232,20 @@ export function TtsScreen() {
                     language: voice.language,
                   })
                 }
-                style={active ? { borderColor: accent, backgroundColor: `${accent}18` } : undefined}
+                style={
+                  active
+                    ? { borderColor: accent, backgroundColor: `${accent}18` }
+                    : undefined
+                }
                 className={`mb-2 rounded-2xl border p-4 ${active ? '' : 'border-white/10 bg-white/[0.035]'}`}
               >
                 <Text
                   style={active ? { color: accent } : undefined}
-                  className={active ? 'text-sm font-black' : 'text-sm font-black text-white'}
+                  className={
+                    active
+                      ? 'text-sm font-black'
+                      : 'text-sm font-black text-white'
+                  }
                 >
                   {voice.name}
                 </Text>
@@ -196,51 +255,62 @@ export function TtsScreen() {
               </Pressable>
             );
           })}
-          {!voices.length ? <Text className="p-3 text-xs text-white/60">Cargando voces Microsoft…</Text> : null}
+          {!voices.length ? (
+            <Text className="p-3 text-xs text-white/60">
+              Cargando voces Microsoft…
+            </Text>
+          ) : null}
         </View>
       </GlassCard>
 
-      <SectionTitle title="Cómo debe hablar" />
-      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/55">Velocidad</Text>
-      <View className="mb-4 flex-row flex-wrap gap-2">
-        {[0.8, 1, 1.15, 1.3].map((rate) => (
-          <Choice
-            key={rate}
-            label={`${rate}x`}
-            active={settings.rate === rate}
-            accent={accent}
-            onPress={() => settings.updateTts({ rate })}
+      <SectionTitle
+        title="Cómo debe hablar"
+        subtitle="Ajusta la voz sin cambiar el motor Microsoft."
+      />
+      <GlassCard variant="soft">
+        <View className="gap-6 p-5">
+          <LuluSlider
+            label="Velocidad"
+            value={settings.rate}
+            minimumValue={0.8}
+            maximumValue={1.3}
+            step={0.05}
+            formatValue={(value) => `${value.toFixed(2)}x`}
+            onValueChange={(rate) => settings.updateTts({ rate })}
           />
-        ))}
-      </View>
-      <Text className="mb-2 text-[11px] font-black uppercase tracking-[1.4px] text-white/55">Tono</Text>
-      <View className="flex-row flex-wrap gap-2">
-        {[0.85, 1, 1.15, 1.3].map((pitch) => (
-          <Choice
-            key={pitch}
-            label={`${pitch}x`}
-            active={settings.pitch === pitch}
-            accent={accent}
-            onPress={() => settings.updateTts({ pitch })}
+          <LuluSlider
+            label="Tono"
+            value={settings.pitch}
+            minimumValue={0.85}
+            maximumValue={1.3}
+            step={0.05}
+            formatValue={(value) => `${value.toFixed(2)}x`}
+            onValueChange={(pitch) => settings.updateTts({ pitch })}
           />
-        ))}
-      </View>
+          <LuluSlider
+            label="Volumen"
+            value={settings.volume}
+            step={0.05}
+            onValueChange={(volume) => settings.updateTts({ volume })}
+          />
+        </View>
+      </GlassCard>
 
       <SectionTitle title="Escuchar una prueba" />
       <GlassCard>
         <View className="p-5">
           <View className="mb-4 flex-row items-center gap-2">
             <MessageCircle size={17} color={accent} />
-            <Text className="text-sm font-black text-white">Texto de prueba</Text>
+            <Text className="text-sm font-black text-white">
+              Texto de prueba
+            </Text>
           </View>
-          <TextInput
+          <LuluInput
             value={preview}
             onChangeText={setPreview}
             multiline
             maxLength={240}
             placeholder="Escribe algo para probar la voz"
-            placeholderTextColor="#6D626C"
-            className="min-h-[100px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-5 text-white"
           />
           <View className="mt-4 gap-3">
             <Button
@@ -251,9 +321,13 @@ export function TtsScreen() {
                 try {
                   await previewTts(preview);
                 } catch (error) {
-                  Alert.alert(
+                  showLuluDialog(
                     'No se pudo reproducir la voz',
-                    error instanceof Error ? error.message : 'Comprueba tu conexión a internet e inténtalo de nuevo.',
+                    error instanceof Error
+                      ? error.message
+                      : 'Comprueba tu conexión a internet e inténtalo de nuevo.',
+                    undefined,
+                    'danger',
                   );
                 } finally {
                   setPreviewing(false);
@@ -278,7 +352,8 @@ export function TtsScreen() {
       </GlassCard>
 
       <Text className="mt-5 text-center text-[10px] leading-5 text-white/25">
-        Requiere internet · la voz se genera con el motor Microsoft de Lulú para PC, sin usar el motor del celular.
+        Requiere internet · la voz se genera con el motor Microsoft de Lulú para
+        PC, sin usar el motor del celular.
       </Text>
     </Screen>
   );
