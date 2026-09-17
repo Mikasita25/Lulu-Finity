@@ -1,8 +1,10 @@
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NavigationContainer, DarkTheme, type Theme } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DarkTheme,
+  type Theme,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { AudioLines, House, Music2, Settings, Zap } from 'lucide-react-native';
 import { DashboardScreen } from '@/screens/DashboardScreen';
 import { MoreScreen } from '@/screens/MoreScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
@@ -20,6 +22,7 @@ import { YouTubeBrowserScreen } from '@/screens/YouTubeBrowserScreen';
 import { RecentActivityScreen } from '@/screens/RecentActivityScreen';
 import { useAppStore } from '@/store/useAppStore';
 import { accentByTheme } from '@/theme/palette';
+import { BottomNavigation } from '@/components/BottomNavigation';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -27,39 +30,52 @@ const Tabs = createBottomTabNavigator();
 function makeNavTheme(accent: string): Theme {
   return {
     ...DarkTheme,
-    colors: { ...DarkTheme.colors, primary: accent, background: '#09070D', card: '#100B13', border: 'rgba(255,255,255,0.08)', text: '#FFF7FC', notification: accent },
+    colors: {
+      ...DarkTheme.colors,
+      primary: accent,
+      background: '#0D1026',
+      card: '#151936',
+      border: 'rgba(222,207,255,0.14)',
+      text: '#F7F3FF',
+      notification: accent,
+    },
   };
 }
 
-function TabIcon({ route, color, size }: { route: string; color: string; size: number }) {
-  const props = { color, size, strokeWidth: 2.4 };
-  if (route === 'Dashboard') return <House {...props} />;
-  if (route === 'TTS') return <AudioLines {...props} />;
-  if (route === 'Music') return <Music2 {...props} />;
-  if (route === 'Interactions') return <Zap {...props} />;
-  return <Settings {...props} />;
-}
-
 function MainTabs() {
-  const insets = useSafeAreaInsets();
-  const accentTheme = useAppStore((state) => state.accentTheme);
-  const accent = accentByTheme[accentTheme];
   return (
-    <Tabs.Navigator screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarHideOnKeyboard: true,
-      tabBarShowLabel: true,
-      tabBarActiveTintColor: accent,
-      tabBarInactiveTintColor: '#ABB2C9',
-      tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginBottom: 8 },
-      tabBarStyle: { position: 'absolute', height: 68 + Math.max(insets.bottom, 12), paddingBottom: Math.max(insets.bottom, 12), paddingTop: 9, backgroundColor: '#151C2E', borderTopColor: 'rgba(255,255,255,0.08)', elevation: 14 },
-      tabBarIcon: ({ color, size }) => <TabIcon route={route.name} color={color} size={size} />,
-    })}>
-      <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Inicio' }} />
-      <Tabs.Screen name="TTS" component={TtsScreen} options={{ title: 'Voz' }} />
-      <Tabs.Screen name="Music" component={MusicScreen} options={{ title: 'Música' }} />
-      <Tabs.Screen name="Interactions" component={InteractionsScreen} options={{ title: 'Automatiza' }} />
-      <Tabs.Screen name="More" component={MoreScreen} options={{ title: 'Ajustes' }} />
+    <Tabs.Navigator
+      tabBar={(props) => <BottomNavigation {...props} />}
+      screenOptions={{
+        headerShown: false,
+        tabBarHideOnKeyboard: true,
+      }}
+    >
+      <Tabs.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{ title: 'Inicio' }}
+      />
+      <Tabs.Screen
+        name="TTS"
+        component={TtsScreen}
+        options={{ title: 'Voz' }}
+      />
+      <Tabs.Screen
+        name="Music"
+        component={MusicScreen}
+        options={{ title: 'Música' }}
+      />
+      <Tabs.Screen
+        name="Interactions"
+        component={InteractionsScreen}
+        options={{ title: 'Automatiza' }}
+      />
+      <Tabs.Screen
+        name="More"
+        component={MoreScreen}
+        options={{ title: 'Ajustes' }}
+      />
     </Tabs.Navigator>
   );
 }
@@ -72,11 +88,22 @@ export function AppNavigator() {
 
   return (
     <NavigationContainer theme={makeNavTheme(accent)}>
-      <Stack.Navigator initialRouteName={initial} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#09070D' }, animation: 'slide_from_right' }}>
+      <Stack.Navigator
+        initialRouteName={initial}
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: '#0D1026' },
+          animation: 'slide_from_right',
+        }}
+      >
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Connect" component={ConnectScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
-        <Stack.Screen name="YouTubeBrowser" component={YouTubeBrowserScreen} options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen
+          name="YouTubeBrowser"
+          component={YouTubeBrowserScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
         <Stack.Screen name="RecentActivity" component={RecentActivityScreen} />
         <Stack.Screen name="Updates" component={UpdatesScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />

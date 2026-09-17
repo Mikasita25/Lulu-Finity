@@ -59,7 +59,7 @@ export function YouTubeBrowserScreen({ route }: any) {
               onPress={() => setPaused(!paused)}
               className={`flex-1 flex-row items-center justify-center gap-2 rounded-2xl px-3 py-3.5 ${currentSong ? 'bg-lulu-500/20' : 'bg-white/[0.03]'}`}
             >
-              {paused ? <Play size={17} color="#FF9DDA" fill="#FF9DDA" /> : <Pause size={17} color="#FF9DDA" />}
+              {paused ? <Play size={17} color="#F2B7FF" fill="#F2B7FF" /> : <Pause size={17} color="#F2B7FF" />}
               <Text className="text-xs font-black text-white">{paused ? 'Continuar' : 'Pausar'}</Text>
             </Pressable>
             <Pressable
@@ -67,7 +67,7 @@ export function YouTubeBrowserScreen({ route }: any) {
               onPress={skip}
               className={`flex-1 flex-row items-center justify-center gap-2 rounded-2xl px-3 py-3.5 ${queue.length ? 'bg-white/[0.07]' : 'bg-white/[0.03]'}`}
             >
-              <SkipForward size={17} color="#FF9DDA" />
+              <SkipForward size={17} color="#F2B7FF" />
               <Text className="text-xs font-black text-white">Siguiente</Text>
             </Pressable>
           </View>
