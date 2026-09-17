@@ -1,5 +1,6 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, type ComponentType } from 'react';
+import { Animated, Pressable, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AudioLines, House, Music2, Settings, Zap } from 'lucide-react-native';
@@ -13,6 +14,116 @@ const icons = {
   Interactions: Zap,
   More: Settings,
 };
+
+type IconComponent = ComponentType<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}>;
+
+function NavigationItem({
+  focused,
+  Icon,
+  label,
+  accessibilityLabel,
+  onPress,
+  onLongPress,
+}: {
+  focused: boolean;
+  Icon: IconComponent;
+  label: string;
+  accessibilityLabel?: string;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const progress = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: focused ? 1 : 0,
+      duration: focused ? 230 : 170,
+      useNativeDriver: true,
+    }).start();
+  }, [focused, progress]);
+
+  const iconScale = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.09],
+  });
+  const iconLift = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, -1],
+  });
+  const indicatorScale = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 1],
+  });
+
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={focused ? { selected: true } : {}}
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={({ pressed }) => ({
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.76 : 1,
+        transform: [{ scale: pressed ? 0.96 : 1 }],
+      })}
+    >
+      <Animated.View
+        style={{
+          alignItems: 'center',
+          transform: [{ translateY: iconLift }, { scale: iconScale }],
+        }}
+      >
+        <View className="h-10 w-12 items-center justify-center overflow-hidden rounded-2xl">
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              opacity: progress,
+            }}
+          >
+            <LinearGradient
+              colors={['rgba(214,133,255,0.27)', 'rgba(167,98,255,0.08)']}
+              style={{ flex: 1 }}
+            />
+          </Animated.View>
+          <Icon
+            size={21}
+            color={focused ? '#F2B7FF' : '#999AB9'}
+            strokeWidth={focused ? 2.5 : 2.1}
+          />
+        </View>
+        <Text
+          style={{ color: focused ? '#F2B7FF' : '#999AB9' }}
+          className="mt-0.5 text-[9px] font-extrabold"
+        >
+          {label}
+        </Text>
+        <Animated.View
+          style={{
+            marginTop: 4,
+            width: 20,
+            height: 4,
+            borderRadius: 999,
+            backgroundColor: palette.pink,
+            opacity: progress,
+            transform: [{ scaleX: indicatorScale }],
+          }}
+        />
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export function BottomNavigation({
   state,
@@ -66,10 +177,11 @@ export function BottomNavigation({
                   navigation.navigate(route.name, route.params);
               };
               return (
-                <Pressable
+                <NavigationItem
                   key={route.key}
-                  accessibilityRole="tab"
-                  accessibilityState={focused ? { selected: true } : {}}
+                  focused={focused}
+                  Icon={Icon}
+                  label={String(label)}
                   accessibilityLabel={
                     descriptor?.options.tabBarAccessibilityLabel
                   }
@@ -77,50 +189,7 @@ export function BottomNavigation({
                   onLongPress={() =>
                     navigation.emit({ type: 'tabLongPress', target: route.key })
                   }
-                  className="flex-1 items-center justify-center"
-                >
-                  <View className="h-10 w-12 items-center justify-center overflow-hidden rounded-2xl">
-                    {focused ? (
-                      <LinearGradient
-                        colors={[
-                          'rgba(214,133,255,0.27)',
-                          'rgba(167,98,255,0.08)',
-                        ]}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          right: 0,
-                          bottom: 0,
-                          left: 0,
-                        }}
-                      />
-                    ) : null}
-                    <Icon
-                      size={21}
-                      color={focused ? '#F2B7FF' : '#999AB9'}
-                      strokeWidth={focused ? 2.5 : 2.1}
-                    />
-                  </View>
-                  <Text
-                    style={{ color: focused ? '#F2B7FF' : '#999AB9' }}
-                    className="mt-0.5 text-[9px] font-extrabold"
-                  >
-                    {String(label)}
-                  </Text>
-                  {focused ? (
-                    <View
-                      style={{
-                        backgroundColor: palette.pink,
-                        shadowColor: palette.pink,
-                        shadowOpacity: 0.8,
-                        shadowRadius: 5,
-                      }}
-                      className="mt-1 h-1 w-5 rounded-full"
-                    />
-                  ) : (
-                    <View className="mt-1 h-1" />
-                  )}
-                </Pressable>
+                />
               );
             })}
           </View>

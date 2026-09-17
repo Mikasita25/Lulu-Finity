@@ -96,6 +96,9 @@ assert.match(navigator, /title: 'Voz'/);
 assert.match(navigator, /title: 'Música'/);
 assert.match(navigator, /title: 'Automatiza'/);
 assert.match(navigator, /title: 'Ajustes'/);
+assert.match(navigator, /animation: 'shift'/);
+assert.match(navigator, /duration: 220/);
+assert.match(navigator, /animationDuration: 240/);
 assert.doesNotMatch(
   navigator,
   /name="LiveView"|name="Goals"|name="Leaderboard"|title: 'Ranking'/,
@@ -316,6 +319,10 @@ assert.match(designSystem, /luluGradients/);
 assert.match(designSystem, /accessibilityRole="switch"/);
 assert.match(designSystem, /PanResponder/);
 assert.match(designSystem, /BlurView/);
+const bottomNavigation = read('src/components/BottomNavigation.tsx');
+assert.match(bottomNavigation, /Animated\.timing/);
+assert.match(bottomNavigation, /useNativeDriver: true/);
+assert.match(bottomNavigation, /scaleX: indicatorScale/);
 const slider = read('src/components/LuluSlider.tsx');
 assert.match(slider, /pendingValue/);
 assert.match(slider, /onPanResponderRelease: finishSliding/);

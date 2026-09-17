@@ -49,6 +49,11 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
+        animation: 'shift',
+        transitionSpec: {
+          animation: 'timing',
+          config: { duration: 220 },
+        },
       }}
     >
       <Tabs.Screen
@@ -94,6 +99,8 @@ export function AppNavigator() {
           headerShown: false,
           contentStyle: { backgroundColor: '#0D1026' },
           animation: 'slide_from_right',
+          animationDuration: 240,
+          gestureEnabled: true,
         }}
       >
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
