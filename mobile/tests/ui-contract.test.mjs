@@ -316,6 +316,16 @@ assert.match(designSystem, /luluGradients/);
 assert.match(designSystem, /accessibilityRole="switch"/);
 assert.match(designSystem, /PanResponder/);
 assert.match(designSystem, /BlurView/);
+const slider = read('src/components/LuluSlider.tsx');
+assert.match(slider, /pendingValue/);
+assert.match(slider, /onPanResponderRelease: finishSliding/);
+assert.match(slider, /onPanResponderTerminationRequest: \(\) => false/);
+assert.match(slider, /width: Math\.max\(0, ratio \* width\)/);
+assert.doesNotMatch(
+  slider,
+  /onPanResponderMove:[\s\S]{0,100}onValueChange/,
+  'El slider no debe redibujar toda la pantalla durante cada movimiento.',
+);
 assert.match(read('src/navigation/AppNavigator.tsx'), /BottomNavigation/);
 assert.match(read('src/screens/TtsScreen.tsx'), /LuluSlider/);
 assert.match(read('src/screens/InteractionsScreen.tsx'), /AutomationCard/);

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PanResponder, Pressable, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Minus, Plus } from 'lucide-react-native';
@@ -32,9 +32,11 @@ export function LuluSlider({
   increaseLabel?: string;
 }) {
   const [width, setWidth] = useState(1);
+  const [previewValue, setPreviewValue] = useState(value);
+  const dragging = useRef(false);
+  const pendingValue = useRef(value);
   const latest = useRef({
     width,
-    value,
     onValueChange,
     disabled,
     minimumValue,
@@ -43,13 +45,17 @@ export function LuluSlider({
   });
   latest.current = {
     width,
-    value,
     onValueChange,
     disabled,
     minimumValue,
     maximumValue,
     step,
   };
+  useEffect(() => {
+    pendingValue.current = value;
+    if (!dragging.current) setPreviewValue(value);
+  }, [value]);
+
   const snap = (raw: number) =>
     clamp(Math.round(raw / step) * step, minimumValue, maximumValue);
   const fromX = (x: number) => {
@@ -63,30 +69,51 @@ export function LuluSlider({
       state.maximumValue,
     );
   };
+  const previewFromX = (x: number) => {
+    const next = fromX(x);
+    pendingValue.current = next;
+    setPreviewValue((current) => (current === next ? current : next));
+  };
+  const finishSliding = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    const next = pendingValue.current;
+    setPreviewValue(next);
+    latest.current.onValueChange(next);
+  };
   const responder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => !latest.current.disabled,
       onMoveShouldSetPanResponder: () => !latest.current.disabled,
-      onPanResponderGrant: (event) =>
-        latest.current.onValueChange(fromX(event.nativeEvent.locationX)),
-      onPanResponderMove: (event) =>
-        latest.current.onValueChange(fromX(event.nativeEvent.locationX)),
+      onPanResponderGrant: (event) => {
+        dragging.current = true;
+        previewFromX(event.nativeEvent.locationX);
+      },
+      onPanResponderMove: (event) => previewFromX(event.nativeEvent.locationX),
+      onPanResponderRelease: finishSliding,
+      onPanResponderTerminate: finishSliding,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
     }),
   ).current;
   const ratio = clamp(
-    (value - minimumValue) / (maximumValue - minimumValue || 1),
+    (previewValue - minimumValue) / (maximumValue - minimumValue || 1),
     0,
     1,
   );
-  const change = (direction: number) =>
-    onValueChange(snap(value + direction * step));
+  const change = (direction: number) => {
+    const next = snap(previewValue + direction * step);
+    pendingValue.current = next;
+    setPreviewValue(next);
+    onValueChange(next);
+  };
   return (
     <View className={disabled ? 'opacity-45' : ''}>
       {label ? (
         <View className="mb-3 flex-row items-center justify-between">
           <Text className="text-xs font-extrabold text-white/75">{label}</Text>
           <Text className="text-xs font-black text-lulu-200">
-            {formatValue(value)}
+            {formatValue(previewValue)}
           </Text>
         </View>
       ) : null}
@@ -100,21 +127,27 @@ export function LuluSlider({
           <Minus size={15} color={palette.text} />
         </Pressable>
         <View
+          accessibilityRole="adjustable"
+          accessibilityLabel={label || 'Control deslizante'}
+          accessibilityValue={{
+            min: minimumValue,
+            max: maximumValue,
+            now: previewValue,
+            text: formatValue(previewValue),
+          }}
           onLayout={(event) =>
             setWidth(Math.max(1, event.nativeEvent.layout.width))
           }
           {...responder.panHandlers}
-          className="h-9 flex-1 justify-center"
+          className="h-11 flex-1 justify-center"
         >
           <View className="h-2.5 overflow-hidden rounded-full border border-white/[0.06] bg-[#0C1027]">
-            <LinearGradient
-              colors={luluGradients.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+            <View
               style={{
-                width: `${ratio * 100}%`,
+                width: Math.max(0, ratio * width),
                 height: '100%',
                 borderRadius: 999,
+                backgroundColor: palette.violet,
               }}
             />
           </View>
@@ -122,19 +155,24 @@ export function LuluSlider({
             pointerEvents="none"
             style={{
               position: 'absolute',
-              left: Math.max(0, ratio * (width - 18)),
-              width: 18,
-              height: 18,
-              borderRadius: 9,
-              backgroundColor: palette.text,
-              borderWidth: 3,
-              borderColor: palette.pink,
-              shadowColor: palette.pink,
-              shadowOpacity: 0.45,
-              shadowRadius: 6,
-              elevation: 4,
+              left: Math.max(0, ratio * (width - 24)),
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              padding: 4,
+              backgroundColor: 'rgba(214,133,255,0.22)',
             }}
-          />
+          >
+            <LinearGradient
+              colors={luluGradients.primary}
+              style={{
+                flex: 1,
+                borderRadius: 8,
+                borderWidth: 2,
+                borderColor: palette.text,
+              }}
+            />
+          </View>
         </View>
         <Pressable
           accessibilityLabel={increaseLabel || `Subir ${label || 'valor'}`}
