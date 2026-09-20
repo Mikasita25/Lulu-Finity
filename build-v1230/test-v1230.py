@@ -61,6 +61,11 @@ for token in (
     "comentario atrasado",
     "sourceTimestamp:Number(message.timestamp || Date.now())",
     "originAt = Number(item.sourceTimestamp || item.queuedAt || 0)",
+    "readCommentIds: new Map()",
+    "function markCommentAsRead(messageId)",
+    "function wasCommentAlreadyRead(messageId)",
+    "function isCommentAlreadyQueued(messageId)",
+    "if (success) markCommentAsRead(queueId)",
 ):
     require(token in renderer, f"falta comportamiento del catálogo: {token}")
 
@@ -87,4 +92,4 @@ for token in (".tiktok-gift-catalog,.detected-gifts-wrap{", ".tiktok-gift-catalo
 changelog = read("CHANGELOG.md")
 require("## 1.2.3" in changelog, "falta changelog 1.2.3")
 
-print("Lulu Finity 1.2.3 validada: catálogo TikTok, avance musical y frescura del chat LIVE")
+print("Lulu Finity 1.2.3 validada: catálogo TikTok, avance musical y registro real de comentarios leídos")
