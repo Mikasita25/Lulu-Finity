@@ -349,9 +349,7 @@ renderer = replace_once(
 renderer = replace_once(
     renderer,
     "const RELEASE_NOTES = Object.freeze({\n  '1.2.2': Object.freeze([",
-    "const RELEASE_NOTES = Object.freeze({\n  '1.2.3': Object.freeze([\n    Object.freeze({icon:'🎁',title:'Catálogo de regalos',text:'Busca regalos de TikTok sin esperar a que alguien los envíe durante el LIVE.'}),\n    Object.freeze({icon:'⌕',title:'México y Global',text:'Filtra el catálogo actual de México o consulta todos los nombres rastreados globalmente.'}),\n    Object.freeze({icon:'↻',title:'Aprende del LIVE',text:'Los regalos recibidos muestran el nombre e ID reales y se pueden usar con un clic.'}),
-    Object.freeze({icon:'⏭',title:'Avance de música reparado',text:'Evita que señales tardías del reproductor repitan o salten otra canción al avanzar.'}),
-    Object.freeze({icon:'⚡',title:'TTS al día',text:'Descarta comentarios repetidos o atrasados después de una reconexión antes de leerlos.'})\n  ]),\n  '1.2.2': Object.freeze([",
+    "const RELEASE_NOTES = Object.freeze({\n  '1.2.3': Object.freeze([\n    Object.freeze({icon:'🎁',title:'Catálogo de regalos',text:'Busca regalos de TikTok sin esperar a que alguien los envíe durante el LIVE.'}),\n    Object.freeze({icon:'⌕',title:'México y Global',text:'Filtra el catálogo actual de México o consulta todos los nombres rastreados globalmente.'}),\n    Object.freeze({icon:'↻',title:'Aprende del LIVE',text:'Los regalos recibidos muestran el nombre e ID reales y se pueden usar con un clic.'}),\n    Object.freeze({icon:'⏭',title:'Avance de música reparado',text:'Evita que señales tardías del reproductor repitan o salten otra canción al avanzar.'}),\n    Object.freeze({icon:'⚡',title:'TTS al día',text:'Descarta comentarios repetidos o atrasados después de una reconexión antes de leerlos.'})\n  ]),\n  '1.2.2': Object.freeze([",
     "notas de 1.2.3",
 )
 
