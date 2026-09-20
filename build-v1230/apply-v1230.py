@@ -146,6 +146,63 @@ main = replace_once(
     "ipcMain.handle('sounds:list-default', async () => defaultSoundCatalog(packagedDefaultSoundsDirectory()));\nipcMain.handle('tiktok-gifts:catalog', async (_event, options = {}) => getTikTokGiftCatalog(options));",
     "IPC del catálogo TikTok",
 )
+
+live_chat_guard = r'''const recentLiveChatIds = new Map();
+
+function liveEventSourceTimestamp(data = {}) {
+  const now = Date.now();
+  const candidates = [
+    data?.timestamp,
+    data?.createTime,
+    data?.create_time,
+    data?.eventTime,
+    data?.event_time,
+    data?.common?.createTime,
+    data?.common?.create_time,
+    data?.common?.eventTime
+  ];
+  for (const value of candidates) {
+    let timestamp = Number(value);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) continue;
+    if (timestamp < 10_000_000_000) timestamp *= 1000;
+    if (timestamp < 946684800000 || timestamp > now + 300000) continue;
+    return Math.round(timestamp);
+  }
+  return 0;
+}
+
+function acceptFreshLiveChat(messageId, sourceTimestamp = 0) {
+  const now = Date.now();
+  for (const [id, seenAt] of recentLiveChatIds) {
+    if (now - seenAt > 120000) recentLiveChatIds.delete(id);
+  }
+  const key = String(messageId || '');
+  if (key && recentLiveChatIds.has(key)) return false;
+  if (key) recentLiveChatIds.set(key, now);
+  if (sourceTimestamp && now - sourceTimestamp > 30000) return false;
+  return true;
+}
+
+'''
+main = replace_once(
+    main,
+    "function attachLiveEvents(connection, connectionNonce) {",
+    live_chat_guard + "function attachLiveEvents(connection, connectionNonce) {",
+    "guardia de frescura del chat LIVE",
+)
+main = replace_once(
+    main,
+    "    void recordRankingMetric('comments', data, 1, `chat:${messageId}`);\n    send('live:chat', {",
+    "    const sourceTimestamp = liveEventSourceTimestamp(data);\n    if (!acceptFreshLiveChat(messageId, sourceTimestamp)) return;\n    void recordRankingMetric('comments', data, 1, `chat:${messageId}`);\n    send('live:chat', {",
+    "filtro de chat repetido o atrasado",
+)
+main = replace_once(
+    main,
+    "      badges: badges.slice(0, 8),\n      timestamp: Date.now()\n    });",
+    "      badges: badges.slice(0, 8),\n      timestamp: sourceTimestamp || Date.now(),\n      receivedAt: Date.now()\n    });",
+    "timestamp original del chat",
+)
+
 write("src/main.js", main)
 
 preload = read("src/preload.js")
@@ -292,9 +349,120 @@ renderer = replace_once(
 renderer = replace_once(
     renderer,
     "const RELEASE_NOTES = Object.freeze({\n  '1.2.2': Object.freeze([",
-    "const RELEASE_NOTES = Object.freeze({\n  '1.2.3': Object.freeze([\n    Object.freeze({icon:'🎁',title:'Catálogo de regalos',text:'Busca regalos de TikTok sin esperar a que alguien los envíe durante el LIVE.'}),\n    Object.freeze({icon:'⌕',title:'México y Global',text:'Filtra el catálogo actual de México o consulta todos los nombres rastreados globalmente.'}),\n    Object.freeze({icon:'↻',title:'Aprende del LIVE',text:'Los regalos recibidos muestran el nombre e ID reales y se pueden usar con un clic.'})\n  ]),\n  '1.2.2': Object.freeze([",
+    "const RELEASE_NOTES = Object.freeze({\n  '1.2.3': Object.freeze([\n    Object.freeze({icon:'🎁',title:'Catálogo de regalos',text:'Busca regalos de TikTok sin esperar a que alguien los envíe durante el LIVE.'}),\n    Object.freeze({icon:'⌕',title:'México y Global',text:'Filtra el catálogo actual de México o consulta todos los nombres rastreados globalmente.'}),\n    Object.freeze({icon:'↻',title:'Aprende del LIVE',text:'Los regalos recibidos muestran el nombre e ID reales y se pueden usar con un clic.'}),
+    Object.freeze({icon:'⏭',title:'Avance de música reparado',text:'Evita que señales tardías del reproductor repitan o salten otra canción al avanzar.'}),
+    Object.freeze({icon:'⚡',title:'TTS al día',text:'Descarta comentarios repetidos o atrasados después de una reconexión antes de leerlos.'})\n  ]),\n  '1.2.2': Object.freeze([",
     "notas de 1.2.3",
 )
+
+renderer = replace_once(
+    renderer,
+    "  handlingExternalYoutubeSkip: false,",
+    "  handlingExternalYoutubeSkip: false,\n  youtubeAdvanceGuardUntil: 0,\n  spotifyAdvanceGuardUntil: 0,",
+    "guardias de avance musical",
+)
+renderer = replace_once(
+    renderer,
+    ".some((song) => songIdentity(song.videoUrl || song.resolving ? `Buscando: ${song.query}` : (song.selectedTitle || song.query)) === identity);",
+    ".some((song) => songIdentity(song.videoUrl || (song.resolving ? `Buscando: ${song.query}` : (song.selectedTitle || song.query))) === identity);",
+    "identidad correcta de canciones duplicadas",
+)
+renderer = replace_once(
+    renderer,
+    """async function skipCurrentSong() {
+  if (!state.currentSong) return;
+  state.currentSong = null;
+  state.youtubeTransitioning = false;
+  state.player = { ...state.player, currentTime: 0, duration: 0, paused: true, title: '' };
+  if (state.songQueue.length) playNextSong();
+  else if (state.settings.continueRecommended !== false) await continueWithRecommendation();
+  else { renderPlayer(); renderSongs(); }
+}""",
+    """async function skipCurrentSong() {
+  if (!state.currentSong) return;
+  await finishCurrentSong('skipped');
+}""",
+    "ruta única para avanzar canción",
+)
+renderer = replace_once(
+    renderer,
+    "async function finishCurrentSong(reason = 'ended') {\n  const finished = state.currentSong;",
+    "async function finishCurrentSong(reason = 'ended') {\n  if (!state.currentSong) return;\n  if (reason === 'skipped') state.youtubeAdvanceGuardUntil = Date.now() + 2500;\n  const finished = state.currentSong;",
+    "guardia al avanzar YouTube",
+)
+renderer = replace_once(
+    renderer,
+    "function finishSpotify(reason='ended'){const finished=state.currentSpotify;",
+    "function finishSpotify(reason='ended'){if(!state.currentSpotify)return;if(reason==='skipped')state.spotifyAdvanceGuardUntil=Date.now()+2500;const finished=state.currentSpotify;",
+    "guardia al avanzar Spotify",
+)
+renderer = replace_once(
+    renderer,
+    "  api.onSpotifyEnded(()=>{if(state.currentSpotify)finishSpotify('ended');else if(state.settings.spotifyContinueRecommended!==false) renderSpotify();});",
+    "  api.onSpotifyEnded(()=>{if(Date.now()<state.spotifyAdvanceGuardUntil)return;if(state.currentSpotify)finishSpotify('ended');else if(state.settings.spotifyContinueRecommended!==false) renderSpotify();});",
+    "fin atrasado de Spotify",
+)
+renderer = replace_once(
+    renderer,
+    "  api.onSpotifyUnavailable(async (payload)=>{\n    const query=state.currentSpotify?.query||'';",
+    "  api.onSpotifyUnavailable(async (payload)=>{\n    if(Date.now()<state.spotifyAdvanceGuardUntil)return;\n    const query=state.currentSpotify?.query||'';",
+    "unavailable atrasado de Spotify",
+)
+renderer = replace_once(
+    renderer,
+    "  api.onYouTubeSelected((payload) => {\n    if (!state.currentSong) return;",
+    "  api.onYouTubeSelected((payload) => {\n    if (!state.currentSong) return;\n    if (Date.now() < state.youtubeAdvanceGuardUntil) {\n      const expectedVideo = youtubeVideoId(state.currentSong?.videoUrl || '');\n      const selectedVideo = youtubeVideoId(payload?.url || '');\n      if (expectedVideo && selectedVideo && expectedVideo !== selectedVideo) return;\n    }",
+    "selección atrasada de YouTube",
+)
+renderer = replace_once(
+    renderer,
+    "  api.onYouTubePlayer((payload) => {\n    const expectedVideo = youtubeVideoId(state.currentSong?.videoUrl || '');",
+    "  api.onYouTubePlayer((payload) => {\n    if (Date.now() < state.youtubeAdvanceGuardUntil) {\n      const guardedExpected = youtubeVideoId(state.currentSong?.videoUrl || '');\n      const guardedActual = youtubeVideoId(payload?.url || '');\n      if (!guardedActual || (guardedExpected && guardedExpected !== guardedActual)) return;\n    }\n    const expectedVideo = youtubeVideoId(state.currentSong?.videoUrl || '');",
+    "telemetría atrasada de YouTube",
+)
+renderer = replace_once(
+    renderer,
+    "  api.onYouTubeEnded(() => finishCurrentSong('ended'));",
+    "  api.onYouTubeEnded(() => { if (Date.now() < state.youtubeAdvanceGuardUntil) return; finishCurrentSong('ended'); });",
+    "ended atrasado de YouTube",
+)
+renderer = replace_once(
+    renderer,
+    "  api.onYouTubeUnavailable((payload) => {\n    toast('Canción omitida', payload?.message || 'No se encontró un video reproducible.', 'error');",
+    "  api.onYouTubeUnavailable((payload) => {\n    if (Date.now() < state.youtubeAdvanceGuardUntil) return;\n    toast('Canción omitida', payload?.message || 'No se encontró un video reproducible.', 'error');",
+    "unavailable atrasado de YouTube",
+)
+renderer = replace_once(
+    renderer,
+    "    timestamp: message.timestamp || Date.now()\n  };\n  addComment(normalizedMessage, 'received');",
+    """    timestamp: message.timestamp || Date.now(),
+    receivedAt: message.receivedAt || Date.now()
+  };
+  if (!simulated) {
+    const sourceTimestamp = Number(normalizedMessage.timestamp || 0);
+    const maxDelayMs = clamp(state.settings.maxCommentDelaySeconds || 8, 3, 30) * 1000;
+    if (sourceTimestamp > 0 && Date.now() - sourceTimestamp > maxDelayMs) {
+      addComment(normalizedMessage, 'skipped');
+      updateCommentResult(normalizedMessage.id, 'skipped', 'comentario atrasado');
+      return;
+    }
+  }
+  addComment(normalizedMessage, 'received');""",
+    "rechazo temprano de comentarios atrasados",
+)
+renderer = replace_once(
+    renderer,
+    "const item = { id:message.id, text:makeSpeechText(message), voice:voiceForMessage(message), audioLockKey:lockKey, priority, queuedAt:Date.now(), preparedPromise:null, speedMultiplier:1 };",
+    "const item = { id:message.id, text:makeSpeechText(message), voice:voiceForMessage(message), audioLockKey:lockKey, priority, queuedAt:Date.now(), sourceTimestamp:Number(message.timestamp || Date.now()), preparedPromise:null, speedMultiplier:1 };",
+    "timestamp original en la cola TTS",
+)
+renderer = replace_once(
+    renderer,
+    "  const maxAge = clamp(state.settings.maxCommentDelaySeconds || 8, 3, 30) * 1000;\n  return Date.now() - item.queuedAt > maxAge;",
+    "  const maxAge = clamp(state.settings.maxCommentDelaySeconds || 8, 3, 30) * 1000;\n  const originAt = Number(item.sourceTimestamp || item.queuedAt || 0);\n  return originAt > 0 && Date.now() - originAt > maxAge;",
+    "edad total del comentario en TTS",
+)
+
 write("src/renderer.js", renderer)
 
 index = read("src/index.html")
@@ -327,6 +495,8 @@ if "## 1.2.3" not in changelog:
 - Evita cargar miles de tarjetas a la vez: mantiene el catálogo completo en memoria y limita el render visible para conservar fluidez.
 - Registra regalos reales recibidos durante el LIVE con `giftName` y `giftId`, y permite usarlos con un clic.
 - Si el catálogo en línea no responde, usa la última copia guardada; en una instalación nueva sin caché, muestra una lista básica de respaldo.
+- Corrige el avance de YouTube y Spotify para ignorar eventos tardíos del reproductor anterior y evita duplicados por identidad de video.
+- Conserva la hora original de los comentarios del LIVE, deduplica IDs recientes y descarta mensajes vencidos antes de TTS, comandos y automatizaciones.
 
 """ + changelog
 write("CHANGELOG.md", changelog)
