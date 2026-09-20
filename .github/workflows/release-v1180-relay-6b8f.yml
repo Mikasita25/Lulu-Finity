@@ -1,0 +1,182 @@
+name: Lulu Finity 1.1.8 - actualización oficial relay 6b8f
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/lulu-finity-update-1.1.8
+    paths:
+      - ".github/workflows/release-v1180-relay-6b8f.yml"
+
+permissions:
+  contents: write
+
+env:
+  BASE_URL: https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.1.1/Lulu-Finity-Source-1.1.1.zip
+  BASE_SHA256: 8c66a6af88bc2cd4b91631eb8369014dc8e4b3877eeca38ced844ea1813d3f61
+  CLOUDFLARED_VERSION: 2026.8.2
+  CLOUDFLARED_SHA256: c29eee2b121f5436a642eed69fd9767da7e7b8c510fa50aaa130337f931357b5
+  RELAY_HOST: lulu-finity-production-6b8f.up.railway.app
+  VERSION: 1.1.8
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruir Lulu Finity 1.1.7 y preparar 1.1.8
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri $env:BASE_URL -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw "Fuente base incorrecta" }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1170/apply-v1170.py app
+          python build-v1170/test-v1170.py app
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('app/package.json','utf8'));p.version=process.env.VERSION;fs.writeFileSync('app/package.json',JSON.stringify(p,null,2)+'\n');const l=JSON.parse(fs.readFileSync('app/package-lock.json','utf8'));l.version=process.env.VERSION;if(l.packages&&l.packages[''])l.packages[''].version=process.env.VERSION;fs.writeFileSync('app/package-lock.json',JSON.stringify(l,null,2)+'\n');"
+          $main = Get-Content "app/src/main.js" -Raw
+          if (!$main.Contains($env:RELAY_HOST)) { throw "La app no contiene el relay 6b8f" }
+          if ($main.Contains("lulu-finity-production.up.railway.app")) { throw "La app conserva el relay anterior" }
+          if ((Get-Content "app/package.json" -Raw | ConvertFrom-Json).version -ne $env:VERSION) { throw "No se aplicó la versión 1.1.8" }
+
+      - name: Preparar Cloudflared verificado
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory "app/resources/tools" -Force | Out-Null
+          $binary = "app/resources/tools/cloudflared.exe"
+          Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/download/$env:CLOUDFLARED_VERSION/cloudflared-windows-amd64.exe" -OutFile $binary
+          if ((Get-FileHash $binary -Algorithm SHA256).Hash.ToLower() -ne $env:CLOUDFLARED_SHA256) { throw "Cloudflared no coincide con el SHA-256 oficial" }
+
+      - name: Crear fuente reproducible sin secretos
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory "source-v1180" -Force | Out-Null
+          foreach ($file in @("package.json","package-lock.json","NOTICE.md","README.md","CHANGELOG.md",".gitignore")) {
+            if (Test-Path "app/$file") { Copy-Item "app/$file" "source-v1180/$file" -Force }
+          }
+          foreach ($folder in @("src","resources","build","railway-relay")) {
+            if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v1180/$folder" -Recurse -Force }
+          }
+          Compress-Archive -Path "source-v1180/*" -DestinationPath "Lulu-Finity-Source-1.1.8.zip" -Force
+
+      - name: Inyectar credencial oficial del relay
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw "Falta LULU_RELAY_CLIENT_TOKEN" }
+          $path = "app/src/main.js"
+          $content = Get-Content $path -Raw
+          if (!$content.Contains("__LULU_RELAY_CLIENT_TOKEN__")) { throw "Falta el marcador privado" }
+          [IO.File]::WriteAllText($path, $content.Replace("__LULU_RELAY_CLIENT_TOKEN__", $env:LULU_RELAY_CLIENT_TOKEN), [Text.UTF8Encoding]::new($false))
+
+      - name: Probar y compilar actualización de Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build:win -- --publish never
+
+      - name: Probar arranque real
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $profile = Join-Path $env:RUNNER_TEMP "lulu-v118-profile"
+          $startupMarker = Join-Path $env:RUNNER_TEMP "lulu-v118-startup.txt"
+          $navigationMarker = Join-Path $env:RUNNER_TEMP "lulu-v118-navigation.json"
+          New-Item -ItemType Directory -Path $profile -Force | Out-Null
+          Remove-Item $startupMarker,$navigationMarker -Force -ErrorAction SilentlyContinue
+          $env:LULU_STARTUP_SMOKE_MARKER = $startupMarker
+          $env:LULU_NAVIGATION_SMOKE_MARKER = $navigationMarker
+          $executable = Resolve-Path "app/dist/win-unpacked/Lulu Finity.exe"
+          $process = Start-Process -FilePath $executable -ArgumentList "--user-data-dir=$profile" -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 90; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+              if ($process.HasExited) { throw "Lulu Finity se cerró durante el arranque con código $($process.ExitCode)" }
+              if ((Test-Path $startupMarker) -and (Test-Path $navigationMarker)) { $ready = $true; break }
+            }
+            if (!$ready) { throw "La interfaz no confirmó el arranque completo" }
+            if ((Get-Content $startupMarker -Raw).Trim() -ne "ready") { throw "La marca de arranque es inválida" }
+            $navigation = Get-Content $navigationMarker -Raw | ConvertFrom-Json
+            if (!$navigation.ok) { throw "Una o más categorías no cargaron" }
+            if (@($navigation.results).Count -lt 12) { throw "La prueba recorrió menos categorías de las esperadas" }
+          }
+          finally {
+            Remove-Item Env:LULU_STARTUP_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Stop-Process -Name "Lulu Finity" -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Verificar archivos de actualización
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $installer = "app/dist/Lulu-Finity-Setup-1.1.8.exe"
+          $zip = "app/dist/Lulu-Finity-1.1.8-x64.zip"
+          $latest = "app/dist/latest.yml"
+          $blockmap = "app/dist/Lulu-Finity-Setup-1.1.8.exe.blockmap"
+          $source = "Lulu-Finity-Source-1.1.8.zip"
+          foreach ($file in @($installer,$zip,$latest,$blockmap,$source)) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          $latestText = Get-Content $latest -Raw
+          if (!$latestText.Contains("version: 1.1.8") -or !$latestText.Contains("Lulu-Finity-Setup-1.1.8.exe")) { throw "latest.yml no apunta a 1.1.8" }
+          Expand-Archive $zip -DestinationPath verify-v118 -Force
+          $asar = Get-ChildItem verify-v118 -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw "Falta app.asar" }
+          $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          if (!$text.Contains($env:RELAY_HOST)) { throw "El ejecutable no contiene el relay 6b8f" }
+          if ($text.Contains("lulu-finity-production.up.railway.app")) { throw "El ejecutable conserva el relay anterior" }
+          if ($text.Contains("__LULU_RELAY_CLIENT_TOKEN__") -or !$text.Contains($env:LULU_RELAY_CLIENT_TOKEN)) { throw "La credencial oficial no fue integrada" }
+
+      - name: Publicar Lulu Finity 1.1.8
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = @(
+            "app/dist/Lulu-Finity-Setup-1.1.8.exe",
+            "app/dist/Lulu-Finity-1.1.8-x64.zip",
+            "app/dist/latest.yml",
+            "app/dist/Lulu-Finity-Setup-1.1.8.exe.blockmap",
+            "Lulu-Finity-Source-1.1.8.zip"
+          )
+          @'
+          ## Lulu Finity 1.1.8
+
+          - Cambia la conexión oficial al nuevo servidor Railway `lulu-finity-production-6b8f.up.railway.app`.
+          - Conserva todas las funciones y ajustes de Lulu Finity 1.1.7.
+          - Incluye instalador, versión portátil, metadatos de actualización y código fuente verificable.
+          '@ | Set-Content "release-notes-v118.md" -Encoding utf8
+          gh release view v1.1.8 *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload v1.1.8 $files --clobber
+            gh release edit v1.1.8 --title "Lulu Finity 1.1.8" --notes-file "release-notes-v118.md" --latest
+          }
+          else {
+            gh release create v1.1.8 $files --target $env:GITHUB_SHA --title "Lulu Finity 1.1.8" --notes-file "release-notes-v118.md" --latest
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v1.1.8
+          path: |
+            app/dist/Lulu-Finity-Setup-1.1.8.exe
+            app/dist/Lulu-Finity-1.1.8-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-1.1.8.exe.blockmap
+            Lulu-Finity-Source-1.1.8.zip
+          if-no-files-found: error
+          retention-days: 30
