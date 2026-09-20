@@ -349,15 +349,15 @@ renderer = replace_once(
 renderer = replace_once(
     renderer,
     "const RELEASE_NOTES = Object.freeze({\n  '1.2.2': Object.freeze([",
-    "const RELEASE_NOTES = Object.freeze({\n  '1.2.3': Object.freeze([\n    Object.freeze({icon:'🎁',title:'Catálogo de regalos',text:'Busca regalos de TikTok sin esperar a que alguien los envíe durante el LIVE.'}),\n    Object.freeze({icon:'⌕',title:'México y Global',text:'Filtra el catálogo actual de México o consulta todos los nombres rastreados globalmente.'}),\n    Object.freeze({icon:'↻',title:'Aprende del LIVE',text:'Los regalos recibidos muestran el nombre e ID reales y se pueden usar con un clic.'}),\n    Object.freeze({icon:'⏭',title:'Avance de música reparado',text:'Evita que señales tardías del reproductor repitan o salten otra canción al avanzar.'}),\n    Object.freeze({icon:'⚡',title:'TTS al día',text:'Descarta comentarios repetidos o atrasados después de una reconexión antes de leerlos.'})\n  ]),\n  '1.2.2': Object.freeze([",
+    "const RELEASE_NOTES = Object.freeze({\n  '1.2.3': Object.freeze([\n    Object.freeze({icon:'🎁',title:'Catálogo de regalos',text:'Busca regalos de TikTok sin esperar a que alguien los envíe durante el LIVE.'}),\n    Object.freeze({icon:'⌕',title:'México y Global',text:'Filtra el catálogo actual de México o consulta todos los nombres rastreados globalmente.'}),\n    Object.freeze({icon:'↻',title:'Aprende del LIVE',text:'Los regalos recibidos muestran el nombre e ID reales y se pueden usar con un clic.'}),\n    Object.freeze({icon:'⏭',title:'Avance de música reparado',text:'Evita que señales tardías del reproductor repitan o salten otra canción al avanzar.'}),\n    Object.freeze({icon:'⚡',title:'TTS al día',text:'Marca internamente cada comentario como leído solo cuando el audio termina; si TikTok vuelve a mandar ese ID, Lulu no lo lee otra vez.'})\n  ]),\n  '1.2.2': Object.freeze([",
     "notas de 1.2.3",
 )
 
 renderer = replace_once(
     renderer,
     "  handlingExternalYoutubeSkip: false,",
-    "  handlingExternalYoutubeSkip: false,\n  youtubeAdvanceGuardUntil: 0,\n  spotifyAdvanceGuardUntil: 0,",
-    "guardias de avance musical",
+    "  handlingExternalYoutubeSkip: false,\n  youtubeAdvanceGuardUntil: 0,\n  spotifyAdvanceGuardUntil: 0,\n  readCommentIds: new Map(),",
+    "guardias de avance musical y registro de comentarios leídos",
 )
 renderer = replace_once(
     renderer,
@@ -437,6 +437,8 @@ renderer = replace_once(
     receivedAt: message.receivedAt || Date.now()
   };
   if (!simulated) {
+    if (wasCommentAlreadyRead(normalizedMessage.id)) return;
+    if (isCommentAlreadyQueued(normalizedMessage.id)) return;
     const sourceTimestamp = Number(normalizedMessage.timestamp || 0);
     const maxDelayMs = clamp(state.settings.maxCommentDelaySeconds || 8, 3, 30) * 1000;
     if (sourceTimestamp > 0 && Date.now() - sourceTimestamp > maxDelayMs) {
@@ -448,12 +450,61 @@ renderer = replace_once(
   addComment(normalizedMessage, 'received');""",
     "rechazo temprano de comentarios atrasados",
 )
+
+read_tracking = r'''function cleanupReadCommentIds() {
+  const now = Date.now();
+  for (const [id, readAt] of state.readCommentIds) {
+    if (now - readAt > 6 * 60 * 60 * 1000) state.readCommentIds.delete(id);
+  }
+  while (state.readCommentIds.size > 5000) {
+    const oldest = state.readCommentIds.keys().next().value;
+    if (!oldest) break;
+    state.readCommentIds.delete(oldest);
+  }
+}
+
+function markCommentAsRead(messageId) {
+  const id = String(messageId || '').trim();
+  if (!id) return;
+  cleanupReadCommentIds();
+  state.readCommentIds.delete(id);
+  state.readCommentIds.set(id, Date.now());
+}
+
+function wasCommentAlreadyRead(messageId) {
+  const id = String(messageId || '').trim();
+  if (!id) return false;
+  cleanupReadCommentIds();
+  return state.readCommentIds.has(id);
+}
+
+function isCommentAlreadyQueued(messageId) {
+  const id = String(messageId || '').trim();
+  if (!id) return false;
+  return state.speechQueue.some((item) => String(item?.id || '') === id);
+}
+
+'''
+renderer = replace_once(
+    renderer,
+    "function enqueueSpeech(message, options = {}) {",
+    read_tracking + "function enqueueSpeech(message, options = {}) {",
+    "registro interno de comentarios leídos",
+)
+
 renderer = replace_once(
     renderer,
     "const item = { id:message.id, text:makeSpeechText(message), voice:voiceForMessage(message), audioLockKey:lockKey, priority, queuedAt:Date.now(), preparedPromise:null, speedMultiplier:1 };",
     "const item = { id:message.id, text:makeSpeechText(message), voice:voiceForMessage(message), audioLockKey:lockKey, priority, queuedAt:Date.now(), sourceTimestamp:Number(message.timestamp || Date.now()), preparedPromise:null, speedMultiplier:1 };",
     "timestamp original en la cola TTS",
 )
+renderer = replace_once(
+    renderer,
+    "      if (queueId) updateCommentResult(queueId, success ? 'read' : 'skipped', success ? '' : (reason || 'audio detenido'));",
+    "      if (queueId) {\n        if (success) markCommentAsRead(queueId);\n        updateCommentResult(queueId, success ? 'read' : 'skipped', success ? '' : (reason || 'audio detenido'));\n      }",
+    "marcar comentario solo cuando terminó de leerse",
+)
+
 renderer = replace_once(
     renderer,
     "  const maxAge = clamp(state.settings.maxCommentDelaySeconds || 8, 3, 30) * 1000;\n  return Date.now() - item.queuedAt > maxAge;",
@@ -494,7 +545,7 @@ if "## 1.2.3" not in changelog:
 - Registra regalos reales recibidos durante el LIVE con `giftName` y `giftId`, y permite usarlos con un clic.
 - Si el catálogo en línea no responde, usa la última copia guardada; en una instalación nueva sin caché, muestra una lista básica de respaldo.
 - Corrige el avance de YouTube y Spotify para ignorar eventos tardíos del reproductor anterior y evita duplicados por identidad de video.
-- Conserva la hora original de los comentarios del LIVE, deduplica IDs recientes y descarta mensajes vencidos antes de TTS, comandos y automatizaciones.
+- Conserva la hora original de los comentarios del LIVE y marca cada ID como leído únicamente cuando el TTS termina correctamente; los IDs ya leídos no vuelven a procesarse tras una reconexión.
 
 """ + changelog
 write("CHANGELOG.md", changelog)
