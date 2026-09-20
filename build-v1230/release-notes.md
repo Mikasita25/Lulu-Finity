@@ -10,7 +10,7 @@ Esta versión mejora la configuración de regalos con sonido para que no tengas 
 - **Botón Usar:** tanto los regalos del catálogo como los detectados copian automáticamente el nombre a la regla de tipo Regalo.
 - **Avance de música reparado:** al saltar una canción, Lulu ignora señales tardías del reproductor anterior para no repetir o saltar la siguiente.
 - **Duplicados de YouTube:** corrige la identidad del video usada por el filtro para que la misma canción no vuelva a entrar por un error de precedencia.
-- **Comentarios al día:** conserva la hora original del comentario, deduplica mensajes recientes al reconectar y descarta los que ya excedieron el límite configurado antes de TTS, comandos o automatizaciones.
+- **Comentarios leídos de verdad:** Lulu guarda internamente el ID de un comentario únicamente cuando su audio terminó correctamente. Si TikTok vuelve a enviar ese mismo ID tras una reconexión, no entra otra vez al TTS. Los mensajes que fallen o se corten no se marcan como leídos.
 - **Compatibilidad:** mantiene el volumen individual por acción de 1.2.2 y las correcciones de estabilidad musical/updater de 1.2.1.
 
 TikTok cambia disponibilidad, nombres y precios según región, temporada y cuenta. Por eso los regalos detectados directamente en el LIVE tienen prioridad como referencia real cuando difieren del catálogo público.
