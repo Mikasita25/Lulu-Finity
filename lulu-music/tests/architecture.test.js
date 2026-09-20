@@ -84,6 +84,28 @@ test('la barra de Lulu conserva el control del volumen de YouTube y Audius', () 
   assert.doesNotMatch(renderer, /Number\(settings\.volume\) \|\| 0\.8/);
 });
 
+test('el ahorro de Electron reduce trabajo visual sin suspender LIVE ni audio', () => {
+  const main = source('main.js');
+  const renderer = source('renderer.js');
+  const html = source('index.html');
+  const css = source('styles.css');
+  assert.equal((main.match(/backgroundThrottling:false/g) || []).length, 1);
+  assert.equal((main.match(/backgroundThrottling:true/g) || []).length, 1);
+  assert.doesNotMatch(main, /paintWhenInitiallyHidden:false/);
+  assert.match(main, /YOUTUBE_BACKGROUND_SIZE = Object\.freeze\(\{ width:320, height:180 \}\)/);
+  assert.match(main, /Menu\.setApplicationMenu\(null\)/);
+  assert.match(main, /powerSaveBlocker\.start\('prevent-app-suspension'\)/);
+  assert.match(main, /pauseYoutubePlayback\(\{ release:!next \}\)/);
+  assert.match(main, /const YOUTUBE_REPORT_INTERVAL_MS = 1_500/);
+  assert.match(main, /const ensureStarted=\(\)=>/);
+  assert.match(main, /video\.addEventListener\('playing',onPlaying\)/);
+  assert.match(renderer, /lastQueueSignature/);
+  assert.match(renderer, /lastAudiusProgressAt < 1_000/);
+  assert.doesNotMatch(html, /class="ambient/);
+  assert.match(css, /backdrop-filter:none!important/);
+  assert.doesNotMatch([main, renderer].join('\n'), /visibilitychange[^\n]*(?:disconnectLive|disconnect\()/);
+});
+
 test('Audius usa audio directo en el renderer existente y automático conserva fallback a YouTube', () => {
   const main = source('main.js');
   const renderer = source('renderer.js');

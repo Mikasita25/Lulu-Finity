@@ -11,6 +11,9 @@ let toastTimer = null;
 let audiusNonce = 0;
 let audiusStopping = false;
 let lastAudiusProgressAt = 0;
+let lastLiveSignature = '';
+let lastQueueSignature = '';
+let lastSettingsSignature = '';
 
 const PROVIDER_LABELS = Object.freeze({ auto:'Automático', audius:'Audius', youtube:'YouTube' });
 const PROVIDER_HINTS = Object.freeze({
@@ -61,6 +64,7 @@ function renderLive(live = {}) {
 
 function renderNow(playback = {}) {
   const current = playback.current;
+  document.body.dataset.playback = !current ? 'idle' : playback.paused ? 'paused' : 'playing';
   for (const id of ['playPauseBtn','restartBtn','skipBtn','showPlayerBtn']) $(id).disabled = !current;
   $('showPlayerBtn').textContent = current?.provider === 'audius' ? 'Ver en Audius' : 'Abrir reproductor';
   $('nowEmpty').classList.toggle('hidden', Boolean(current));
@@ -143,13 +147,24 @@ function renderSettings(settings = {}) {
 
 function renderState(next) {
   if (!next) return;
-  const first = !appState;
   appState = next;
-  $('appVersion').textContent = next.version || '1.0.2';
-  renderLive(next.live);
+  $('appVersion').textContent = next.version || '1.0.3';
+  const liveSignature = JSON.stringify(next.live || {});
+  if (liveSignature !== lastLiveSignature) {
+    lastLiveSignature = liveSignature;
+    renderLive(next.live);
+  }
   renderNow(next.playback);
-  renderQueue(next.queue || []);
-  if (first) renderSettings(next.settings);
+  const queueSignature = JSON.stringify([(next.queue || []).map((item) => [item.id,item.query,item.requestedBy,item.provider]),next.settings?.queueLimit]);
+  if (queueSignature !== lastQueueSignature) {
+    lastQueueSignature = queueSignature;
+    renderQueue(next.queue || []);
+  }
+  const settingsSignature = JSON.stringify(next.settings || {});
+  if (settingsSignature !== lastSettingsSignature) {
+    lastSettingsSignature = settingsSignature;
+    renderSettings(next.settings);
+  }
 }
 
 function readSettingsForm() {
@@ -215,7 +230,7 @@ function bindAudiusPlayer() {
   audio.addEventListener('pause', () => { if (!audiusStopping && audio.getAttribute('src') && !audio.ended) reportAudius('paused'); });
   audio.addEventListener('timeupdate', () => {
     const now = Date.now();
-    if (now - lastAudiusProgressAt < 450) return;
+    if (now - lastAudiusProgressAt < 1_000) return;
     lastAudiusProgressAt = now;
     reportAudius('progress');
   });
