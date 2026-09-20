@@ -30,6 +30,11 @@ for token in (
     "ipcMain.handle('tiktok-gifts:catalog'",
     "lastPayloadAt:0",
     "youtubeAdMuteFailsafeTimer",
+    "recentLiveChatIds",
+    "liveEventSourceTimestamp",
+    "acceptFreshLiveChat",
+    "sourceTimestamp || Date.now()",
+    "receivedAt: Date.now()",
 ):
     require(token in main, f"falta integración principal: {token}")
 
@@ -50,6 +55,12 @@ for token in (
     "automation-action-volume-input",
     "mediaVolume:Math.max(0,Math.min(1,Number(selected.volume??.9)))",
     "'1.2.3': Object.freeze([",
+    "youtubeAdvanceGuardUntil",
+    "spotifyAdvanceGuardUntil",
+    "song.videoUrl || (song.resolving ?",
+    "comentario atrasado",
+    "sourceTimestamp:Number(message.timestamp || Date.now())",
+    "originAt = Number(item.sourceTimestamp || item.queuedAt || 0)",
 ):
     require(token in renderer, f"falta comportamiento del catálogo: {token}")
 
@@ -76,4 +87,4 @@ for token in (".tiktok-gift-catalog,.detected-gifts-wrap{", ".tiktok-gift-catalo
 changelog = read("CHANGELOG.md")
 require("## 1.2.3" in changelog, "falta changelog 1.2.3")
 
-print("Lulu Finity 1.2.3 validada: catálogo TikTok, detección LIVE y volumen 1.2.2 conservados")
+print("Lulu Finity 1.2.3 validada: catálogo TikTok, avance musical y frescura del chat LIVE")
