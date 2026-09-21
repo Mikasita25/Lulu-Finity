@@ -61,6 +61,7 @@ export function MusicPlaybackHost() {
   const loadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
+  const lastHandledEndGeneration = useRef<string | undefined>(undefined);
   const [ttsActive, setTtsActive] = useState(false);
   const [soundEffectActive, setSoundEffectActive] = useState(false);
   const keeper = useAudioPlayer(BACKGROUND_KEEPER_URI, {
@@ -79,6 +80,7 @@ export function MusicPlaybackHost() {
     : soundEffectActive && soundMix.duckMusic
       ? Math.min(music.volume, soundMix.duckMusicVolume)
       : music.volume;
+  const playbackGeneration = currentSong?.id ?? 'manual';
 
   useEffect(() => {
     if (!currentSong) return;
@@ -122,6 +124,7 @@ export function MusicPlaybackHost() {
         music.autoSkipAds,
         autoSelect,
         music.backgroundPlayback,
+        playbackGeneration,
       ),
     [
       music.adBlockEnabled,
@@ -130,6 +133,7 @@ export function MusicPlaybackHost() {
       playbackVolume,
       autoSelect,
       music.backgroundPlayback,
+      playbackGeneration,
     ],
   );
 
@@ -209,6 +213,7 @@ export function MusicPlaybackHost() {
             music.autoSkipAds,
             autoSelect,
             music.backgroundPlayback,
+            playbackGeneration,
           ),
         );
         return;
@@ -226,6 +231,7 @@ export function MusicPlaybackHost() {
             music.autoSkipAds,
             autoSelect,
             music.backgroundPlayback,
+            playbackGeneration,
           ),
         );
       }
@@ -243,6 +249,7 @@ export function MusicPlaybackHost() {
     playbackVolume,
     autoSelect,
     browser.initialized,
+    playbackGeneration,
   ]);
 
   useEffect(
@@ -477,6 +484,15 @@ export function MusicPlaybackHost() {
           onMessage={(event) => {
             try {
               const message = JSON.parse(event.nativeEvent.data);
+              const messageGeneration = String(message?.generation ?? '');
+              const expectedGeneration =
+                useMobileControlStore.getState().currentSong?.id ?? 'manual';
+              if (
+                message?.type !== 'native-background-error' &&
+                messageGeneration !== expectedGeneration
+              ) {
+                return;
+              }
               if (message?.type === 'native-background-error')
                 setBrowserError(
                   'Android no permitió iniciar el audio en segundo plano. Vuelve a abrir la app y pulsa reproducir.',
@@ -496,6 +512,8 @@ export function MusicPlaybackHost() {
                 setPlaybackStatus('playing', 'Reproduciendo correctamente.');
               }
               if (message?.type === 'ended') {
+                if (lastHandledEndGeneration.current === messageGeneration) return;
+                lastHandledEndGeneration.current = messageGeneration;
                 setPlaybackStatus('loading', 'Cargando la siguiente canción…');
                 browser.setPlaying(false);
                 if (autoSelect && !playNextSong())

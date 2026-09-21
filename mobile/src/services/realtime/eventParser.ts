@@ -345,6 +345,13 @@ function normalizeOne(raw: any): ParsedRealtimeMessage[] {
     event.fanStickerImageUrl = resolved.imageUrl;
   } else if (normalizedType === 'gift') {
     event.giftName = text(gift?.giftName, gift?.name, payload?.giftName, 'Regalo');
+    event.giftId = text(gift?.giftId, gift?.id, payload?.giftId, payload?.gift_id);
+    event.giftImageUrl = text(
+      gift?.imageUrl,
+      gift?.image?.urlList?.[0],
+      gift?.icon?.urlList?.[0],
+      payload?.giftImageUrl,
+    );
     event.repeatCount = repeatCount;
     event.diamonds = diamondEach * repeatCount;
   } else if (normalizedType === 'like') {

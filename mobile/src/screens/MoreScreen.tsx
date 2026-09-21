@@ -7,6 +7,7 @@ import {
   DownloadCloud,
   Headphones,
   History,
+  Goal,
   Layers3,
   ListFilter,
   Music2,
@@ -43,6 +44,12 @@ const liveOptions = [
     title: 'Sonidos de alerta',
     subtitle: 'Personaliza el audio de cada evento',
     icon: Volume2,
+  },
+  {
+    route: 'Goals',
+    title: 'Metas del LIVE',
+    subtitle: 'Progreso y acciones al completar objetivos',
+    icon: Goal,
   },
 ];
 

@@ -5,6 +5,7 @@ import {
   FileAudio,
   Play,
   Plus,
+  Search,
   Sparkles,
   Zap,
 } from 'lucide-react-native';
@@ -87,12 +88,26 @@ function triggerLabel(rule: InteractionRule) {
 export function InteractionsScreen() {
   const mode = useAppStore((state) => state.mode);
   const rules = useAppStore((state) => state.interactionRules);
+  const detectedGifts = useAppStore((state) => state.detectedGifts);
   const addRule = useAppStore((state) => state.addInteractionRule);
   const updateRule = useAppStore((state) => state.updateInteractionRule);
   const removeRule = useAppStore((state) => state.removeInteractionRule);
   const readonly = mode === 'spectator';
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [giftSearch, setGiftSearch] = useState('');
+
+  const visibleGifts = useMemo(() => {
+    const query = giftSearch.trim().toLocaleLowerCase('es-MX');
+    return detectedGifts
+      .filter(
+        (gift) =>
+          !query ||
+          gift.name.toLocaleLowerCase('es-MX').includes(query) ||
+          String(gift.id || '').toLocaleLowerCase('es-MX').includes(query),
+      )
+      .slice(0, 30);
+  }, [detectedGifts, giftSearch]);
 
   const triggerMeta = useMemo(
     () =>
@@ -207,6 +222,18 @@ export function InteractionsScreen() {
     });
   };
 
+  const createFromGift = (name: string) => {
+    setEditingId(null);
+    setDraft({
+      ...blankDraft(),
+      name: `Regalo ${name}`,
+      triggerType: 'gift',
+      triggerValue: name,
+      actionType: 'tts',
+      ttsText: 'Gracias {name} por enviar {gift}',
+    });
+  };
+
   return (
     <Screen>
       <AppHeader
@@ -253,6 +280,57 @@ export function InteractionsScreen() {
               Variables TTS: {'{name}'} · {'{user}'} · {'{comment}'} ·{' '}
               {'{fanSticker}'} · {'{gift}'} · {'{count}'}
             </Text>
+          </View>
+        </View>
+      </GlassCard>
+
+      <GlassCard className="mb-5">
+        <View className="p-5">
+          <Text className="text-base font-black text-white">
+            Regalos detectados en el LIVE
+          </Text>
+          <Text className="mt-1 text-xs leading-5 text-white/55">
+            Son datos recibidos realmente por Lulú. No se inventan precios ni
+            disponibilidad regional.
+          </Text>
+          <View className="mt-4">
+            <LuluInput
+              value={giftSearch}
+              onChangeText={setGiftSearch}
+              placeholder="Buscar por nombre o ID"
+              icon={<Search size={17} color={palette.pinkSoft} />}
+            />
+          </View>
+          <View className="mt-3 gap-2">
+            {visibleGifts.map((gift) => (
+              <View
+                key={gift.key}
+                className="flex-row items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3"
+              >
+                <View className="flex-1">
+                  <Text className="text-sm font-black text-white">{gift.name}</Text>
+                  <Text className="mt-1 text-[11px] text-white/50">
+                    {gift.id ? `ID ${gift.id} · ` : ''}detectado {gift.timesSeen}×
+                    {gift.diamondsEach !== undefined
+                      ? ` · ${gift.diamondsEach} diamantes por unidad`
+                      : ''}
+                  </Text>
+                </View>
+                {!readonly ? (
+                  <Button
+                    label="Crear regla"
+                    compact
+                    variant="secondary"
+                    onPress={() => createFromGift(gift.name)}
+                  />
+                ) : null}
+              </View>
+            ))}
+            {!visibleGifts.length ? (
+              <Text className="py-4 text-center text-xs text-white/40">
+                Conecta un LIVE para registrar los regalos que lleguen.
+              </Text>
+            ) : null}
           </View>
         </View>
       </GlassCard>

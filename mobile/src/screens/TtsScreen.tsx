@@ -178,6 +178,24 @@ export function TtsScreen() {
       <GlassCard>
         <View className="px-5">
           <ToggleRow
+            title="Comentarios"
+            subtitle="Lee los mensajes normales del chat."
+            value={settings.readComments}
+            onChange={(readComments) => settings.updateTts({ readComments })}
+          />
+          <ToggleRow
+            title="Regalos"
+            subtitle="Agradece regalos con su propia voz, volumen y plantilla."
+            value={settings.readGifts}
+            onChange={(readGifts) => settings.updateTts({ readGifts })}
+          />
+          <ToggleRow
+            title="Bienvenidas"
+            subtitle="Saluda a cada usuario una sola vez durante el LIVE."
+            value={settings.readWelcomes}
+            onChange={(readWelcomes) => settings.updateTts({ readWelcomes })}
+          />
+          <ToggleRow
             title="Decir el nombre"
             subtitle="Ejemplo: “LuluFan dice: hola”."
             value={settings.announceUsername}
@@ -191,6 +209,94 @@ export function TtsScreen() {
             value={settings.skipCommands}
             onChange={(skipCommands) => settings.updateTts({ skipCommands })}
           />
+          <View className="gap-6 border-t border-white/[0.06] py-5">
+            <LuluSlider
+              label="Máximo de mensajes en cola"
+              value={settings.queueLimit}
+              minimumValue={1}
+              maximumValue={10}
+              step={1}
+              formatValue={(value) => `${Math.round(value)}`}
+              onValueChange={(queueLimit) => settings.updateTts({ queueLimit })}
+            />
+            <LuluSlider
+              label="Caducidad de cada mensaje"
+              value={settings.maxPendingAgeSeconds}
+              minimumValue={3}
+              maximumValue={30}
+              step={1}
+              formatValue={(value) => `${Math.round(value)} s`}
+              onValueChange={(maxPendingAgeSeconds) =>
+                settings.updateTts({ maxPendingAgeSeconds })
+              }
+            />
+          </View>
+        </View>
+      </GlassCard>
+
+      <SectionTitle
+        title="Voz para regalos"
+        subtitle="Se configura por separado de los comentarios."
+      />
+      <GlassCard>
+        <View className="gap-4 p-5">
+          <LuluInput
+            value={settings.giftTemplate}
+            onChangeText={(giftTemplate) => settings.updateTts({ giftTemplate })}
+            placeholder="Gracias {name} por enviar {gift} {count} veces"
+          />
+          <LuluSlider
+            label="Volumen de regalos"
+            value={settings.giftVolume}
+            step={0.05}
+            onValueChange={(giftVolume) => settings.updateTts({ giftVolume })}
+          />
+          <View className="flex-row flex-wrap gap-2">
+            {matchingVoices.slice(0, 8).map((voice) => (
+              <Choice
+                key={`gift-${voice.identifier}`}
+                label={voice.name}
+                active={settings.giftVoice === voice.identifier}
+                accent={accent}
+                onPress={() => settings.updateTts({ giftVoice: voice.identifier })}
+              />
+            ))}
+          </View>
+        </View>
+      </GlassCard>
+
+      <SectionTitle
+        title="Voz para bienvenidas"
+        subtitle="La bienvenida se ejecuta una vez por usuario y directo."
+      />
+      <GlassCard>
+        <View className="gap-4 p-5">
+          <LuluInput
+            value={settings.welcomeTemplate}
+            onChangeText={(welcomeTemplate) => settings.updateTts({ welcomeTemplate })}
+            placeholder="Bienvenida {name}"
+          />
+          <LuluSlider
+            label="Volumen de bienvenidas"
+            value={settings.welcomeVolume}
+            step={0.05}
+            onValueChange={(welcomeVolume) =>
+              settings.updateTts({ welcomeVolume })
+            }
+          />
+          <View className="flex-row flex-wrap gap-2">
+            {matchingVoices.slice(0, 8).map((voice) => (
+              <Choice
+                key={`welcome-${voice.identifier}`}
+                label={voice.name}
+                active={settings.welcomeVoice === voice.identifier}
+                accent={accent}
+                onPress={() =>
+                  settings.updateTts({ welcomeVoice: voice.identifier })
+                }
+              />
+            ))}
+          </View>
         </View>
       </GlassCard>
 
@@ -209,6 +315,8 @@ export function TtsScreen() {
               settings.updateTts({
                 language: value,
                 voice: defaultMicrosoftVoice(value),
+                giftVoice: defaultMicrosoftVoice(value),
+                welcomeVoice: defaultMicrosoftVoice(value),
               })
             }
           />

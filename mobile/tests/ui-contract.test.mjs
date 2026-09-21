@@ -92,16 +92,17 @@ assert.match(navigator, /name="TTS"/);
 assert.match(navigator, /name="Interactions"/);
 assert.match(navigator, /name="YouTubeBrowser"/);
 assert.match(navigator, /name="RecentActivity"/);
+assert.match(navigator, /name="Goals"/);
 assert.match(navigator, /title: 'Voz'/);
 assert.match(navigator, /title: 'Música'/);
-assert.match(navigator, /title: 'Automatiza'/);
+assert.match(navigator, /title: 'Acciones'/);
 assert.match(navigator, /title: 'Ajustes'/);
 assert.match(navigator, /animation: 'shift'/);
 assert.match(navigator, /duration: 220/);
 assert.match(navigator, /animationDuration: 240/);
 assert.doesNotMatch(
   navigator,
-  /name="LiveView"|name="Goals"|name="Leaderboard"|title: 'Ranking'/,
+  /name="LiveView"|name="Leaderboard"|title: 'Ranking'/,
 );
 
 const menu = read('src/screens/MoreScreen.tsx');
@@ -207,6 +208,16 @@ assert.match(ttsRuntime, /setTtsPlaybackActive\(true\)/);
 assert.match(ttsRuntime, /status\.isLoaded/);
 assert.match(ttsRuntime, /expo\/fetch/);
 assert.doesNotMatch(ttsRuntime, /expo-speech|Speech\.speak/);
+assert.match(ttsRuntime, /claimTtsDelivery/);
+assert.match(ttsRuntime, /transitionTtsDelivery\(item\.deliveryKey, 'completed'\)/);
+assert.match(ttsRuntime, /Android no confirmó el final del audio TTS/);
+
+const ttsDelivery =
+  read('src/services/ttsDelivery.ts') +
+  read('src/services/ttsDeliveryLedger.ts');
+assert.match(ttsDelivery, /status: 'pending'/);
+assert.match(ttsDelivery, /record\.status !== 'completed'/);
+assert.match(ttsDelivery, /AsyncStorage\.setItem/);
 
 const relayTts = read('src/services/microsoftRelay.ts');
 assert.match(relayTts, /\/v1\/tts\/microsoft/);
@@ -220,6 +231,10 @@ assert.match(ttsScreen, /mismo motor Microsoft que la versión de PC/);
 assert.match(ttsScreen, /motor Microsoft de Lulú para\s+PC/);
 assert.match(ttsScreen, /No se pudo reproducir la voz/);
 assert.doesNotMatch(ttsScreen, /Predeterminada del sistema|voces instaladas/);
+assert.match(ttsScreen, /Voz para regalos/);
+assert.match(ttsScreen, /Voz para bienvenidas/);
+assert.match(ttsScreen, /Máximo de mensajes en cola/);
+assert.match(ttsScreen, /Caducidad de cada mensaje/);
 
 const liveRuntime = read('src/services/liveRuntime.ts');
 assert.match(liveRuntime, /LiveFreshnessGate/);
@@ -258,6 +273,17 @@ assert.match(mobileControls, /volume:/);
 assert.match(mobileControls, /backgroundPlayback/);
 assert.match(mobileControls, /adBlockEnabled/);
 assert.match(mobileControls, /ttsDuckingVolume/);
+assert.match(mobileControls, /duplicate/);
+assert.match(mobileControls, /moveSong/);
+assert.match(mobileControls, /removeOwnSong/);
+
+const bottomNavigation = read('src/components/BottomNavigation.tsx');
+const screenLayout = read('src/components/Screen.tsx');
+assert.match(bottomNavigation, /left: 0/);
+assert.match(bottomNavigation, /right: 0/);
+assert.match(bottomNavigation, /bottomNavigationHeight\(insets\.bottom\)/);
+assert.match(screenLayout, /screenBottomPadding\(insets\.bottom\)/);
+assert.doesNotMatch(bottomNavigation, /indicatorScale/);
 
 const sounds = read('src/screens/SoundsScreen.tsx');
 assert.match(sounds, /Mezcla general/);
@@ -275,6 +301,12 @@ assert.match(soundLibrary, /initializeBuiltinSoundDefaults/);
 const appStore = read('src/store/useAppStore.ts');
 assert.match(appStore, /soundMix/);
 assert.match(appStore, /applySoundProfile/);
+assert.match(appStore, /detectedGifts/);
+
+const interactions = read('src/screens/InteractionsScreen.tsx');
+assert.match(interactions, /Regalos detectados en el LIVE/);
+assert.match(interactions, /Buscar por nombre o ID/);
+assert.match(interactions, /createFromGift/);
 
 const updateService = read('src/services/updates.ts');
 assert.match(updateService, /per_page=100/);
@@ -319,10 +351,9 @@ assert.match(designSystem, /luluGradients/);
 assert.match(designSystem, /accessibilityRole="switch"/);
 assert.match(designSystem, /PanResponder/);
 assert.match(designSystem, /BlurView/);
-const bottomNavigation = read('src/components/BottomNavigation.tsx');
 assert.match(bottomNavigation, /Animated\.timing/);
 assert.match(bottomNavigation, /useNativeDriver: true/);
-assert.match(bottomNavigation, /scaleX: indicatorScale/);
+assert.match(bottomNavigation, /borderTopLeftRadius: 24/);
 const slider = read('src/components/LuluSlider.tsx');
 assert.match(slider, /pendingValue/);
 assert.match(slider, /onPanResponderRelease: finishSliding/);

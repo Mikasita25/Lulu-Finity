@@ -19,6 +19,8 @@ export type LiveEvent = {
   profilePictureUrl?: string;
   comment?: string;
   giftName?: string;
+  giftId?: string;
+  giftImageUrl?: string;
   repeatCount?: number;
   diamonds?: number;
   count?: number;
@@ -27,6 +29,16 @@ export type LiveEvent = {
   fanStickerId?: string;
   fanStickerName?: string;
   fanStickerImageUrl?: string;
+};
+
+export type DetectedGift = {
+  key: string;
+  id?: string;
+  name: string;
+  imageUrl?: string;
+  diamondsEach?: number;
+  timesSeen: number;
+  lastSeenAt: number;
 };
 
 export type LiveStats = {

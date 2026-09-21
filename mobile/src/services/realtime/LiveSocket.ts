@@ -145,7 +145,8 @@ export class LiveSocket {
       });
       return;
     }
-    const delay = reconnectDelays[this.retryCount - 1] ?? reconnectDelays[reconnectDelays.length - 1]!;
+    const baseDelay = reconnectDelays[this.retryCount - 1] ?? reconnectDelays[reconnectDelays.length - 1]!;
+    const delay = baseDelay + Math.round(baseDelay * 0.2 * Math.random());
     this.listener({
       kind: 'relay',
       state: 'rotating',

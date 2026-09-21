@@ -11,7 +11,7 @@ test('navigation accepts YouTube HTTPS only and encodes searches', () => {
   assert.equal(browserSearchUrl(' a & b '), 'https://m.youtube.com/results?search_query=a%20%26%20b');
 });
 
-function page({ paused = false, autoSelect = true, background = true, pathname = '/watch', hostname = 'm.youtube.com' } = {}) {
+function page({ paused = false, autoSelect = true, background = true, pathname = '/watch', hostname = 'm.youtube.com', generation = 'song-1' } = {}) {
   const events = {};
   const messages = [];
   let plays = 0, pauses = 0, clicks = 0;
@@ -28,7 +28,7 @@ function page({ paused = false, autoSelect = true, background = true, pathname =
   });
   const window = { ReactNativeWebView: { postMessage(value) { messages.push(JSON.parse(value)); } } };
   const context = { window, document, Document, location: { hostname, pathname, href: 'https://m.youtube.com/watch?v=abc' }, MutationObserver: class { observe() {} }, setInterval() {}, setTimeout() {}, Date };
-  vm.runInNewContext(playerAutomation(.35, paused, false, false, autoSelect, background), context);
+  vm.runInNewContext(playerAutomation(.35, paused, false, false, autoSelect, background, generation), context);
   return { video, document, window, events, messages, plays: () => plays, pauses: () => pauses, clicks: () => clicks, context };
 }
 
@@ -69,4 +69,11 @@ test('native pulse respects an explicit pause while JavaScript timers are suspen
   const p = page({ paused: true });
   p.window.__luluNativeTick();
   assert.equal(p.plays(), 0);
+});
+test('playback callbacks keep the document generation and identify late endings', () => {
+  const p = page({ generation: 'song-original' });
+  vm.runInNewContext(playerAutomation(.2, false, false, false, true, true, 'song-new'), p.context);
+  p.events.ended();
+  const ended = p.messages.findLast(message => message.type === 'ended');
+  assert.equal(ended.generation, 'song-original');
 });

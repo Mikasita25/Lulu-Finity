@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
   Disc3,
   ListMusic,
   Pause,
@@ -35,11 +37,15 @@ function SongRow({
   index,
   onPlay,
   onRemove,
+  onMoveUp,
+  onMoveDown,
 }: {
   song: SongRequest;
   index: number;
   onPlay: () => void;
   onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   return (
     <View className="flex-row items-center gap-3 border-b border-white/[0.055] py-3.5">
@@ -54,6 +60,21 @@ function SongRow({
           pedido por @{song.requestedBy}
         </Text>
       </View>
+      <Pressable
+        onPress={onMoveUp}
+        disabled={index === 0}
+        accessibilityLabel="Subir canción"
+        className="h-10 w-9 items-center justify-center rounded-xl bg-white/[0.05] disabled:opacity-25"
+      >
+        <ChevronUp size={15} color="#D8CBFF" />
+      </Pressable>
+      <Pressable
+        onPress={onMoveDown}
+        accessibilityLabel="Bajar canción"
+        className="h-10 w-9 items-center justify-center rounded-xl bg-white/[0.05]"
+      >
+        <ChevronDown size={15} color="#D8CBFF" />
+      </Pressable>
       <Pressable
         onPress={onPlay}
         className="h-10 w-10 items-center justify-center rounded-xl bg-white/[0.07]"
@@ -89,6 +110,7 @@ export function MusicScreen({ navigation }: any) {
     (state) => state.skipCurrentSong,
   );
   const removeSong = useMobileControlStore((state) => state.removeSong);
+  const moveSong = useMobileControlStore((state) => state.moveSong);
   const clearSongQueue = useMobileControlStore((state) => state.clearSongQueue);
   const setPaused = useMobileControlStore((state) => state.setMusicPaused);
   const setPlaybackPaused = useMobileControlStore(
@@ -128,6 +150,8 @@ export function MusicScreen({ navigation }: any) {
         'No se pudo agregar',
         result.reason === 'queue_full'
           ? 'La cola está llena.'
+          : result.reason === 'duplicate'
+            ? 'Esa canción ya está sonando o ya se encuentra en la cola.'
           : 'Escribe una canción o artista.',
         undefined,
         'warning',
@@ -387,7 +411,8 @@ export function MusicScreen({ navigation }: any) {
           />
           <Text className="mt-3 text-xs leading-5 text-white/60">
             También quedan activos !song y !sr. Ejemplo: {music.command} Die
-            With A Smile
+            With A Smile. Cada persona puede retirar su última solicitud con
+            !quitar o !remove.
           </Text>
         </View>
       </GlassCard>
@@ -519,6 +544,8 @@ export function MusicScreen({ navigation }: any) {
               index={index}
               onPlay={() => startSong(song)}
               onRemove={() => removeSong(song.id)}
+              onMoveUp={() => moveSong(song.id, -1)}
+              onMoveDown={() => moveSong(song.id, 1)}
             />
           ))}
           {!queue.length ? (

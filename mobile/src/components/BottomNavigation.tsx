@@ -5,7 +5,10 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AudioLines, House, Music2, Settings, Zap } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { palette } from '@/theme/palette';
+import {
+  BOTTOM_NAV_CONTENT_HEIGHT,
+  bottomNavigationHeight,
+} from '@/navigation/layout';
 
 const icons = {
   Dashboard: House,
@@ -54,11 +57,6 @@ function NavigationItem({
     inputRange: [0, 1],
     outputRange: [1, -1],
   });
-  const indicatorScale = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.35, 1],
-  });
-
   return (
     <Pressable
       accessibilityRole="tab"
@@ -68,6 +66,8 @@ function NavigationItem({
       onLongPress={onLongPress}
       style={({ pressed }) => ({
         flex: 1,
+        minWidth: 0,
+        minHeight: 48,
         alignItems: 'center',
         justifyContent: 'center',
         opacity: pressed ? 0.76 : 1,
@@ -80,7 +80,7 @@ function NavigationItem({
           transform: [{ translateY: iconLift }, { scale: iconScale }],
         }}
       >
-        <View className="h-10 w-12 items-center justify-center overflow-hidden rounded-2xl">
+        <View className="h-9 w-12 items-center justify-center overflow-hidden rounded-2xl">
           <Animated.View
             pointerEvents="none"
             style={{
@@ -105,21 +105,11 @@ function NavigationItem({
         </View>
         <Text
           style={{ color: focused ? '#F2B7FF' : '#999AB9' }}
-          className="mt-0.5 text-[9px] font-extrabold"
+          className="mt-1 text-[10px] font-extrabold"
+          numberOfLines={1}
         >
           {label}
         </Text>
-        <Animated.View
-          style={{
-            marginTop: 4,
-            width: 20,
-            height: 4,
-            borderRadius: 999,
-            backgroundColor: palette.pink,
-            opacity: progress,
-            transform: [{ scaleX: indicatorScale }],
-          }}
-        />
       </Animated.View>
     </Pressable>
   );
@@ -136,65 +126,63 @@ export function BottomNavigation({
       pointerEvents="box-none"
       style={{
         position: 'absolute',
-        left: 12,
-        right: 12,
-        bottom: Math.max(8, insets.bottom),
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: bottomNavigationHeight(insets.bottom),
       }}
     >
-      <View
+      <BlurView
+        intensity={34}
+        tint="dark"
+        experimentalBlurMethod="dimezisBlurView"
         style={{
-          borderRadius: 27,
+          flex: 1,
+          paddingBottom: insets.bottom,
           overflow: 'hidden',
-          borderWidth: 1,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          borderTopWidth: 1,
           borderColor: 'rgba(222,207,255,0.16)',
-          shadowColor: '#050714',
-          shadowOpacity: 0.5,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: 12 },
-          elevation: 12,
+          backgroundColor: 'rgba(12,15,38,0.94)',
         }}
       >
-        <BlurView
-          intensity={38}
-          tint="dark"
-          experimentalBlurMethod="dimezisBlurView"
-          style={{ backgroundColor: 'rgba(15,18,45,0.80)' }}
+        <View
+          style={{ height: BOTTOM_NAV_CONTENT_HEIGHT }}
+          className="flex-row items-stretch px-1"
         >
-          <View pointerEvents="none" className="mx-5 h-px bg-white/[0.12]" />
-          <View className="h-[72px] flex-row items-center px-2">
-            {state.routes.map((route, index) => {
-              const focused = state.index === index;
-              const Icon = icons[route.name as keyof typeof icons] ?? Settings;
-              const descriptor = descriptors[route.key];
-              const label = descriptor?.options.title ?? route.name;
-              const onPress = () => {
-                const event = navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!focused && !event.defaultPrevented)
-                  navigation.navigate(route.name, route.params);
-              };
-              return (
-                <NavigationItem
-                  key={route.key}
-                  focused={focused}
-                  Icon={Icon}
-                  label={String(label)}
-                  accessibilityLabel={
-                    descriptor?.options.tabBarAccessibilityLabel
-                  }
-                  onPress={onPress}
-                  onLongPress={() =>
-                    navigation.emit({ type: 'tabLongPress', target: route.key })
-                  }
-                />
-              );
-            })}
-          </View>
-        </BlurView>
-      </View>
+          {state.routes.map((route, index) => {
+            const focused = state.index === index;
+            const Icon = icons[route.name as keyof typeof icons] ?? Settings;
+            const descriptor = descriptors[route.key];
+            const label = descriptor?.options.title ?? route.name;
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+              if (!focused && !event.defaultPrevented)
+                navigation.navigate(route.name, route.params);
+            };
+            return (
+              <NavigationItem
+                key={route.key}
+                focused={focused}
+                Icon={Icon}
+                label={String(label)}
+                accessibilityLabel={
+                  descriptor?.options.tabBarAccessibilityLabel
+                }
+                onPress={onPress}
+                onLongPress={() =>
+                  navigation.emit({ type: 'tabLongPress', target: route.key })
+                }
+              />
+            );
+          })}
+        </View>
+      </BlurView>
     </View>
   );
 }

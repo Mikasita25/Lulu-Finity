@@ -2,6 +2,8 @@ import type { PropsWithChildren } from 'react';
 import { ScrollView, View, type ScrollViewProps } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { screenBottomPadding } from '@/navigation/layout';
 
 type Props = PropsWithChildren<{
   scroll?: boolean;
@@ -15,20 +17,27 @@ export function Screen({
   contentClassName = '',
   scrollProps,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = screenBottomPadding(insets.bottom);
+  const { contentContainerStyle, ...restScrollProps } = scrollProps ?? {};
   const content = scroll ? (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="px-[18px] pb-40 pt-3"
+      contentContainerClassName="px-[18px] pt-3"
+      contentContainerStyle={[{ paddingBottom: bottomPadding }, contentContainerStyle]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      {...scrollProps}
+      {...restScrollProps}
     >
       <View className={`w-full max-w-[960px] self-center ${contentClassName}`}>
         {children}
       </View>
     </ScrollView>
   ) : (
-    <View className="flex-1 px-[18px] pb-32 pt-3">
+    <View
+      className="flex-1 px-[18px] pt-3"
+      style={{ paddingBottom: bottomPadding }}
+    >
       <View
         className={`w-full max-w-[960px] flex-1 self-center ${contentClassName}`}
       >

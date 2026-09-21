@@ -1,10 +1,11 @@
 import { useAppStore } from '@/store/useAppStore';
 import { LiveSocket } from './realtime/LiveSocket';
 import { runEventEffects } from './effects';
-import { handleTtsEvent, stopTts } from './tts';
+import { handleTtsEvent, resetTtsLiveSession, stopTts } from './tts';
 import { clearInteractionCooldowns, runInteractionRules } from './interactions';
 import { clearMusicCooldowns, handleMusicEvent } from './music';
 import { LiveFreshnessGate } from './realtime/liveFreshness';
+import { setTtsDeliveryAccount } from './ttsDelivery';
 
 function top3Snapshot() {
   return Object.values(useAppStore.getState().leaderboard)
@@ -51,7 +52,7 @@ const socket = new LiveSocket((message) => {
   // crudo que entregue TikTok/Euler en una versión concreta.
   runInteractionRules(message.event).catch(() => {});
   handleMusicEvent(message.event);
-  handleTtsEvent(message.event);
+  handleTtsEvent(message.event).catch(() => {});
   runEventEffects(message.event, previousTop3).catch(() => {});
 });
 
@@ -60,6 +61,8 @@ export function connectLive(username?: string) {
   const target = (username || state.username).trim().replace(/^@/, '');
   if (!target) throw new Error('Escribe un usuario de TikTok.');
   stopTts().catch(() => {});
+  setTtsDeliveryAccount(target);
+  resetTtsLiveSession();
   freshness.startSession();
   clearInteractionCooldowns();
   clearMusicCooldowns();

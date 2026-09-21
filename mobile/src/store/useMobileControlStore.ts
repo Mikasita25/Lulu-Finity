@@ -15,7 +15,7 @@ export type SongRequest = {
 
 export type EnqueueSongResult =
   | { ok: true; song: SongRequest }
-  | { ok: false; reason: 'disabled' | 'empty' | 'queue_full' | 'user_limit' };
+  | { ok: false; reason: 'disabled' | 'empty' | 'queue_full' | 'user_limit' | 'duplicate' };
 
 export type MusicSettings = {
   enabled: boolean;
@@ -54,6 +54,8 @@ type MobileControlState = {
   playNextSong: () => SongRequest | undefined;
   skipCurrentSong: () => SongRequest | undefined;
   removeSong: (id: string) => void;
+  removeOwnSong: (requestedBy: string) => boolean;
+  moveSong: (id: string, direction: -1 | 1) => void;
   clearSongQueue: () => void;
   setMusicPaused: (paused: boolean) => void;
   setPlaybackPaused: (paused: boolean) => void;
@@ -91,6 +93,14 @@ function normalizeCommand(value: string) {
   const trimmed = value.trim().toLowerCase();
   if (!trimmed) return '!cancion';
   return trimmed.startsWith('!') ? trimmed : `!${trimmed}`;
+}
+
+function normalizeSongQuery(value: string) {
+  return value
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('es-MX');
 }
 
 export const useMobileControlStore = create<MobileControlState>()(
@@ -151,9 +161,17 @@ export const useMobileControlStore = create<MobileControlState>()(
       enqueueSong: (rawQuery, requestedBy, source = 'chat') => {
         const state = get();
         if (!state.music.enabled && source === 'chat') return { ok: false, reason: 'disabled' };
-        const query = rawQuery.trim().replace(/\s+/g, ' ');
+        const query = rawQuery.normalize('NFKC').trim().replace(/\s+/g, ' ');
         if (!query) return { ok: false, reason: 'empty' };
         if (state.songQueue.length >= state.music.maxQueue) return { ok: false, reason: 'queue_full' };
+        const normalizedQuery = normalizeSongQuery(query);
+        if (
+          (state.currentSong &&
+            normalizeSongQuery(state.currentSong.query) === normalizedQuery) ||
+          state.songQueue.some((song) => normalizeSongQuery(song.query) === normalizedQuery)
+        ) {
+          return { ok: false, reason: 'duplicate' };
+        }
         const normalizedUser = requestedBy.trim().replace(/^@/, '').toLowerCase() || 'manual';
         const activeForUser = state.songQueue.filter(
           (song) => song.requestedBy.toLowerCase() === normalizedUser,
@@ -211,6 +229,29 @@ export const useMobileControlStore = create<MobileControlState>()(
         return next;
       },
       removeSong: (id) => set((state) => ({ songQueue: state.songQueue.filter((song) => song.id !== id) })),
+      removeOwnSong: (requestedBy) => {
+        const normalizedUser = requestedBy.trim().replace(/^@/, '').toLowerCase();
+        const state = get();
+        let index = -1;
+        for (let songIndex = state.songQueue.length - 1; songIndex >= 0; songIndex -= 1) {
+          if (state.songQueue[songIndex]?.requestedBy.toLowerCase() === normalizedUser) {
+            index = songIndex;
+            break;
+          }
+        }
+        if (index < 0) return false;
+        set({ songQueue: state.songQueue.filter((_, songIndex) => songIndex !== index) });
+        return true;
+      },
+      moveSong: (id, direction) =>
+        set((state) => {
+          const index = state.songQueue.findIndex((song) => song.id === id);
+          const target = index + direction;
+          if (index < 0 || target < 0 || target >= state.songQueue.length) return state;
+          const songQueue = [...state.songQueue];
+          [songQueue[index], songQueue[target]] = [songQueue[target]!, songQueue[index]!];
+          return { songQueue };
+        }),
       clearSongQueue: () => set({ songQueue: [] }),
       setMusicPaused: (musicPaused) => set({ musicPaused }),
       setPlaybackPaused: (playbackPaused) => set({

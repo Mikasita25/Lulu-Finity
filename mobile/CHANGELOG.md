@@ -19,6 +19,16 @@ Validación física pendiente: reproducción prolongada con pantalla bloqueada, 
 
 # Lulú Finity Mobile
 
+## 1.6.0
+
+- Registra cada lectura TTS como pendiente, reproduciendo, completada, fallida, cancelada o caducada; solo conserva como completada una lectura cuyo audio terminó realmente.
+- Persiste un historial acotado de IDs completados por cuenta para impedir que una reconexión vuelva a leer comentarios ya terminados.
+- Añade límites configurables de cola y caducidad, TTS separado para comentarios, regalos y bienvenidas, voces/volúmenes/plantillas por canal y una bienvenida por usuario y LIVE.
+- Protege la música con una generación por reproducción para ignorar callbacks atrasados; impide canciones duplicadas, permite reordenarlas y admite `!quitar`/`!remove` para retirar la última solicitud propia.
+- Corrige la barra inferior: cinco áreas iguales, etiqueta **Acciones**, superficie única, área segura real y espacio dinámico para que el último control quede visible y pulsable.
+- Registra regalos recibidos realmente en el LIVE con nombre, ID y valor observado, permite buscarlos y crear una automatización desde el regalo sin inventar precios regionales.
+- Recupera el acceso a Metas desde Ajustes y añade variación a la espera progresiva de reconexión.
+
 ## 1.4.0
 
 - Amplía la personalización de sonidos con seis efectos integrados: Campanita cute, Brillo mágico, Pop suave, Cristal, Subida de nivel y Celebración.

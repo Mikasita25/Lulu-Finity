@@ -5,6 +5,9 @@ import { defaultMicrosoftVoice, normalizeMicrosoftVoice } from '@/services/micro
 
 export type TtsSettings = {
   enabled: boolean;
+  readComments: boolean;
+  readGifts: boolean;
+  readWelcomes: boolean;
   announceUsername: boolean;
   skipCommands: boolean;
   language: string;
@@ -13,6 +16,14 @@ export type TtsSettings = {
   pitch: number;
   volume: number;
   maxChars: number;
+  queueLimit: number;
+  maxPendingAgeSeconds: number;
+  giftVoice: string;
+  giftVolume: number;
+  giftTemplate: string;
+  welcomeVoice: string;
+  welcomeVolume: number;
+  welcomeTemplate: string;
 };
 
 type TtsState = TtsSettings & {
@@ -22,6 +33,9 @@ type TtsState = TtsSettings & {
 
 const defaults: TtsSettings = {
   enabled: true,
+  readComments: true,
+  readGifts: false,
+  readWelcomes: false,
   announceUsername: true,
   skipCommands: true,
   language: 'es-MX',
@@ -30,13 +44,39 @@ const defaults: TtsSettings = {
   pitch: 1,
   volume: 1,
   maxChars: 180,
+  queueLimit: 5,
+  maxPendingAgeSeconds: 10,
+  giftVoice: defaultMicrosoftVoice('es-MX'),
+  giftVolume: 1,
+  giftTemplate: 'Gracias {name} por enviar {gift} {count} veces',
+  welcomeVoice: defaultMicrosoftVoice('es-MX'),
+  welcomeVolume: 0.9,
+  welcomeTemplate: 'Bienvenida {name}',
 };
 
 export const useTtsStore = create<TtsState>()(
   persist(
     (set) => ({
       ...defaults,
-      updateTts: (patch) => set(patch),
+      updateTts: (patch) => {
+        const sanitized = { ...patch };
+        if (patch.queueLimit !== undefined) {
+          sanitized.queueLimit = Math.max(1, Math.min(10, Math.round(patch.queueLimit)));
+        }
+        if (patch.maxPendingAgeSeconds !== undefined) {
+          sanitized.maxPendingAgeSeconds = Math.max(
+            3,
+            Math.min(30, Math.round(patch.maxPendingAgeSeconds)),
+          );
+        }
+        if (patch.giftVolume !== undefined) {
+          sanitized.giftVolume = Math.max(0, Math.min(1, patch.giftVolume));
+        }
+        if (patch.welcomeVolume !== undefined) {
+          sanitized.welcomeVolume = Math.max(0, Math.min(1, patch.welcomeVolume));
+        }
+        set(sanitized);
+      },
       resetTts: () => set(defaults),
     }),
     {
@@ -44,6 +84,9 @@ export const useTtsStore = create<TtsState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         enabled: state.enabled,
+        readComments: state.readComments,
+        readGifts: state.readGifts,
+        readWelcomes: state.readWelcomes,
         announceUsername: state.announceUsername,
         skipCommands: state.skipCommands,
         language: state.language,
@@ -52,6 +95,14 @@ export const useTtsStore = create<TtsState>()(
         pitch: state.pitch,
         volume: state.volume,
         maxChars: state.maxChars,
+        queueLimit: state.queueLimit,
+        maxPendingAgeSeconds: state.maxPendingAgeSeconds,
+        giftVoice: state.giftVoice,
+        giftVolume: state.giftVolume,
+        giftTemplate: state.giftTemplate,
+        welcomeVoice: state.welcomeVoice,
+        welcomeVolume: state.welcomeVolume,
+        welcomeTemplate: state.welcomeTemplate,
       }),
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<TtsSettings>;
@@ -61,6 +112,8 @@ export const useTtsStore = create<TtsState>()(
           ...saved,
           language,
           voice: normalizeMicrosoftVoice(saved.voice, language),
+          giftVoice: normalizeMicrosoftVoice(saved.giftVoice, language),
+          welcomeVoice: normalizeMicrosoftVoice(saved.welcomeVoice, language),
         };
       },
     },

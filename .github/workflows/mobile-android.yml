@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - agent/lulu-finity-mobile-android
+      - codex/mobile-parity-1.6.0
     paths:
       - "mobile/**"
       - ".github/workflows/mobile-android.yml"

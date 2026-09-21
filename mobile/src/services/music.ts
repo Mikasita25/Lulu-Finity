@@ -30,10 +30,16 @@ export function handleMusicEvent(event: LiveEvent) {
   const state = useMobileControlStore.getState();
   if (!state.music.enabled || state.musicPaused) return;
 
+  const user = (event.uniqueId || event.nickname || 'viewer').trim().replace(/^@/, '').toLowerCase();
+  const normalizedComment = event.comment.normalize('NFKC').trim().toLowerCase();
+  if (normalizedComment === '!quitar' || normalizedComment === '!remove') {
+    state.removeOwnSong(user);
+    return;
+  }
+
   const request = parseSongRequest(event.comment);
   if (!request?.query) return;
 
-  const user = (event.uniqueId || event.nickname || 'viewer').trim().replace(/^@/, '').toLowerCase();
   const now = Date.now();
   const previous = lastRequestAt.get(user) ?? 0;
   if (now - previous < state.music.cooldownSeconds * 1000) return;

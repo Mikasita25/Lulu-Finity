@@ -1,5 +1,14 @@
-export function playerAutomation(volume: number, paused: boolean, adBlockEnabled: boolean, autoSkipAds: boolean, autoSelect = true, background = true) {
+export function playerAutomation(
+  volume: number,
+  paused: boolean,
+  adBlockEnabled: boolean,
+  autoSkipAds: boolean,
+  autoSelect = true,
+  background = true,
+  playbackGeneration = 'manual',
+) {
   const safeVolume = Math.max(0, Math.min(1, volume));
+  const safeGeneration = JSON.stringify(playbackGeneration);
   return `
 (() => {
   if (!/(^|\\.)youtube\\.com$/.test(location.hostname)) return true;
@@ -9,10 +18,11 @@ export function playerAutomation(volume: number, paused: boolean, adBlockEnabled
   window.__luluPlaybackPaused = ${paused ? 'true' : 'false'};
   window.__luluAdBlockEnabled = ${adBlockEnabled ? 'true' : 'false'};
   window.__luluAutoSkipAds = ${autoSkipAds ? 'true' : 'false'};
+  if (!window.__luluAutoPlayerInstalled) window.__luluPlaybackGeneration = ${safeGeneration};
 
   window.__luluNativeReport = () => {
     const media = document.querySelector('video');
-    const state = { type: 'lulu-native-playback', enabled: window.__luluBackground,
+    const state = { type: 'lulu-native-playback', generation: window.__luluPlaybackGeneration, enabled: window.__luluBackground,
       hasMedia: Boolean(media && !media.ended), playing: Boolean(media && !media.paused),
       paused: window.__luluPlaybackPaused, title: document.title || 'YouTube' };
     const encoded = JSON.stringify(state);
@@ -61,7 +71,7 @@ export function playerAutomation(volume: number, paused: boolean, adBlockEnabled
 
   const send = (payload) => {
     try {
-      window.ReactNativeWebView?.postMessage(JSON.stringify(payload));
+      window.ReactNativeWebView?.postMessage(JSON.stringify({ ...payload, generation: window.__luluPlaybackGeneration }));
     } catch (_) {}
   };
 
@@ -204,4 +214,3 @@ export function playerAutomation(volume: number, paused: boolean, adBlockEnabled
 })();
 `;
 }
-

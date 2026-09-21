@@ -20,6 +20,7 @@ import { SettingsScreen } from '@/screens/SettingsScreen';
 import { MusicScreen } from '@/screens/MusicScreen';
 import { YouTubeBrowserScreen } from '@/screens/YouTubeBrowserScreen';
 import { RecentActivityScreen } from '@/screens/RecentActivityScreen';
+import { GoalsScreen } from '@/screens/GoalsScreen';
 import { useAppStore } from '@/store/useAppStore';
 import { accentByTheme } from '@/theme/palette';
 import { BottomNavigation } from '@/components/BottomNavigation';
@@ -74,7 +75,7 @@ function MainTabs() {
       <Tabs.Screen
         name="Interactions"
         component={InteractionsScreen}
-        options={{ title: 'Automatiza' }}
+        options={{ title: 'Acciones' }}
       />
       <Tabs.Screen
         name="More"
@@ -112,6 +113,7 @@ export function AppNavigator() {
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen name="RecentActivity" component={RecentActivityScreen} />
+        <Stack.Screen name="Goals" component={GoalsScreen} />
         <Stack.Screen name="Updates" component={UpdatesScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Sounds" component={SoundsScreen} />

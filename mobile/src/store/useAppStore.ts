@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
   AccentTheme,
   AppMode,
+  DetectedGift,
   Goal,
   InteractionRule,
   LeaderboardEntry,
@@ -66,6 +67,7 @@ type AppState = {
   leaderboard: Record<string, LeaderboardEntry>;
   goals: Goal[];
   interactionRules: InteractionRule[];
+  detectedGifts: DetectedGift[];
   accentTheme: AccentTheme;
   darkMode: boolean;
   hapticsEnabled: boolean;
@@ -215,6 +217,7 @@ export const useAppStore = create<AppState>()(
       leaderboard: {},
       goals: [],
       interactionRules: [],
+      detectedGifts: [],
       accentTheme: 'lulu',
       darkMode: true,
       hapticsEnabled: true,
@@ -281,12 +284,38 @@ export const useAppStore = create<AppState>()(
           return goal;
         });
 
+        let detectedGifts = before.detectedGifts;
+        if (event.type === 'gift') {
+          const id = String(event.giftId || '').trim();
+          const name = String(event.giftName || 'Regalo').trim();
+          const key = id ? `id:${id}` : `name:${name.toLocaleLowerCase('es-MX')}`;
+          const existing = detectedGifts.find((gift) => gift.key === key);
+          const repeatCount = Math.max(1, event.repeatCount ?? 1);
+          const diamondsEach = event.diamonds
+            ? Math.max(0, Math.round(event.diamonds / repeatCount))
+            : existing?.diamondsEach;
+          const detected: DetectedGift = {
+            key,
+            id: id || existing?.id,
+            name,
+            imageUrl: event.giftImageUrl || existing?.imageUrl,
+            diamondsEach,
+            timesSeen: (existing?.timesSeen ?? 0) + repeatCount,
+            lastSeenAt: event.timestamp || Date.now(),
+          };
+          detectedGifts = [
+            detected,
+            ...detectedGifts.filter((gift) => gift.key !== key),
+          ].slice(0, 250);
+        }
+
         set({
           stats: nextStats,
           events: [event, ...before.events].slice(0, 500),
           leaderboard: bumpLeaderboard(before.leaderboard, event),
           goals: nextGoals,
           lastGoalCompletion: completion ?? before.lastGoalCompletion,
+          detectedGifts,
         });
       },
 
@@ -397,7 +426,12 @@ export const useAppStore = create<AppState>()(
       name: 'lulu-finity-mobile-v1',
       storage: createJSONStorage(() => AsyncStorage),
       merge: (persisted, current) => {
-        const saved = (persisted ?? {}) as Partial<AppState> & { soundSettings?: any; events?: unknown[]; interactionRules?: unknown[] };
+        const saved = (persisted ?? {}) as Partial<AppState> & {
+          soundSettings?: any;
+          events?: unknown[];
+          interactionRules?: unknown[];
+          detectedGifts?: unknown[];
+        };
         const legacyFanStickerSound = saved.soundSettings?.fanSticker ?? saved.soundSettings?.sticker;
         return {
           ...current,
@@ -407,6 +441,9 @@ export const useAppStore = create<AppState>()(
             : [],
           interactionRules: Array.isArray(saved.interactionRules)
             ? saved.interactionRules.map(migrateRule).filter((rule): rule is InteractionRule => Boolean(rule))
+            : [],
+          detectedGifts: Array.isArray(saved.detectedGifts)
+            ? (saved.detectedGifts as DetectedGift[]).slice(0, 250)
             : [],
           soundSettings: {
             ...defaultSounds,
@@ -424,6 +461,7 @@ export const useAppStore = create<AppState>()(
         events: state.events,
         goals: state.goals,
         interactionRules: state.interactionRules,
+        detectedGifts: state.detectedGifts,
         accentTheme: state.accentTheme,
         darkMode: state.darkMode,
         hapticsEnabled: state.hapticsEnabled,

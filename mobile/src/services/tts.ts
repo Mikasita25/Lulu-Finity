@@ -12,6 +12,10 @@ import {
   microsoftTtsHeaders,
   microsoftTtsUrl,
 } from './microsoftRelay';
+import {
+  claimTtsDelivery,
+  transitionTtsDelivery,
+} from './ttsDelivery';
 
 const MAX_QUEUE = 5;
 const MAX_PENDING_AGE_MS = 10_000;
@@ -29,11 +33,13 @@ type PendingSpeech = {
   voice: string;
   rate: number;
   pitch: number;
+  volume: number;
   prepared?: Promise<File>;
   preparedGeneration?: number;
   controllers?: Set<AbortController>;
   resolve?: () => void;
   reject?: (error: Error) => void;
+  deliveryKey?: string;
 };
 type Player = ReturnType<typeof createAudioPlayer>;
 type Subscription = { remove: () => void };
@@ -44,7 +50,9 @@ let speaking = false;
 let playbackActive = false;
 let generation = 0;
 let activePlayer: Player | null = null;
-let activePlaybackFinish: (() => void) | null = null;
+let activeSpeech: PendingSpeech | null = null;
+let activePlaybackFinish: ((error?: Error) => void) | null = null;
+const welcomedUsers = new Set<string>();
 
 function cleanText(value: string) {
   return value
@@ -72,13 +80,27 @@ function delay(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
+function queueLimit() {
+  return Math.max(1, Math.min(10, Math.round(useTtsStore.getState().queueLimit || MAX_QUEUE)));
+}
+
+function maxPendingAgeMs() {
+  const seconds = useTtsStore.getState().maxPendingAgeSeconds || MAX_PENDING_AGE_MS / 1000;
+  return Math.max(3_000, Math.min(30_000, Math.round(seconds * 1000)));
+}
+
 function shouldRetryStatus(status: number) {
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
-function cancelSpeech(item: PendingSpeech, reason: Error) {
+function cancelSpeech(
+  item: PendingSpeech,
+  reason: Error,
+  status: 'cancelled' | 'expired' | 'failed' = 'cancelled',
+) {
   for (const controller of item.controllers ?? []) controller.abort();
   item.controllers?.clear();
+  transitionTtsDelivery(item.deliveryKey, status, reason.message);
   item.reject?.(reason);
 }
 
@@ -156,7 +178,7 @@ function prepareSpeech(item: PendingSpeech, currentGeneration: number) {
 }
 
 function nextFreshPending() {
-  return pending.find((item) => Date.now() - item.queuedAt <= MAX_PENDING_AGE_MS);
+  return pending.find((item) => Date.now() - item.queuedAt <= maxPendingAgeMs());
 }
 
 function prefetchNext(currentGeneration: number) {
@@ -165,7 +187,12 @@ function prefetchNext(currentGeneration: number) {
   if (next && !next.prepared) void prepareSpeech(next, currentGeneration);
 }
 
-function playAudioFile(file: File, volume: number, currentGeneration: number) {
+function playAudioFile(
+  file: File,
+  volume: number,
+  currentGeneration: number,
+  onStarted: () => void,
+) {
   const player = createAudioPlayer(file.uri, {
     updateInterval: 200,
     preferredForwardBufferDuration: 0,
@@ -176,6 +203,7 @@ function playAudioFile(file: File, volume: number, currentGeneration: number) {
   return new Promise<void>((resolve, reject) => {
     let finished = false;
     let started = false;
+    let confirmedPlaying = false;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
     const finish = (error?: Error) => {
       if (finished) return;
@@ -197,15 +225,22 @@ function playAudioFile(file: File, volume: number, currentGeneration: number) {
       }
     };
 
-    activePlaybackFinish = () => finish();
+    activePlaybackFinish = (error) => finish(error);
     subscription = player.addListener('playbackStatusUpdate', (status) => {
       if (currentGeneration !== generation) return finish();
       if (status.error) return finish(new Error(`Android no pudo reproducir la voz: ${status.error}`));
       if (status.isLoaded) start();
+      if (!confirmedPlaying && (status as { playing?: boolean }).playing) {
+        confirmedPlaying = true;
+        onStarted();
+      }
       if (status.didJustFinish) finish();
     });
     if (player.isLoaded) start();
-    watchdog = setTimeout(finish, 60_000);
+    watchdog = setTimeout(
+      () => finish(new Error('Android no confirmó el final del audio TTS.')),
+      60_000,
+    );
   }).finally(() => {
     try {
       subscription?.remove();
@@ -220,24 +255,33 @@ function playAudioFile(file: File, volume: number, currentGeneration: number) {
 async function processNext(item: PendingSpeech) {
   const currentGeneration = generation;
   speaking = true;
+  activeSpeech = item;
   try {
     const file = await prepareSpeech(item, currentGeneration);
     if (currentGeneration !== generation) {
       safeDelete(file);
       return;
     }
-    const { volume } = useTtsStore.getState();
     setTtsPlaybackActive(true);
     playbackActive = true;
     prefetchNext(currentGeneration);
-    await playAudioFile(file, volume, currentGeneration);
+    await playAudioFile(file, item.volume, currentGeneration, () => {
+      transitionTtsDelivery(item.deliveryKey, 'playing');
+    });
+    if (currentGeneration !== generation) return;
+    transitionTtsDelivery(item.deliveryKey, 'completed');
     item.resolve?.();
   } catch (error) {
     if (currentGeneration === generation) {
       console.warn('[LuluFinity] Microsoft TTS no pudo generar el audio', error);
     }
-    item.reject?.(error instanceof Error ? error : new Error('Microsoft TTS no pudo generar el audio.'));
+    const normalized = error instanceof Error ? error : new Error('Microsoft TTS no pudo generar el audio.');
+    if (currentGeneration === generation) {
+      transitionTtsDelivery(item.deliveryKey, 'failed', normalized.message);
+      item.reject?.(normalized);
+    }
   } finally {
+    if (activeSpeech === item) activeSpeech = null;
     playbackActive = false;
     setTtsPlaybackActive(false);
     if (currentGeneration === generation) {
@@ -250,18 +294,23 @@ async function processNext(item: PendingSpeech) {
 function runNext() {
   if (speaking) return;
   let item = pending.shift();
-  while (item && Date.now() - item.queuedAt > MAX_PENDING_AGE_MS) {
-    cancelSpeech(item, new Error('La prueba caducó antes de reproducirse.'));
+  while (item && Date.now() - item.queuedAt > maxPendingAgeMs()) {
+    cancelSpeech(item, new Error('El mensaje caducó antes de reproducirse.'), 'expired');
     item = pending.shift();
   }
   if (item) void processNext(item);
 }
 
-function speak(text: string, completion?: Pick<PendingSpeech, 'resolve' | 'reject'>) {
+function speak(
+  text: string,
+  options?: Partial<
+    Pick<PendingSpeech, 'resolve' | 'reject' | 'deliveryKey' | 'voice' | 'volume'>
+  >,
+) {
   const value = text.slice(0, MAX_SPEECH_CHARS).trim();
   if (!value) return false;
 
-  if (pending.length + (speaking ? 1 : 0) >= MAX_QUEUE) {
+  if (pending.length + (speaking ? 1 : 0) >= queueLimit()) {
     // El chat nuevo reemplaza al pendiente más antiguo para que el audio nunca
     // quede varios minutos detrás del LIVE.
     if (!pending.length) return false;
@@ -273,10 +322,11 @@ function speak(text: string, completion?: Pick<PendingSpeech, 'resolve' | 'rejec
   const item: PendingSpeech = {
     text: value,
     queuedAt: Date.now(),
-    voice: normalizeMicrosoftVoice(settings.voice, settings.language),
     rate: Math.max(0.6, Math.min(1.5, settings.rate)),
     pitch: Math.max(0.7, Math.min(1.3, settings.pitch)),
-    ...completion,
+    volume: Math.max(0, Math.min(1, options?.volume ?? settings.volume)),
+    ...options,
+    voice: normalizeMicrosoftVoice(options?.voice ?? settings.voice, settings.language),
   };
   pending.push(item);
   runNext();
@@ -284,20 +334,53 @@ function speak(text: string, completion?: Pick<PendingSpeech, 'resolve' | 'rejec
   return true;
 }
 
-export function handleTtsEvent(event: LiveEvent) {
-  if (event.type !== 'comment') return false;
+export async function handleTtsEvent(event: LiveEvent) {
   const settings = useTtsStore.getState();
   if (!settings.enabled) return false;
-
-  const comment = cleanText(event.comment ?? '');
-  if (!comment) return false;
-  if (settings.skipCommands && comment.startsWith('!')) return false;
-
-  const maxChars = Math.max(40, Math.min(MAX_SPEECH_CHARS, Math.round(settings.maxChars)));
-  const trimmed = comment.slice(0, maxChars);
   const name = cleanName(event.nickname || event.uniqueId || 'Usuario').slice(0, 50);
-  const text = settings.announceUsername && name ? `${name} dice: ${trimmed}` : trimmed;
-  return speak(text);
+  let text = '';
+  let voice = settings.voice;
+  let volume = settings.volume;
+
+  if (event.type === 'comment') {
+    if (!settings.readComments) return false;
+    const comment = cleanText(event.comment ?? '');
+    if (!comment) return false;
+    if (settings.skipCommands && comment.startsWith('!')) return false;
+    const maxChars = Math.max(40, Math.min(MAX_SPEECH_CHARS, Math.round(settings.maxChars)));
+    const trimmed = comment.slice(0, maxChars);
+    text = settings.announceUsername && name ? `${name} dice: ${trimmed}` : trimmed;
+  } else if (event.type === 'gift') {
+    if (!settings.readGifts) return false;
+    text = settings.giftTemplate
+      .replace(/\{name\}/gi, name || 'Usuario')
+      .replace(/\{gift\}/gi, cleanText(event.giftName || 'regalo'))
+      .replace(/\{count\}/gi, String(event.repeatCount ?? 1));
+    voice = settings.giftVoice;
+    volume = settings.giftVolume;
+  } else if (event.type === 'member') {
+    if (!settings.readWelcomes) return false;
+    const userKey = String(event.uniqueId || event.nickname || '').trim().toLowerCase();
+    if (!userKey || welcomedUsers.has(userKey)) return false;
+    text = settings.welcomeTemplate.replace(/\{name\}/gi, name || 'Usuario');
+    voice = settings.welcomeVoice;
+    volume = settings.welcomeVolume;
+  } else {
+    return false;
+  }
+
+  text = cleanText(text);
+  if (!text) return false;
+  const deliveryKey = await claimTtsDelivery(event);
+  if (!deliveryKey) return false;
+  if (!speak(text, { deliveryKey, voice, volume })) {
+    transitionTtsDelivery(deliveryKey, 'failed', 'La cola TTS estaba llena.');
+    return false;
+  }
+  if (event.type === 'member') {
+    welcomedUsers.add(String(event.uniqueId || event.nickname).trim().toLowerCase());
+  }
+  return true;
 }
 
 // Los comandos usan la misma voz configurada en TTS Bot, pero no necesitan tener
@@ -318,16 +401,24 @@ export async function previewTts(text: string) {
 
 export async function stopTts() {
   generation += 1;
+  const stopped = new Error('La lectura TTS fue detenida.');
   for (const item of pending.splice(0)) {
-    cancelSpeech(item, new Error('La lectura TTS fue detenida.'));
+    cancelSpeech(item, stopped);
   }
   for (const controller of activeSynthesisControllers) controller.abort();
   activeSynthesisControllers.clear();
+  if (activeSpeech) {
+    cancelSpeech(activeSpeech, stopped);
+  }
   speaking = false;
   playbackActive = false;
-  activePlaybackFinish?.();
+  activePlaybackFinish?.(stopped);
   activePlaybackFinish = null;
   setTtsPlaybackActive(false);
+}
+
+export function resetTtsLiveSession() {
+  welcomedUsers.clear();
 }
 
 export async function getTtsVoices() {
