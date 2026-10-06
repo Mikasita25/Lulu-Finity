@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.10",
+    "jsdom": "^30.1.2"
+  },
+  "private": true,
+  "scripts": {
+    "test": "node editor.test.cjs"
+  }
+}
