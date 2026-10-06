@@ -17,6 +17,8 @@ Abre `index.html` junto con su carpeta `vendor`. El editor usa Three.js si WebGL
 - **Bedrock + textura (.zip)**: geometría y atlas PNG único; las rotaciones UV se hornean en el atlas. No es un addon completo.
 - **geometry.json**: descarga geometría y su atlas PNG, que deben mantenerse juntos.
 
+Al exportar, pulsa el enlace de descarga de la ventana «Archivo listo». Esta descarga directa funciona también cuando el navegador bloquea descargas automáticas.
+
 El guardado es local a este navegador. Exporta el proyecto Alya para transferirlo a otro dispositivo o conservar una copia. Si se llena el almacenamiento, la página pide exportar sin borrar el trabajo.
 
 El visor compatible usa proyección ortográfica y ordenación de caras; está pensado para modelos de cubos. No sustituye todos los formatos y funciones avanzadas de Blockbench.
