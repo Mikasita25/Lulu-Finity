@@ -1,0 +1,56 @@
+name: Publish verified Lulu Finity 1.2.0
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/lulu-finity-studio-1.2.0]
+    paths: ['.github/workflows/publish-v1200.yml', 'release-v1200/**']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-lulu-finity-1.2.0
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Confirm the tested Windows build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/Mikasita25/Lulu-Finity/actions/runs/33948035453 > verified-run.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('verified-run.json'))
+          assert r['conclusion']=='success'
+          assert r['head_sha']=='b46d83741ab328202d55c6b70516df08fe85ff9a'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: Lulu-Finity-Studio-1.2.0
+          run-id: 33948035453
+          github-token: ${{ github.token }}
+          path: tested-build
+      - name: Verify and stage the original installer
+        run: python3 release-v1200/prepare.py
+      - name: Generate updater block map with the original builder version
+        run: |
+          npm install --prefix tooling --ignore-scripts --no-audit --no-fund app-builder-lib@26.15.3
+          node release-v1200/blockmap.cjs
+      - name: Publish the stable release and update channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1.2.0 release-assets/* --draft --target b46d83741ab328202d55c6b70516df08fe85ff9a --title 'Lulu Finity 1.2.0' --notes-file release-v1200/notes.md
+          gh release edit v1.2.0 --draft=false --latest
+          gh release view v1.2.0 --json tagName,isDraft,isPrerelease,assets > published-release.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('published-release.json'))
+          assert r['tagName']=='v1.2.0' and not r['isDraft'] and not r['isPrerelease']
+          assert len(r['assets'])==6
+          PY

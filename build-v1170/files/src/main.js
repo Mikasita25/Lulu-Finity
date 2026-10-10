@@ -179,10 +179,10 @@ function getLocalVoiceManager() {
 const UPDATE_REPOSITORY_URL = 'https://github.com/Mikasita25/Lulu-Finity';
 const UPDATE_RELEASES_URL = `${UPDATE_REPOSITORY_URL}/releases/latest`;
 const DEFAULT_RELAY_PATH = '/v1/tiktok/live';
-const EMBEDDED_RELAY_URL = 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live';
+const EMBEDDED_RELAY_URL = 'wss://lulu-finity-production-6b8f.up.railway.app/v1/tiktok/live';
 const EMBEDDED_RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';
-const RELAY_USAGE_URL = 'https://lulu-finity-production.up.railway.app/usage';
-const STABLE_OVERLAY_BASE_URL = 'https://lulu-finity-production.up.railway.app';
+const RELAY_USAGE_URL = 'https://lulu-finity-production-6b8f.up.railway.app/usage';
+const STABLE_OVERLAY_BASE_URL = 'https://lulu-finity-production-6b8f.up.railway.app';
 const YOUTUBE_PARTITION = 'persist:lulu-youtube';
 const SPOTIFY_PARTITION = 'persist:lulu-spotify';
 const TIKTOK_CHAT_PARTITION = 'persist:lulu-tiktok-chat';
