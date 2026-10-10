@@ -355,6 +355,10 @@ async function handleHttpRequest(request, response) {
     response.end();
     return;
   }
+  if (request.method === 'GET' && url.pathname === '/roulette.html') {
+    response.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'public, max-age=3600', 'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; media-src data:; frame-ancestors 'self'" });
+    response.end(require('zlib').gunzipSync(Buffer.concat(['00','01'].map(part=>require('fs').readFileSync(require('path').join(__dirname,'roulette.html.gz.'+part)))))); return;
+  }
   if (request.method === 'GET' && url.pathname === '/health') {
     const snapshot = keyPool.snapshot();
     const usage = usageMeter.snapshot();
