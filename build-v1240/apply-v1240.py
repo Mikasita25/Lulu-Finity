@@ -13,10 +13,10 @@ animation=b''.join((FILES/('src/roulette.html.gz.'+part)).read_bytes() for part 
 (ROOT/'src/roulette.html.gz').write_bytes(animation)
 (ROOT/'railway-relay/src/roulette.html.gz').write_bytes(animation)
 for name in ['package.json','package-lock.json']:
- p=ROOT/name;data=json.loads(p.read_text());assert data['version']=='1.2.3'
+ p=ROOT/name;data=json.loads(p.read_text(encoding='utf-8'));assert data['version']=='1.2.3'
  data['version']='1.2.4'
  if name.endswith('lock.json'):data['packages']['']['version']='1.2.4'
- p.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+ p.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 patch('src/live-games.js',"const GAME_IDS =", "const { normalizeColorRoulette, validateColorRoulette, pickColor, DURATION_MS } = require('./color-roulette');\nconst GAME_IDS =")
 patch('src/live-games.js','    gameCommands: Array.isArray(input.liveGameCommands)', '    roulette: normalizeColorRoulette(input.colorRoulette),\n    gameCommands: Array.isArray(input.liveGameCommands)')
 patch('src/live-games.js','    this.cooldowns = new Map();','    this.rouletteUntil = 0;\n    this.rouletteCooldowns = new Map();\n    this.rouletteRequests = new Map();\n    this.cooldowns = new Map();')
@@ -78,19 +78,19 @@ patch('src/live-games.js','  async playRoulette(details, bet, config) {',r'''  a
 patch('src/main.js','  liveGamesMigratedV032: false,','  colorRoulette: { cost:0, cooldownSeconds:30, cooldownScope:\'user\', resultSeconds:3 },\n  liveGamesMigratedV032: false,')
 patch('src/main.js','expiresAt:Date.now() + (pending ? 95_000 : 12_000)','expiresAt:result?.animationDurationMs ? result.expiresAt : Date.now() + (pending ? 95_000 : 12_000)')
 # Protect cooldowns and event deduplication against the idle-module release.
-p=ROOT/'src/main.js';s=p.read_text();s=s.replace("Boolean(liveGameManager?.blackjackHands?.size)","Boolean(liveGameManager?.blackjackHands?.size || liveGameManager?.rouletteRequests?.size || liveGameManager?.rouletteUntil > Date.now())");p.write_text(s)
+p=ROOT/'src/main.js';s=p.read_text(encoding='utf-8');s=s.replace("Boolean(liveGameManager?.blackjackHands?.size)","Boolean(liveGameManager?.blackjackHands?.size || liveGameManager?.rouletteRequests?.size || liveGameManager?.rouletteUntil > Date.now())");p.write_text(s,encoding='utf-8')
 patch('src/main.js',"      if (url.pathname === '/widget') {", "      if (url.pathname === '/roulette.html') {\n        response.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'public, max-age=3600' });\n        response.end(require('zlib').gunzipSync(fs.readFileSync(path.join(__dirname,'roulette.html.gz')))); return;\n      }\n      if (url.pathname === '/widget') {")
-bridge=(FILES/'src/roulette-overlay-bridge.js').read_text()
+bridge=(FILES/'src/roulette-overlay-bridge.js').read_text(encoding='utf-8')
 patch('src/main.js',"  function renderGame(data){hideAll();", "  " + bridge.replace('ROULETTE_FRAME_URL',"'/roulette.html?token='+encodeURIComponent("+'${safeToken}'+")") + "\n  function renderGame(data){hideAll();if(data.game==='roulette'&&Number.isInteger(data.rouletteIndex)){showColorRoulette(data);return;}")
 patch('src/main.js','function hideAll(){clearTimeout(hideTimer);','function hideAll(){stopColorRoulette();clearTimeout(hideTimer);')
 patch('src/main.js',"  next.automationRules = Array.isArray(next.automationRules)", "  const colorConfig = require('./color-roulette');\n  next.colorRoulette = colorConfig.normalizeColorRoulette(next.colorRoulette);\n  const rouletteError = colorConfig.validateColorRoulette(next.colorRoulette);\n  if (rouletteError) throw new Error(rouletteError);\n  next.automationRules = Array.isArray(next.automationRules)")
 patch('src/renderer.js',"help:'!ruleta rojo 100 · negro/par/impar/número'", "help:'!ruleta · 8 colores con premios configurables'")
-patch('src/renderer.js',"function renderLiveGames() {",(FILES/'src/roulette-settings-ui.js').read_text()+"\nfunction renderLiveGames() {")
+patch('src/renderer.js',"function renderLiveGames() {",(FILES/'src/roulette-settings-ui.js').read_text(encoding='utf-8')+"\nfunction renderLiveGames() {")
 patch('src/renderer.js',"  const recent=$('liveGameResultsList');", "  renderColorRouletteSettings();\n  const recent=$('liveGameResultsList');")
 patch('src/renderer.js',"  if (state.settings.liveGamesSpeakResults === true && payload.text)","  if (payload.animationDurationMs && !payload.animationAnnounced) {\n    setTimeout(()=>announceColorRouletteResult(payload), Math.max(0, Number(payload.animationStartedAt)+Number(payload.animationDurationMs)-Date.now()));\n    refreshEconomy().catch(()=>{}); return;\n  }\n  if (state.settings.liveGamesSpeakResults === true && payload.text)")
 patch('src/index.html','<strong>🎡 Ruleta:</strong> <code>!ruleta rojo 100</code>, negro, par, impar o un número.', '<strong>🎡 Ruleta:</strong> <code>!ruleta</code>. Sortea uno de los 8 colores y entrega el premio configurado.')
 patch('src/index.html','Resolución recomendada: 700 × 280. El tema elegido viaja dentro del enlace.','Para la ruleta usa una fuente web de 960 × 960 con fondo transparente. Copia este enlace en TikTok Studio; aparece con el comando y desaparece al terminar.')
-p=ROOT/'src/index.html';p.write_text(p.read_text().replace('v1.2.3','v1.2.4'))
+p=ROOT/'src/index.html';p.write_text(p.read_text(encoding='utf-8').replace('v1.2.3','v1.2.4'),encoding='utf-8')
 patch('railway-relay/src/overlay-page.js',"connect-src 'self';", "connect-src 'self'; frame-src 'self';")
 patch('railway-relay/src/overlay-page.js',"  function renderGame(data){hideRoot();", "  "+bridge.replace('ROULETTE_FRAME_URL',"'/roulette.html'")+"\n  function renderGame(data){hideRoot();if(data.game==='roulette'&&Number.isInteger(data.rouletteIndex)){showColorRoulette(data);return;}")
 patch('railway-relay/src/overlay-page.js','const hideRoot=()=>{clearTimeout(hideTimer);','const hideRoot=()=>{stopColorRoulette();clearTimeout(hideTimer);')
@@ -99,4 +99,4 @@ print('Lulu Finity 1.2.4: ruleta de 8 colores integrada.')
 
 patch('src/runtime-regression.test.js', r"expiresAt:Date\.now\(\) \+ \(pending \? 95_000 : 12_000\)", r"expiresAt:result\?\.animationDurationMs \? result\.expiresAt : Date\.now\(\) \+ \(pending \? 95_000 : 12_000\)")
 
-p=ROOT/'src/live-games.js';s=p.read_text();a=s.index('  async playRoulette(');b=s.index('  async playDice(',a);s=s[:a]+s[b:];s=s.replace("    if (game === 'roulette') return this.playRoulette(details, parsed.bet, config);\n",'');p.write_text(s)
+p=ROOT/'src/live-games.js';s=p.read_text(encoding='utf-8');a=s.index('  async playRoulette(');b=s.index('  async playDice(',a);s=s[:a]+s[b:];s=s.replace("    if (game === 'roulette') return this.playRoulette(details, parsed.bet, config);\n",'');p.write_text(s,encoding='utf-8')
