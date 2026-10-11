@@ -73,6 +73,227 @@ jobs:
           foreach ($folder in @('src','resources','build','railway-relay')) {
             if (Test-Path "app/$folder") { Copy-Item "app/$folder" "source-v1250/$folder" -Recurse -Force }
           }
+          $sourceMain = 'source-v1250/src/main.js'
+          $text = Get-Content $sourceMain -Raw
+          $declarations = [regex]::Matches($text, '(?m)^const EMBEDDED_RELAY_CLIENT_TOKEN = .+;
+      - name: Incorporar credencial del relay al instalador
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw 'Configura LULU_RELAY_CLIENT_TOKEN en los secretos de GitHub Actions.' }
+          $path = 'app/src/main.js'
+          $content = Get-Content $path -Raw
+          $matches = [regex]::Matches($content, '(?m)^const EMBEDDED_RELAY_CLIENT_TOKEN = .+;
+      - name: Probar y compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build:win -- --publish never
+      - name: Probar arranque real
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $profile = Join-Path $env:RUNNER_TEMP 'lulu-v122-profile'
+          $startupMarker = Join-Path $env:RUNNER_TEMP 'lulu-v122-startup.txt'
+          $navigationMarker = Join-Path $env:RUNNER_TEMP 'lulu-v122-navigation.json'
+          New-Item -ItemType Directory -Path $profile -Force | Out-Null
+          Remove-Item $startupMarker,$navigationMarker -Force -ErrorAction SilentlyContinue
+          $env:LULU_STARTUP_SMOKE_MARKER = $startupMarker
+          $env:LULU_NAVIGATION_SMOKE_MARKER = $navigationMarker
+          $executable = Resolve-Path 'app/dist/win-unpacked/Lulu Finity.exe'
+          $process = Start-Process -FilePath $executable -ArgumentList "--user-data-dir=$profile" -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 120; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+              if ($process.HasExited) { throw "Lulu Finity se cerró durante la prueba con código $($process.ExitCode)" }
+              if ((Test-Path $startupMarker) -and (Test-Path $navigationMarker)) { $ready = $true; break }
+            }
+            if (!$ready) { throw 'La interfaz no confirmó el arranque completo' }
+            if ((Get-Content $startupMarker -Raw).Trim() -ne 'ready') { throw 'Marca de arranque inválida' }
+            $navigation = Get-Content $navigationMarker -Raw | ConvertFrom-Json
+            if (!$navigation.ok -or @($navigation.results).Count -lt 12) { throw 'La prueba de navegación no pasó' }
+          }
+          finally {
+            Remove-Item Env:LULU_STARTUP_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Stop-Process -Name 'Lulu Finity' -Force -ErrorAction SilentlyContinue
+          }
+      - name: Verificar artefactos del actualizador
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = 'app/dist/Lulu-Finity-Setup-1.2.5.exe'
+          $zip = 'app/dist/Lulu-Finity-1.2.5-x64.zip'
+          $latest = 'app/dist/latest.yml'
+          $blockmap = 'app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap'
+          $source = 'Lulu-Finity-Source-1.2.5.zip'
+          foreach ($file in @($installer,$zip,$latest,$blockmap,$source)) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          $latestText = Get-Content $latest -Raw
+          if (!$latestText.Contains('version: 1.2.5')) { throw 'latest.yml no anuncia 1.2.5' }
+          if (!$latestText.Contains('Lulu-Finity-Setup-1.2.5.exe')) { throw 'latest.yml no apunta al instalador 1.2.5' }
+          Expand-Archive $zip -DestinationPath verify-v122 -Force
+          $asar = Get-ChildItem verify-v122 -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw 'Falta app.asar' }
+          $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          if ($env:GITHUB_EVENT_NAME -ne 'pull_request' -and $asarText.Contains('__LULU_RELAY_CLIENT_TOKEN__')) { throw 'El instalador no tiene credencial de conexión.' }
+          foreach ($token in @('v1.2.5','automation-action-volume-input','automation-action-volume','lastPayloadAt','youtubeAdMuteFailsafeTimer','readCommentIds','markCommentAsRead','wasCommentAlreadyRead','youtubeAdvanceGuardUntil','tiktokGiftCatalog','colorRoulette','showColorRoulette','playColorRoulette')) {
+            if (!$asarText.Contains($token)) { throw "El paquete no contiene $token" }
+          }
+          $files = @($installer,$zip,$latest,$blockmap,$source)
+          $lines = foreach ($file in $files) { "{0}  {1}" -f (Get-FileHash $file -Algorithm SHA256).Hash.ToLower(), (Split-Path $file -Leaf) }
+          $lines | Set-Content SHA256SUMS.txt -Encoding utf8
+      - name: Publicar Lulu Finity 1.2.5
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            'app/dist/Lulu-Finity-Setup-1.2.5.exe',
+            'app/dist/Lulu-Finity-1.2.5-x64.zip',
+            'app/dist/latest.yml',
+            'app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap',
+            'Lulu-Finity-Source-1.2.5.zip',
+            'SHA256SUMS.txt'
+          )
+          gh release view v1.2.5 *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload v1.2.5 $files --clobber
+            gh release edit v1.2.5 --title 'Lulu Finity 1.2.5' --notes-file 'build-v1250/release-notes.md' --latest
+          } else {
+            gh release create v1.2.5 $files --target $env:GITHUB_SHA --title 'Lulu Finity 1.2.5' --notes-file 'build-v1250/release-notes.md' --latest
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v1.2.5
+          path: |
+            app/dist/Lulu-Finity-Setup-1.2.5.exe
+            app/dist/Lulu-Finity-1.2.5-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap
+            Lulu-Finity-Source-1.2.5.zip
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+)
+          if ($matches.Count -ne 1) { throw 'La aplicación no tiene una declaración única de credencial del relay.' }
+          $encodedToken = ConvertTo-Json -InputObject $env:LULU_RELAY_CLIENT_TOKEN -Compress
+          $replacement = 'const EMBEDDED_RELAY_CLIENT_TOKEN = ' + $encodedToken + ';'
+          [IO.File]::WriteAllText($path, $content.Replace($matches[0].Value, $replacement), [Text.UTF8Encoding]::new($false))
+      - name: Probar y compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build:win -- --publish never
+      - name: Probar arranque real
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $profile = Join-Path $env:RUNNER_TEMP 'lulu-v122-profile'
+          $startupMarker = Join-Path $env:RUNNER_TEMP 'lulu-v122-startup.txt'
+          $navigationMarker = Join-Path $env:RUNNER_TEMP 'lulu-v122-navigation.json'
+          New-Item -ItemType Directory -Path $profile -Force | Out-Null
+          Remove-Item $startupMarker,$navigationMarker -Force -ErrorAction SilentlyContinue
+          $env:LULU_STARTUP_SMOKE_MARKER = $startupMarker
+          $env:LULU_NAVIGATION_SMOKE_MARKER = $navigationMarker
+          $executable = Resolve-Path 'app/dist/win-unpacked/Lulu Finity.exe'
+          $process = Start-Process -FilePath $executable -ArgumentList "--user-data-dir=$profile" -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 120; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+              if ($process.HasExited) { throw "Lulu Finity se cerró durante la prueba con código $($process.ExitCode)" }
+              if ((Test-Path $startupMarker) -and (Test-Path $navigationMarker)) { $ready = $true; break }
+            }
+            if (!$ready) { throw 'La interfaz no confirmó el arranque completo' }
+            if ((Get-Content $startupMarker -Raw).Trim() -ne 'ready') { throw 'Marca de arranque inválida' }
+            $navigation = Get-Content $navigationMarker -Raw | ConvertFrom-Json
+            if (!$navigation.ok -or @($navigation.results).Count -lt 12) { throw 'La prueba de navegación no pasó' }
+          }
+          finally {
+            Remove-Item Env:LULU_STARTUP_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Stop-Process -Name 'Lulu Finity' -Force -ErrorAction SilentlyContinue
+          }
+      - name: Verificar artefactos del actualizador
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = 'app/dist/Lulu-Finity-Setup-1.2.5.exe'
+          $zip = 'app/dist/Lulu-Finity-1.2.5-x64.zip'
+          $latest = 'app/dist/latest.yml'
+          $blockmap = 'app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap'
+          $source = 'Lulu-Finity-Source-1.2.5.zip'
+          foreach ($file in @($installer,$zip,$latest,$blockmap,$source)) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          $latestText = Get-Content $latest -Raw
+          if (!$latestText.Contains('version: 1.2.5')) { throw 'latest.yml no anuncia 1.2.5' }
+          if (!$latestText.Contains('Lulu-Finity-Setup-1.2.5.exe')) { throw 'latest.yml no apunta al instalador 1.2.5' }
+          Expand-Archive $zip -DestinationPath verify-v122 -Force
+          $asar = Get-ChildItem verify-v122 -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw 'Falta app.asar' }
+          $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          if ($env:GITHUB_EVENT_NAME -ne 'pull_request' -and $asarText.Contains('__LULU_RELAY_CLIENT_TOKEN__')) { throw 'El instalador no tiene credencial de conexión.' }
+          foreach ($token in @('v1.2.5','automation-action-volume-input','automation-action-volume','lastPayloadAt','youtubeAdMuteFailsafeTimer','readCommentIds','markCommentAsRead','wasCommentAlreadyRead','youtubeAdvanceGuardUntil','tiktokGiftCatalog','colorRoulette','showColorRoulette','playColorRoulette')) {
+            if (!$asarText.Contains($token)) { throw "El paquete no contiene $token" }
+          }
+          $files = @($installer,$zip,$latest,$blockmap,$source)
+          $lines = foreach ($file in $files) { "{0}  {1}" -f (Get-FileHash $file -Algorithm SHA256).Hash.ToLower(), (Split-Path $file -Leaf) }
+          $lines | Set-Content SHA256SUMS.txt -Encoding utf8
+      - name: Publicar Lulu Finity 1.2.5
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            'app/dist/Lulu-Finity-Setup-1.2.5.exe',
+            'app/dist/Lulu-Finity-1.2.5-x64.zip',
+            'app/dist/latest.yml',
+            'app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap',
+            'Lulu-Finity-Source-1.2.5.zip',
+            'SHA256SUMS.txt'
+          )
+          gh release view v1.2.5 *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload v1.2.5 $files --clobber
+            gh release edit v1.2.5 --title 'Lulu Finity 1.2.5' --notes-file 'build-v1250/release-notes.md' --latest
+          } else {
+            gh release create v1.2.5 $files --target $env:GITHUB_SHA --title 'Lulu Finity 1.2.5' --notes-file 'build-v1250/release-notes.md' --latest
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v1.2.5
+          path: |
+            app/dist/Lulu-Finity-Setup-1.2.5.exe
+            app/dist/Lulu-Finity-1.2.5-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap
+            Lulu-Finity-Source-1.2.5.zip
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+)
+          if ($declarations.Count -ne 1) { throw 'No se pudo anonimizar la fuente del relay.' }
+          $text = $text.Replace($declarations[0].Value, "const EMBEDDED_RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';")
+          [IO.File]::WriteAllText($sourceMain, $text, [Text.UTF8Encoding]::new($false))
           Compress-Archive -Path 'source-v1250/*' -DestinationPath 'Lulu-Finity-Source-1.2.5.zip' -Force
       - name: Incorporar credencial del relay al instalador
         if: github.event_name != 'pull_request'
@@ -84,8 +305,111 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw 'Configura LULU_RELAY_CLIENT_TOKEN en los secretos de GitHub Actions.' }
           $path = 'app/src/main.js'
           $content = Get-Content $path -Raw
-          if (!$content.Contains('__LULU_RELAY_CLIENT_TOKEN__')) { throw 'La aplicación no contiene el marcador de credencial del relay.' }
-          [IO.File]::WriteAllText($path, $content.Replace('__LULU_RELAY_CLIENT_TOKEN__', $env:LULU_RELAY_CLIENT_TOKEN), [Text.UTF8Encoding]::new($false))
+          $matches = [regex]::Matches($content, '(?m)^const EMBEDDED_RELAY_CLIENT_TOKEN = .+;
+      - name: Probar y compilar Windows
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build:win -- --publish never
+      - name: Probar arranque real
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $profile = Join-Path $env:RUNNER_TEMP 'lulu-v122-profile'
+          $startupMarker = Join-Path $env:RUNNER_TEMP 'lulu-v122-startup.txt'
+          $navigationMarker = Join-Path $env:RUNNER_TEMP 'lulu-v122-navigation.json'
+          New-Item -ItemType Directory -Path $profile -Force | Out-Null
+          Remove-Item $startupMarker,$navigationMarker -Force -ErrorAction SilentlyContinue
+          $env:LULU_STARTUP_SMOKE_MARKER = $startupMarker
+          $env:LULU_NAVIGATION_SMOKE_MARKER = $navigationMarker
+          $executable = Resolve-Path 'app/dist/win-unpacked/Lulu Finity.exe'
+          $process = Start-Process -FilePath $executable -ArgumentList "--user-data-dir=$profile" -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 120; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+              if ($process.HasExited) { throw "Lulu Finity se cerró durante la prueba con código $($process.ExitCode)" }
+              if ((Test-Path $startupMarker) -and (Test-Path $navigationMarker)) { $ready = $true; break }
+            }
+            if (!$ready) { throw 'La interfaz no confirmó el arranque completo' }
+            if ((Get-Content $startupMarker -Raw).Trim() -ne 'ready') { throw 'Marca de arranque inválida' }
+            $navigation = Get-Content $navigationMarker -Raw | ConvertFrom-Json
+            if (!$navigation.ok -or @($navigation.results).Count -lt 12) { throw 'La prueba de navegación no pasó' }
+          }
+          finally {
+            Remove-Item Env:LULU_STARTUP_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Remove-Item Env:LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
+            Stop-Process -Name 'Lulu Finity' -Force -ErrorAction SilentlyContinue
+          }
+      - name: Verificar artefactos del actualizador
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = 'app/dist/Lulu-Finity-Setup-1.2.5.exe'
+          $zip = 'app/dist/Lulu-Finity-1.2.5-x64.zip'
+          $latest = 'app/dist/latest.yml'
+          $blockmap = 'app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap'
+          $source = 'Lulu-Finity-Source-1.2.5.zip'
+          foreach ($file in @($installer,$zip,$latest,$blockmap,$source)) {
+            if (!(Test-Path $file)) { throw "No se generó $file" }
+          }
+          $latestText = Get-Content $latest -Raw
+          if (!$latestText.Contains('version: 1.2.5')) { throw 'latest.yml no anuncia 1.2.5' }
+          if (!$latestText.Contains('Lulu-Finity-Setup-1.2.5.exe')) { throw 'latest.yml no apunta al instalador 1.2.5' }
+          Expand-Archive $zip -DestinationPath verify-v122 -Force
+          $asar = Get-ChildItem verify-v122 -Recurse -Filter app.asar | Select-Object -First 1
+          if (!$asar) { throw 'Falta app.asar' }
+          $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
+          if ($env:GITHUB_EVENT_NAME -ne 'pull_request' -and $asarText.Contains('__LULU_RELAY_CLIENT_TOKEN__')) { throw 'El instalador no tiene credencial de conexión.' }
+          foreach ($token in @('v1.2.5','automation-action-volume-input','automation-action-volume','lastPayloadAt','youtubeAdMuteFailsafeTimer','readCommentIds','markCommentAsRead','wasCommentAlreadyRead','youtubeAdvanceGuardUntil','tiktokGiftCatalog','colorRoulette','showColorRoulette','playColorRoulette')) {
+            if (!$asarText.Contains($token)) { throw "El paquete no contiene $token" }
+          }
+          $files = @($installer,$zip,$latest,$blockmap,$source)
+          $lines = foreach ($file in $files) { "{0}  {1}" -f (Get-FileHash $file -Algorithm SHA256).Hash.ToLower(), (Split-Path $file -Leaf) }
+          $lines | Set-Content SHA256SUMS.txt -Encoding utf8
+      - name: Publicar Lulu Finity 1.2.5
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            'app/dist/Lulu-Finity-Setup-1.2.5.exe',
+            'app/dist/Lulu-Finity-1.2.5-x64.zip',
+            'app/dist/latest.yml',
+            'app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap',
+            'Lulu-Finity-Source-1.2.5.zip',
+            'SHA256SUMS.txt'
+          )
+          gh release view v1.2.5 *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload v1.2.5 $files --clobber
+            gh release edit v1.2.5 --title 'Lulu Finity 1.2.5' --notes-file 'build-v1250/release-notes.md' --latest
+          } else {
+            gh release create v1.2.5 $files --target $env:GITHUB_SHA --title 'Lulu Finity 1.2.5' --notes-file 'build-v1250/release-notes.md' --latest
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-Windows-v1.2.5
+          path: |
+            app/dist/Lulu-Finity-Setup-1.2.5.exe
+            app/dist/Lulu-Finity-1.2.5-x64.zip
+            app/dist/latest.yml
+            app/dist/Lulu-Finity-Setup-1.2.5.exe.blockmap
+            Lulu-Finity-Source-1.2.5.zip
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+)
+          if ($matches.Count -ne 1) { throw 'La aplicación no tiene una declaración única de credencial del relay.' }
+          $encodedToken = ConvertTo-Json -InputObject $env:LULU_RELAY_CLIENT_TOKEN -Compress
+          $replacement = 'const EMBEDDED_RELAY_CLIENT_TOKEN = ' + $encodedToken + ';'
+          [IO.File]::WriteAllText($path, $content.Replace($matches[0].Value, $replacement), [Text.UTF8Encoding]::new($false))
       - name: Probar y compilar Windows
         working-directory: app
         env:
