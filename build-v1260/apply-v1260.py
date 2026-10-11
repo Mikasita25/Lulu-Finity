@@ -22,7 +22,7 @@ for filename in ['src/widget-design.js','railway-relay/src/widget-design.js']:
 for filename in ['src/main.js','railway-relay/src/overlay-page.js']:
  p=root/filename;s=p.read_text(encoding='utf-8');s=s.replace("'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'public, max-age=3600'","'Content-Type':'text/html; charset=utf-8', 'Content-Encoding':'gzip', 'Cache-Control':'public, max-age=3600'");s=s.replace('Number(data.expiresAt||0)','Number(data.activityExpiresAt??data.expiresAt??0)')
  s=s.replace('&&expiresAt>Date.now()','&&(data.autoHide===false||expiresAt>Date.now())')
- s=s.replace('if(expiresAt>Date.now())hideTimer=', 'if(data.autoHide!==false&&expiresAt>Date.now())hideTimer=')
+ s=s.replace('if(expiresAt>Date.now())hideTimer=', 'if(data.autoHide!==false&&expiresAt>Date.now())hideTimer=');s=s.replace('function armActivityExpiry(data){if(preview)return;', 'function armActivityExpiry(data){clearTimeout(hideTimer);if(preview)return;').replace('const armActivityExpiry=(data)=>{', 'const armActivityExpiry=(data)=>{clearTimeout(hideTimer);')
  if filename=='src/main.js':
   s=s.replace("else renderPlaylist(data)}", "else renderPlaylist(data);if(!preview&&data.autoHide===true&&!(data.game==='roulette'&&Number.isInteger(data.rouletteIndex))){const end=Number(data.activityExpiresAt??data.expiresAt??0);if(end<=Date.now()){hideAll();return}armActivityExpiry(data)}}")
   s=s.replace("board.className='style-'", "clearTimeout(rankingHideTimer);board.hidden=false;if(!preview&&data.autoHide!==false){const end=Number(data.activityExpiresAt||0);if(end<=Date.now()){board.hidden=true;return}rankingHideTimer=setTimeout(()=>{board.hidden=true},end-Date.now())}\n    board.className='style-'")
