@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import re
 import sys
 
 root = Path(sys.argv[1] if len(sys.argv) > 1 else "app").resolve()
@@ -19,19 +20,21 @@ for filename in ("package.json", "package-lock.json"):
 
 main_path = root / "src/main.js"
 main = main_path.read_text(encoding="utf-8")
-old = """const EMBEDDED_RELAY_URL = 'wss://lulu-finity-production.up.railway.app/v1/tiktok/live';
-const EMBEDDED_RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';
-const RELAY_USAGE_URL = 'https://lulu-finity-production.up.railway.app/usage';
-const STABLE_OVERLAY_BASE_URL = 'https://lulu-finity-production.up.railway.app';"""
-new = """// Un mismo origen para TikTok LIVE, consumo, TTS y fuentes HTTPS.
-const LULU_SERVER_ORIGIN = 'https://lulu-finity-production.up.railway.app';
-const EMBEDDED_RELAY_URL = LULU_SERVER_ORIGIN.replace(/^http/, 'ws') + '/v1/tiktok/live';
-const EMBEDDED_RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';
-const RELAY_USAGE_URL = LULU_SERVER_ORIGIN + '/usage';
-const STABLE_OVERLAY_BASE_URL = LULU_SERVER_ORIGIN;"""
-if main.count(old) != 1:
-    raise RuntimeError("No se encontró la configuración del relay esperada")
-main_path.write_text(main.replace(old, new, 1), encoding="utf-8")
+replacements = {
+    "EMBEDDED_RELAY_URL": "const EMBEDDED_RELAY_URL = LULU_SERVER_ORIGIN.replace(/^http/, 'ws') + '/v1/tiktok/live';",
+    "RELAY_USAGE_URL": "const RELAY_USAGE_URL = LULU_SERVER_ORIGIN + '/usage';",
+    "STABLE_OVERLAY_BASE_URL": "const STABLE_OVERLAY_BASE_URL = LULU_SERVER_ORIGIN;"
+}
+if "const LULU_SERVER_ORIGIN =" in main:
+    raise RuntimeError("La constante del servidor ya existe; revisar la versión base")
+for constant, replacement in replacements.items():
+    pattern = re.compile(r"(?m)^const " + re.escape(constant) + r" = .*?;$")
+    main, found = pattern.subn(lambda match: replacement, main)
+    if found != 1:
+        raise RuntimeError(f"No se encontró una única declaración de {constant}: {found}")
+anchor = "// Un mismo origen para TikTok LIVE, consumo, TTS y fuentes HTTPS.\n" + "const LULU_SERVER_ORIGIN = '" + server + "';\n"
+main = main.replace("const EMBEDDED_RELAY_URL =", anchor + "const EMBEDDED_RELAY_URL =", 1)
+main_path.write_text(main, encoding="utf-8")
 
 html_path = root / "src/index.html"
 html = html_path.read_text(encoding="utf-8")
