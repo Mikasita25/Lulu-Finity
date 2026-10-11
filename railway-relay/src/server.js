@@ -1,6 +1,7 @@
 'use strict';
 
 const http = require('http');
+let rouletteAssetCache;
 const { URL } = require('url');
 const WebSocket = require('ws');
 const { WebSocketServer } = WebSocket;
@@ -356,8 +357,8 @@ async function handleHttpRequest(request, response) {
     return;
   }
   if (request.method === 'GET' && url.pathname === '/roulette.html') {
-    response.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'public, max-age=3600', 'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; media-src data:; frame-ancestors 'self'" });
-    response.end(require('zlib').gunzipSync(Buffer.concat(['00','01'].map(part=>require('fs').readFileSync(require('path').join(__dirname,'roulette.html.gz.'+part)))))); return;
+    response.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Content-Encoding':'gzip', 'Cache-Control':'public, max-age=3600', 'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; media-src data:; frame-ancestors 'self'" });
+    rouletteAssetCache ||= Buffer.concat(['00','01'].map(part=>require('fs').readFileSync(require('path').join(__dirname,'roulette.html.gz.'+part))));response.end(rouletteAssetCache); return;
   }
   if (request.method === 'GET' && url.pathname === '/health') {
     const snapshot = keyPool.snapshot();
