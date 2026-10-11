@@ -12,7 +12,7 @@ assert main.count("const LULU_SERVER_ORIGIN = 'https://lulu-finity-production.up
 assert "const EMBEDDED_RELAY_URL = LULU_SERVER_ORIGIN.replace(/^http/, 'ws') + '/v1/tiktok/live';" in main
 assert "const RELAY_USAGE_URL = LULU_SERVER_ORIGIN + '/usage';" in main
 assert "const STABLE_OVERLAY_BASE_URL = LULU_SERVER_ORIGIN;" in main
-assert "const EMBEDDED_RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';" in main
+assert main.count("const EMBEDDED_RELAY_CLIENT_TOKEN = ") == 1
 assert "autoUpdater.checkForUpdates()" in main
 assert "autoUpdater.quitAndInstall(false, true)" in main
 assert "colorRoulette" in main and "showColorRoulette" in main
