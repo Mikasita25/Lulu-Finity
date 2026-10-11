@@ -13,7 +13,7 @@
     return '';
   }
   function normalize(source = {}) {
-    return { fontFamily:Object.hasOwn(fonts, source.fontFamily) ? source.fontFamily : 'system', fontSize:number(source.fontSize,12,40,22), scale:number(source.scale,50,150,100), borderWidth:number(source.borderWidth,0,8,1), shadow:number(source.shadow,0,60,24), blur:number(source.blur,0,24,0), padding:number(source.padding,8,40,18), backgroundImage:image(source.backgroundImage), logoImage:image(source.logoImage), backgroundFit:source.backgroundFit === 'contain' ? 'contain' : 'cover' };
+    return { autoHide:source.autoHide!==false,displaySeconds:number(source.displaySeconds,1,300,10),fontFamily:Object.hasOwn(fonts, source.fontFamily) ? source.fontFamily : 'system', fontSize:number(source.fontSize,12,40,22), scale:number(source.scale,50,150,100), borderWidth:number(source.borderWidth,0,8,1), shadow:number(source.shadow,0,60,24), blur:number(source.blur,0,24,0), padding:number(source.padding,8,40,18), backgroundImage:image(source.backgroundImage), logoImage:image(source.logoImage), backgroundFit:source.backgroundFit === 'contain' ? 'contain' : 'cover' };
   }
   function css(source = {}) {
     if (!source.enabled) return '';
