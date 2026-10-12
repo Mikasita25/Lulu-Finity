@@ -1,6 +1,6 @@
 # Lectura de usuarios y cola de voz
 
-Corrección preparada sobre la fuente publicada 1.2.6. El parche genera la versión 1.2.7 sin publicar ni desplegar automáticamente.
+Corrección preparada sobre la fuente publicada 1.2.6. El parche genera la versión 1.2.7. El workflow v1270 valida, compila Windows, prueba el arranque y publica los archivos del actualizador al integrarse en main.
 
 - Los datos parciales dentro de `user`, `sender`, `fromUser` o `member` conservan el usuario, nombre y avatar que vienen en el nivel superior. Los datos del relay siguen pasando por su lista permitida.
 - Los nombres con puntos y guiones bajos se preparan para voz sin confundirse con enlaces. Si el apodo solo contiene emojis, se usa el identificador del usuario.
@@ -10,4 +10,4 @@ Corrección preparada sobre la fuente publicada 1.2.6. El parche genera la versi
 
 Validación: pruebas de identidad parcial, nombres decorados, cola completa de 100 entradas, espera, vencimiento explícito, prioridades y liberación de bloqueos, junto con la suite existente.
 
-La revisión no verifica un LIVE real ni genera un instalador Windows. Los demás filtros de lectura, permisos y cooldowns siguen aplicándose.
+Las pruebas automáticas incluyen arranque y navegación del ejecutable Windows. La lectura en un LIVE real requiere un directo; los demás filtros de lectura, permisos y cooldowns siguen aplicándose.

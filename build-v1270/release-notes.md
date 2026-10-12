@@ -1,0 +1,6 @@
+- Se conserva el usuario correcto cuando TikTok envía datos parciales del perfil.
+- Los nombres con puntos y los apodos con emojis se preparan mejor para la lectura de voz.
+- Los comentarios aceptados ya no vencen a los 8 segundos por defecto ni se reemplazan al llenarse la cola.
+- Nuevo ajuste de espera máxima en cola: 0 conserva los pendientes sin vencimiento; de 1 a 600 segundos activa el límite.
+- Los comandos de voz tienen prioridad y conservan su orden.
+- Se mantienen los widgets ocultables y las ruletas de la versión anterior.
