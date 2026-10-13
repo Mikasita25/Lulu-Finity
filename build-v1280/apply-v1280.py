@@ -125,7 +125,7 @@ exact('src/renderer.js',
 async function synthesizeSpeechData(text, voiceConfig, speedMultiplier = 1) {''')
 exact('src/renderer.js',
       "const preparedState = speechItem?.preparedPromise ? await speechItem.preparedPromise : { ok:true, prepared:await synthesizeSpeechData(text, voiceConfig, speedMultiplier) };",
-      "const preparedState = await withSpeechTimeout(speechItem?.preparedPromise || synthesizeSpeechData(text, voiceConfig, speedMultiplier));")
+      "const preparedState = await withSpeechTimeout(speechItem?.preparedPromise || synthesizeSpeechData(text, voiceConfig, speedMultiplier).then(prepared => ({ ok:true, prepared })));")
 exact('src/renderer.js',
       '      state.onlineAudio = null;\n      state.speechPlaybackStarted = false;',
       '      state.systemSpeechRecoveryCancel?.();\n      state.onlineAudio = null;\n      state.speechPlaybackStarted = false;')
