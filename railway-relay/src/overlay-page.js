@@ -2,7 +2,7 @@
 const widgetDesignScript = require('fs').readFileSync(require('path').join(__dirname, 'widget-design.js'), 'utf8');
 
 function overlayPageCsp() {
-  return "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors *";
+  return "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors *";
 }
 
 function renderOverlayPage(publicId, kind, name) {
@@ -24,7 +24,54 @@ function renderOverlayPage(publicId, kind, name) {
   function card(title,badge){const box=node('section','card');box.append(header(title,badge));return box}
   function renderPlaylist(data){clearTimeout(hideTimer);const items=Array.isArray(data.queue)?data.queue:[];if(data.visible===false||(!data.current&&!items.length)){hideRoot();return}const box=card('Lista de reproducción',data.provider||'Música');if(data.current){const now=node('div','now');now.append(node('strong','',data.current.title||'Canción actual'),node('small','',data.current.requestedBy?'Solicitada por '+data.current.requestedBy:'Reproduciendo ahora'));box.append(now)}else box.append(node('div','empty','Preparando la canción solicitada…'));const queue=node('div','queue');items.slice(0,5).forEach((item,index)=>{const row=node('div','row'),copy=node('div','row-copy');copy.append(node('strong','',item.title||'Canción'),node('small','',item.requestedBy?'Pedida por '+item.requestedBy:'Solicitud manual'));row.append(node('span','rank',index+1),copy);queue.append(row)});box.append(queue);root.replaceChildren(box)}
   function renderWallet(data){hideRoot();if(!timedActivityVisible(data,data.user))return;const box=card(data.displayName||data.user,'SALDO'),row=node('div','row'),copy=node('div','row-copy');copy.append(node('strong','','@'+data.user),node('small','',data.currencyName||'Lunitas'));row.append(copy,node('strong','value',(data.currencySymbol||'🌙')+' '+Number(data.balance||0).toLocaleString('es-MX')));box.append(row);root.replaceChildren(box);armActivityExpiry(data)}
-  let rouletteFrame=null,roulettePayload=null,rouletteTimer=0,rouletteReady=false;
+  let rouletteMediaKey = '', rouletteMediaStartTimer = 0, rouletteMediaEndTimer = 0, rouletteMediaNode = null;
+function stopRouletteMedia() {
+  clearTimeout(rouletteMediaStartTimer);
+  clearTimeout(rouletteMediaEndTimer);
+  rouletteMediaStartTimer = 0;
+  rouletteMediaEndTimer = 0;
+  rouletteMediaKey = '';
+  if (rouletteMediaNode) {
+    if (rouletteMediaNode.tagName === 'VIDEO') rouletteMediaNode.pause();
+    rouletteMediaNode.remove();
+    rouletteMediaNode = null;
+  }
+}
+function scheduleRouletteMedia(data) {
+  const media = data && data.rouletteMedia;
+  const key = String(data && data.id || '');
+  if (key && key === rouletteMediaKey) return;
+  stopRouletteMedia();
+  if (!media || !['gif','image','video'].includes(media.type)) return;
+  let url;
+  try { url = new URL(String(media.url || '')); } catch { return; }
+  if (url.protocol !== 'https:' || !url.hostname) return;
+  const startAt = Number(data.animationStartedAt) + Number(data.animationDurationMs || 14110);
+  const endAt = Math.min(Number(data.expiresAt), startAt + Math.max(1,Math.min(30,Number(media.seconds)||5))*1000);
+  if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= Date.now()) return;
+  rouletteMediaKey = key;
+  const show = () => {
+    if (rouletteMediaKey !== key || Date.now() >= endAt) return;
+    const el = document.createElement(media.type === 'video' ? 'video' : 'img');
+    el.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;background:transparent;z-index:110;';
+    if (media.type === 'video') {
+      el.muted = true;
+      el.autoplay = true;
+      el.loop = true;
+      el.playsInline = true;
+      el.preload = 'auto';
+    } else { el.alt = 'Acción del color ganador'; }
+    el.src = url.href;
+    document.body.append(el);
+    rouletteMediaNode = el;
+    if (media.type === 'video') { const result = el.play(); if (result && result.catch) result.catch(() => {}); }
+    rouletteMediaEndTimer = setTimeout(stopRouletteMedia, Math.max(0,endAt - Date.now()));
+  };
+  if (startAt > Date.now()) rouletteMediaStartTimer = setTimeout(show, Math.max(0,startAt - Date.now()));
+  else show();
+}
+
+let rouletteFrame=null,roulettePayload=null,rouletteTimer=0,rouletteReady=false;
 function prepareColorRoulette(){
   if(rouletteFrame)return;
   rouletteFrame=document.createElement('iframe');rouletteFrame.title='Ruleta';
@@ -37,18 +84,20 @@ function prepareColorRoulette(){
   });
 }
 function stopColorRoulette(){
+  stopRouletteMedia();
   clearTimeout(rouletteTimer);roulettePayload=null;
   if(rouletteFrame){rouletteFrame.style.display='none';queueMicrotask(()=>{if(!roulettePayload)rouletteFrame.contentWindow.postMessage({type:'lulu-roulette-stop'},location.origin);});}
 }
 function showColorRoulette(data){
-  if(data.visible===false||Number(data.expiresAt)<=Date.now())return;
+  if(data.visible===false||Number(data.expiresAt)<=Date.now()){stopColorRoulette();return;}
   prepareColorRoulette();roulettePayload=data;rouletteFrame.style.display='block';
   if(rouletteReady)rouletteFrame.contentWindow.postMessage({...data,type:'lulu-roulette-play'},location.origin);
   rouletteTimer=setTimeout(stopColorRoulette,Math.max(0,Number(data.expiresAt)-Date.now()));
+  scheduleRouletteMedia(data);
 }
 if((typeof widget!=='undefined'&&widget==='game'&&typeof preview!=='undefined'&&!preview)||(typeof boot!=='undefined'&&boot.name==='game'))prepareColorRoulette();
 
-  function renderGame(data){hideRoot();if(data.game==='roulette'&&Number.isInteger(data.rouletteIndex)){showColorRoulette(data);return;}if(!timedActivityVisible(data,data.user&&data.status&&data.status!=='idle'))return;const box=card(data.title||'Juegos del LIVE',text(data.status).toUpperCase());box.append(node('div','now',data.detail||data.text||'Partida activa'));const meta=node('div','meta');meta.append(node('span','',data.displayName||data.user),node('strong','',(data.currencySymbol||'🌙')+' '+Number(data.payout||0).toLocaleString('es-MX')));box.append(meta);root.replaceChildren(box);armActivityExpiry(data)}
+  function renderGame(data){if(data.game==='roulette'&&Number.isInteger(data.rouletteIndex)){root.replaceChildren();showColorRoulette(data);return;}hideRoot();if(!timedActivityVisible(data,data.user&&data.status&&data.status!=='idle'))return;const box=card(data.title||'Juegos del LIVE',text(data.status).toUpperCase());box.append(node('div','now',data.detail||data.text||'Partida activa'));const meta=node('div','meta');meta.append(node('span','',data.displayName||data.user),node('strong','',(data.currencySymbol||'🌙')+' '+Number(data.payout||0).toLocaleString('es-MX')));box.append(meta);root.replaceChildren(box);armActivityExpiry(data)}
   function renderAlert(data){hideRoot();if(!timedActivityVisible(data,data.text))return;const box=card(data.title||'Alertas de Lulu',data.icon||'✦');box.append(node('div','now',data.text));root.replaceChildren(box);armActivityExpiry(data)}
   function renderGoal(data){clearTimeout(hideTimer);if(data.visible===false||!data.title){hideRoot();return}const target=Math.max(1,Number(data.target||1)),progress=Math.max(0,Number(data.progress||0)),percent=Math.max(0,Math.min(100,Number(data.percent??progress/target*100))),box=card(data.title,Math.round(percent)+'%'),track=node('div','progress');track.append(node('span'));track.firstChild.style.width=percent+'%';box.append(track);const meta=node('div','meta');meta.append(node('strong','',data.text||progress.toLocaleString('es-MX')+' / '+target.toLocaleString('es-MX')),node('small','',text(data.goalType||'meta').toUpperCase()));box.append(meta);root.replaceChildren(box)}
   function renderGift(data){hideRoot();if(!timedActivityVisible(data,data.lastGift))return;const box=card('Regalos del LIVE',Number(data.totalGifts||0).toLocaleString('es-MX')+' regalos'),grid=node('div','gift-grid');for(const [label,gift] of [['TOP REGALO',data.topGift],['MEJOR RACHA',data.topStreak]]){const item=node('div','gift-box'),value=gift||{};item.append(node('small','',label),node('strong','',value.displayName||'Esperando'),node('div','',value.giftName?value.giftName+' ×'+Number(value.repeatCount||1):'—'));grid.append(item)}box.append(grid);root.replaceChildren(box);armActivityExpiry(data)}
