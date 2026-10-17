@@ -34,5 +34,6 @@ test('el relay acepta mensajes individuales y paquetes antiguos', () => {
   const bundle = Buffer.from(JSON.stringify({ messages:[comment] }));
   assert.equal(inspectUpstreamFrame(single).valid, true);
   assert.equal(inspectUpstreamFrame(bundle).valid, true);
-  assert.match(source, /upstream\\.on\\('message',[\\s\\S]*?this\\.client\\.send\\(data, \\{ binary: isBinary \\}\\)/);
+  assert.ok(source.includes("upstream.on('message', (data, isBinary) => {"));
+  assert.ok(source.includes('this.client.send(data, { binary: isBinary })'));
 });
