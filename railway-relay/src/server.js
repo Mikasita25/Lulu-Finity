@@ -157,7 +157,9 @@ function buildUpstreamUrl(uniqueId, apiKey) {
   const url = new URL(UPSTREAM_WS_URL);
   url.searchParams.set('uniqueId', uniqueId);
   url.searchParams.set('apiKey', apiKey);
-  url.searchParams.set('features.bundleEvents', 'true');
+  // Los comentarios deben llegar al relay en cuanto EulerStream los emite.
+  // Con lotes activados, algunos eventos pueden esperar al siguiente paquete.
+  url.searchParams.set('features.bundleEvents', 'false');
   url.searchParams.set('features.rawMessages', 'false');
   url.searchParams.set('features.normalizeUniqueId', 'true');
   url.searchParams.set('features.syntheticPresence', 'true');
