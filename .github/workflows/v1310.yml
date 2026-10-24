@@ -170,7 +170,7 @@ jobs:
           if (!$asar) { throw 'Falta app.asar' }
           $asarText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($asar.FullName))
           if ($env:GITHUB_EVENT_NAME -ne 'pull_request' -and $asarText.Contains('__LULU_RELAY_CLIENT_TOKEN__')) { throw 'El instalador no tiene credencial del relay.' }
-          foreach ($token in @('v1.3.1','automation-action-volume-input','automation-action-volume','lastPayloadAt','youtubeAdMuteFailsafeTimer','readCommentIds','markCommentAsRead','wasCommentAlreadyRead','youtubeAdvanceGuardUntil','tiktokGiftCatalog','colorRoulette','showColorRoulette','playColorRoulette','activityExpiresAt','rankingAutoHideInput','data-widget-recall','queueWaitSeconds','queueWaitInput','cola llena; se conservan los comentarios pendientes','systemSpeechRecoveryCancel','withSpeechTimeout','rouletteMedia','rouletteActionFields','scheduleRouletteMedia','Math.min(3,baseKeys.length)','v1.3.1')) {
+          foreach ($token in @('v1.3.1','automation-action-volume-input','automation-action-volume','lastPayloadAt','youtubeAdMuteFailsafeTimer','readCommentIds','markCommentAsRead','wasCommentAlreadyRead','youtubeAdvanceGuardUntil','tiktokGiftCatalog','colorRoulette','showColorRoulette','playColorRoulette','activityExpiresAt','rankingAutoHideInput','data-widget-recall','queueWaitSeconds','queueWaitInput','cola llena; se conservan los comentarios pendientes','systemSpeechRecoveryCancel','withSpeechTimeout','rouletteMedia','rouletteActionFields','scheduleRouletteMedia','v1.3.1')) {
             if (!$asarText.Contains($token)) { throw "El paquete no contiene $token" }
           }
           $files = @($installer,$zip,$latest,$blockmap,$source)
