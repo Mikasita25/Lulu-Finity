@@ -3,6 +3,8 @@ on:
   push:
     branches: [fix/voz-microsoft-cola-132]
     paths: ['.github/workflows/prueba-voz-132.yml', 'build-v1320/**']
+  pull_request:
+    paths: ['.github/workflows/prueba-voz-132.yml', 'build-v1320/**']
   workflow_dispatch:
 permissions:
   contents: read
