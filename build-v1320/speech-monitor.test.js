@@ -34,3 +34,18 @@ test('un audio terminado libera la cola aunque falte el evento ended', () => {
 test('cancelar el monitor impide que se active después', () => {
   const h = setup(); h.stop(); h.advance(10000); assert.equal(h.stalled, 0);
 });
+test('prepara Microsoft mientras otro sonido ocupa el reproductor', async () => {
+  const begin = source.indexOf('function speakNext()');
+  const finish = source.indexOf('\nfunction clearSpeechQueue()', begin);
+  assert.ok(begin >= 0 && finish > begin);
+  const item = { id:'1', text:'hola', voice:{ mode:'online' }, speedMultiplier:1 };
+  let syntheses = 0, submitted;
+  const ctx = { state:{ speaking:false, audioBusy:true, speechQueue:[item], settings:{} },
+    speechItemExpired:()=>false, adaptiveSpeechMultiplier:()=>1, renderStats:()=>{},
+    synthesizeSpeechData:async()=>{ syntheses++; return {data:'audio'}; },
+    speakText:(...args)=>{ submitted=args; return {accepted:true}; },
+    releaseAudioLock:()=>{}, updateCommentResult:()=>{}, queueMicrotask };
+  vm.createContext(ctx); vm.runInContext(source.slice(begin,finish),ctx); ctx.speakNext();
+  assert.equal(syntheses,1); assert.equal(submitted[4].speechItem,item);
+  assert.equal((await item.preparedPromise).ok,true);
+});
