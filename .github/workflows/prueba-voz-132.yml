@@ -1,0 +1,63 @@
+name: Prueba de voz 1.3.2
+on:
+  push:
+    branches: [fix/voz-microsoft-cola-132]
+    paths: ['.github/workflows/prueba-voz-132.yml', 'build-v1320/**']
+  pull_request:
+    paths: ['.github/workflows/prueba-voz-132.yml', 'build-v1320/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Preparar fuente verificada
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest -Uri 'https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.2.9/Lulu-Finity-Source-1.2.9.zip' -OutFile base.zip
+          if ((Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower() -ne 'f841d6bef0b9ea1cf83a2857ca173ee26b5bef9390047ad8dbf3b3c23d51cf5f') { throw 'Fuente incorrecta' }
+          Expand-Archive base.zip -DestinationPath app -Force
+          python build-v1300/apply-v1300.py app
+          python build-v1310/apply-v1310.py app
+          python build-v1320/apply-v1320.py app
+          node build-v1320/speech-monitor.test.js app/src/renderer.js
+          node --check app/src/renderer.js
+      - name: Configurar conexión
+        shell: pwsh
+        env:
+          LULU_RELAY_CLIENT_TOKEN: ${{ secrets.LULU_RELAY_CLIENT_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:LULU_RELAY_CLIENT_TOKEN) -or $env:LULU_RELAY_CLIENT_TOKEN.Length -lt 32) { throw 'Falta la credencial de conexión.' }
+          $path = 'app/src/main.js'
+          $content = Get-Content $path -Raw
+          $line = "const EMBEDDED_RELAY_CLIENT_TOKEN = '__LULU_RELAY_CLIENT_TOKEN__';"
+          if (!$content.Contains($line)) { throw 'No se encontró el marcador de credencial.' }
+          $encoded = ConvertTo-Json -InputObject $env:LULU_RELAY_CLIENT_TOKEN -Compress
+          [IO.File]::WriteAllText($path, $content.Replace($line, 'const EMBEDDED_RELAY_CLIENT_TOKEN = ' + $encoded + ';'), [Text.UTF8Encoding]::new($false))
+      - name: Probar y compilar
+        working-directory: app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build:win -- --publish never
+      - name: Guardar compilación
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lulu-Finity-132-Prueba
+          path: |
+            app/dist/Lulu-Finity-Setup-1.3.2.exe
+            app/dist/Lulu-Finity-1.3.2-x64.zip
+          if-no-files-found: error
