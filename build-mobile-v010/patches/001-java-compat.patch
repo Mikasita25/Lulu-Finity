@@ -1,0 +1,28 @@
+diff -ruN a/app/src/main/java/com/mikasita25/lulufinity/mobile/MainActivity.java b/app/src/main/java/com/mikasita25/lulufinity/mobile/MainActivity.java
+--- a/app/src/main/java/com/mikasita25/lulufinity/mobile/MainActivity.java
++++ b/app/src/main/java/com/mikasita25/lulufinity/mobile/MainActivity.java
+@@ -269,8 +269,8 @@
+             appendLog("Solicitud ignorada: falta el nombre de la canción.");
+             return;
+         }
+-        String query = trimmed.substring(space + 1).trim();
+-        if (query.length() > 100) query = query.substring(0, 100);
++        String rawQuery = trimmed.substring(space + 1).trim();
++        final String query = rawQuery.length() > 100 ? rawQuery.substring(0, 100) : rawQuery;
+         synchronized (queueLock) {
+             boolean duplicate = songQueue.stream().anyMatch(item -> item.user.equalsIgnoreCase(user) && item.query.equalsIgnoreCase(query));
+             if (!duplicate && songQueue.size() < 50) songQueue.addLast(new SongRequest(user, query));
+diff -ruN a/app/src/main/java/com/mikasita25/lulufinity/mobile/RankingStore.java b/app/src/main/java/com/mikasita25/lulufinity/mobile/RankingStore.java
+--- a/app/src/main/java/com/mikasita25/lulufinity/mobile/RankingStore.java
++++ b/app/src/main/java/com/mikasita25/lulufinity/mobile/RankingStore.java
+@@ -56,7 +56,9 @@
+         String raw = preferences.getString(category, "{}");
+         try {
+             JSONObject json = new JSONObject(raw);
+-            for (String key : json.keySet()) {
++            java.util.Iterator<String> keys = json.keys();
++            while (keys.hasNext()) {
++                String key = keys.next();
+                 result.put(key, json.optLong(key, 0));
+             }
+         } catch (Exception ignored) {
