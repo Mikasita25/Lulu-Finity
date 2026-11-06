@@ -1,0 +1,30 @@
+name: Lulu relay LIVE auth
+
+on:
+  pull_request:
+    paths:
+      - "railway-relay/**"
+      - ".github/workflows/relay-live-auth.yml"
+  push:
+    branches: [main]
+    paths:
+      - "railway-relay/**"
+      - ".github/workflows/relay-live-auth.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar dependencias
+        working-directory: railway-relay
+        run: npm ci --no-audit --no-fund
+      - name: Validar sintaxis
+        working-directory: railway-relay
+        run: npm run check
+      - name: Probar relay
+        working-directory: railway-relay
+        run: npm test
