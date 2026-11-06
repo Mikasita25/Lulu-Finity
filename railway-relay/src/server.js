@@ -6,6 +6,7 @@ const { URL } = require('url');
 const WebSocket = require('ws');
 const { WebSocketServer } = WebSocket;
 const { isLiveAuthorized } = require('./live-auth');
+const { closeUpstreamSafely } = require('./close-upstream');
 const { KeyPool, parseList } = require('./key-pool');
 const { classifyUpstreamFailure } = require('./failure-classifier');
 const { inspectUpstreamFrame } = require('./upstream-frame');
@@ -198,9 +199,7 @@ class RelaySession {
     const socket = this.upstream;
     this.upstream = null;
     if (!socket) return;
-    socket.removeAllListeners();
-    try { socket.close(1000, 'relay rotation'); } catch {}
-    try { socket.terminate(); } catch {}
+    closeUpstreamSafely(socket);
   }
 
   connectNext(trigger, lastMessage = '') {
