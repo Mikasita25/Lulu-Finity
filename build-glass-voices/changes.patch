@@ -1,0 +1,263 @@
+diff --git a/src/glass.css b/src/glass.css
+new file mode 100644
+index 0000000..21b3127
+--- /dev/null
++++ b/src/glass.css
+@@ -0,0 +1,60 @@
++/* Lulu Glass: shared surfaces and controls, layered after existing themes. */
++:root {
++  --glass-surface: color-mix(in srgb, var(--bg2) 58%, transparent);
++  --glass-raised: color-mix(in srgb, var(--bg2) 73%, transparent);
++  --glass-edge: rgba(255,255,255,.19);
++  --glass-shadow: 0 18px 48px rgba(4,3,14,.24), inset 0 1px 0 rgba(255,255,255,.12);
++  color-scheme: dark;
++}
++html, body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
++.app-shell {
++  background: radial-gradient(ellipse at 83% 3%, var(--glow-pink, rgba(255,117,172,.25)), transparent 44%),
++    radial-gradient(ellipse at 30% 82%, var(--glow-purple, rgba(154,87,196,.22)), transparent 50%),
++    linear-gradient(135deg, var(--bg), var(--bg2) 55%, var(--bg)) !important;
++}
++.titlebar, .sidebar {
++  background: color-mix(in srgb, var(--bg) 65%, transparent) !important;
++  backdrop-filter: blur(26px) saturate(145%); -webkit-backdrop-filter: blur(26px) saturate(145%);
++  border-color: var(--glass-edge) !important;
++}
++.titlebar { box-shadow: 0 1px 0 rgba(255,255,255,.04); }
++.sidebar { gap: 12px !important; }
++.logo-mark { border-radius: 15px !important; box-shadow: inset 0 1px 0 #fff8, 0 8px 22px #0003 !important; }
++.nav-item { border-radius: 13px !important; transition: background .2s ease, border-color .2s ease, transform .2s ease !important; }
++.nav-item:hover { background: rgba(255,255,255,.09) !important; }
++.nav-item.active { background: color-mix(in srgb, var(--pink) 19%, transparent) !important; border-color: color-mix(in srgb,var(--pink) 34%,transparent) !important; box-shadow: inset 0 1px 0 #ffffff20 !important; }
++.main-content { padding: 30px 34px 42px !important; }
++.page { animation: glass-enter .28s ease both; }
++@keyframes glass-enter { from {opacity:0;transform:translateY(7px)} to {opacity:1;transform:translateY(0)} }
++.panel, .studio-card, .studio-hero, .stat-card, .sidebar-bottom, .account-chip,
++.widget-launch, .design-page-note, .status-banner, .feature-search-results,
++.dialog, dialog, .modal-content, .release-notice, .local-voice-card {
++  background: linear-gradient(145deg, rgba(255,255,255,.065), transparent 55%), var(--glass-surface) !important;
++  border: 1px solid var(--glass-edge) !important;
++  border-radius: 22px !important;
++  box-shadow: var(--glass-shadow) !important;
++  backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%);
++}
++.studio-hero { background: radial-gradient(ellipse at 80% 0%,color-mix(in srgb,var(--pink) 18%,transparent),transparent 65%), var(--glass-surface) !important; }
++.panel-header, .studio-card-head { border-color: rgba(255,255,255,.09) !important; }
++.widget-focus-header { background: var(--glass-raised) !important; backdrop-filter: blur(24px); }
++dialog::backdrop { background: rgba(8,7,17,.65); backdrop-filter: blur(8px); }
++input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=color]), select, textarea {
++  background: rgba(10,9,22,.30) !important; color: var(--text) !important;
++  border: 1px solid rgba(255,255,255,.15) !important; border-radius: 13px !important;
++  box-shadow: inset 0 1px 2px rgba(0,0,0,.12);
++  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
++}
++select option, select optgroup { background: var(--bg2); color: var(--text); }
++input::placeholder, textarea::placeholder { color: var(--muted); opacity:.75; }
++button { transition: transform .18s ease, background-color .18s ease, border-color .18s ease, box-shadow .18s ease, filter .18s ease !important; }
++button:not(:disabled):hover { filter: brightness(1.09); }
++button:not(:disabled):active { transform: scale(.975) !important; }
++button.primary, .primary { border-radius: 13px !important; background: linear-gradient(145deg, color-mix(in srgb,var(--pink) 78%,white),var(--pink)) !important; box-shadow: 0 7px 20px color-mix(in srgb,var(--pink) 24%,transparent), inset 0 1px 0 #ffffff99 !important; }
++.ghost, .secondary, .danger-outline, .icon-button { border-radius: 13px !important; border: 1px solid rgba(255,255,255,.16) !important; box-shadow: inset 0 1px 0 #ffffff14 !important; }
++.category-tabs, .tts-tabs { background: rgba(12,10,25,.32) !important; border: 1px solid rgba(255,255,255,.1); border-radius: 15px !important; }
++.category-tabs button, .tts-tabs button { border-radius: 11px !important; }
++button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--pink) !important; outline-offset: 3px !important; }
++::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.22); border-radius: 20px; }
++@media (max-width:1100px) { .main-content { padding: 22px !important; } }
++@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; scroll-behavior: auto !important; } }
+diff --git a/src/index.html b/src/index.html
+index 3529407..343ef17 100644
+--- a/src/index.html
++++ b/src/index.html
+@@ -5,9 +5,10 @@
+ <meta charset="utf-8"/>
+ <meta content="default-src 'self' file:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src http://127.0.0.1:*; media-src 'self' file: data: blob:;" http-equiv="Content-Security-Policy"/>
+ <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+-<title>Lulu Finity 1.2.0</title>
++<title>Lulu Finity 1.3.3</title>
+ <link href="styles.css" rel="stylesheet"/>
+ <link href="studio.css" rel="stylesheet"/>
++<link href="glass.css" rel="stylesheet"/>
+ </head>
+ <body>
+ <div class="app-shell">
+diff --git a/src/main.js b/src/main.js
+index dbac24d..3be8a83 100644
+--- a/src/main.js
++++ b/src/main.js
+@@ -2139,6 +2139,7 @@ async function getEdgeTtsModule() {
+ }
+ 
+ let onlineVoiceCatalogCache = null;
++let onlineVoiceCatalogCacheIsFallback = false;
+ 
+ function onlineVoiceCatalogCachePath() {
+   return path.join(app.getPath('userData'), 'online-voice-catalog-v1.json');
+@@ -2166,7 +2167,7 @@ async function writeOnlineVoiceCatalogCache(voices) {
+ async function listOnlineVoices(options = {}) {
+   const refresh = Boolean(options?.refresh);
+   if (!refresh && onlineVoiceCatalogCache?.length) {
+-    return { voices: onlineVoiceCatalogCache, fallback: false, cached: true };
++    return { voices: onlineVoiceCatalogCache, fallback: onlineVoiceCatalogCacheIsFallback, cached: true };
+   }
+   try {
+     const module = await getEdgeTtsModule();
+@@ -2176,6 +2177,7 @@ async function listOnlineVoices(options = {}) {
+     const voices = prepareOnlineVoices(await listVoices());
+     if (!voices.length) throw new Error('El proveedor devolvió un catálogo vacío.');
+     onlineVoiceCatalogCache = voices;
++    onlineVoiceCatalogCacheIsFallback = false;
+     await writeOnlineVoiceCatalogCache(voices);
+     return { voices, fallback: false, cached: false };
+   } catch (error) {
+@@ -2183,6 +2185,7 @@ async function listOnlineVoices(options = {}) {
+     const savedVoices = await readOnlineVoiceCatalogCache();
+     if (savedVoices.length) {
+       onlineVoiceCatalogCache = savedVoices;
++      onlineVoiceCatalogCacheIsFallback = true;
+       return { voices: savedVoices, fallback: true, cached: true, message: friendlyUpdateError(error) };
+     }
+     const {FALLBACK_ONLINE_VOICES}=getOnlineVoiceCatalog();
+@@ -2206,7 +2209,7 @@ async function synthesizeOnlineVoice(request) {
+   const text = String(request?.text || '').trim().slice(0, 500);
+   const voice = String(request?.voice || '').trim();
+   if (!text) throw new Error('No hay texto para leer.');
+-  if (!voice || !/^[A-Za-z0-9-]+Neural$/.test(voice)) {
++  if (!voice || voice.length > 256 || /[\u0000-\u001f<>"'&]/.test(voice)) {
+     throw new Error('La voz online seleccionada no es válida.');
+   }
+ 
+@@ -2246,7 +2249,7 @@ function normalizeVoiceSettings(settings = {}) {
+   if (retired) next.voiceMode = 'online';
+   if (!['tiktok', 'online', 'local', 'system'].includes(next.voiceMode)) next.voiceMode = 'local';
+   if (!/^[A-Za-z0-9_]{3,80}$/.test(String(next.tiktokVoice||''))) next.tiktokVoice = 'es_mx_002';
+-  if (!/^[A-Za-z0-9-]+Neural$/.test(String(next.onlineVoice || ''))) next.onlineVoice = 'es-MX-DaliaNeural';
++  if (!String(next.onlineVoice || '').trim()) next.onlineVoice = 'es-MX-DaliaNeural';
+   next.userVoiceRules = (Array.isArray(next.userVoiceRules) ? next.userVoiceRules : []).map((rule) => {
+     const voice = String(rule?.voice || '');
+     if (voice === 'local:lulu-official') return { ...rule, voice: `online:${next.onlineVoice}` };
+diff --git a/src/online-voice-catalog.js b/src/online-voice-catalog.js
+index 9456b20..892b918 100644
+--- a/src/online-voice-catalog.js
++++ b/src/online-voice-catalog.js
+@@ -1,6 +1,6 @@
+ 'use strict';
+ 
+-const BLOCKED_LANGUAGE_PREFIXES = new Set(['cmn', 'ja', 'ko', 'wuu', 'yue', 'zh']);
++const BLOCKED_LANGUAGE_PREFIXES = new Set();
+ 
+ const FALLBACK_ONLINE_VOICES = [
+   ['es-MX-DaliaNeural', 'Dalia', 'es-MX', 'Female'],
+@@ -60,8 +60,7 @@ function normalizeOnlineVoice(voice) {
+ }
+ 
+ function isAllowedVoiceLocale(locale) {
+-  const language = String(locale || '').trim().toLowerCase().split(/[-_]/)[0];
+-  return Boolean(language) && !BLOCKED_LANGUAGE_PREFIXES.has(language);
++  return Boolean(String(locale || '').trim());
+ }
+ 
+ function voiceSortKey(voice) {
+@@ -82,8 +81,8 @@ function prepareOnlineVoices(input) {
+   const unique = new Map();
+   for (const item of Array.isArray(input) ? input : []) {
+     const voice = normalizeOnlineVoice(item);
+-    if (!voice.shortName || !voice.locale || !isAllowedVoiceLocale(voice.locale)) continue;
+-    if (!/^[A-Za-z0-9-]+Neural$/.test(voice.shortName)) continue;
++    // Keep every named provider voice, including new voice types and locales.
++    if (!voice.shortName) continue;
+     if (!unique.has(voice.shortName)) unique.set(voice.shortName, voice);
+   }
+   return [...unique.values()].sort(compareVoices);
+diff --git a/src/online-voice-catalog.test.js b/src/online-voice-catalog.test.js
+index c91f8fa..924615d 100644
+--- a/src/online-voice-catalog.test.js
++++ b/src/online-voice-catalog.test.js
+@@ -1,30 +1,17 @@
+ 'use strict';
+-
+ const test = require('node:test');
+ const assert = require('node:assert/strict');
+-const {
+-  FALLBACK_ONLINE_VOICES,
+-  isAllowedVoiceLocale,
+-  prepareOnlineVoices
+-} = require('./online-voice-catalog');
+-
+-test('keeps the free catalog broad but excludes CJK locales', () => {
+-  assert.equal(isAllowedVoiceLocale('es-MX'), true);
+-  assert.equal(isAllowedVoiceLocale('en-US'), true);
+-  for (const locale of ['zh-CN', 'ja-JP', 'ko-KR', 'yue-CN', 'wuu-CN']) {
+-    assert.equal(isAllowedVoiceLocale(locale), false, locale);
+-  }
+-  assert.ok(FALLBACK_ONLINE_VOICES.length >= 35);
+-  assert.equal(FALLBACK_ONLINE_VOICES.some((voice) => !isAllowedVoiceLocale(voice.locale)), false);
+-});
+-
+-test('normalizes, filters, deduplicates and prioritizes Spanish voices', () => {
++const { FALLBACK_ONLINE_VOICES, isAllowedVoiceLocale, prepareOnlineVoices } = require('./online-voice-catalog');
++test('includes Microsoft voices across languages and voice types', () => {
++  for (const locale of ['es-MX','zh-CN','ja-JP','ko-KR','yue-CN','wuu-CN']) assert.equal(isAllowedVoiceLocale(locale), true);
+   const voices = prepareOnlineVoices([
+-    { ShortName: 'en-US-JennyNeural', LocalName: 'Jenny', Locale: 'en-US', Gender: 'Female' },
+-    { ShortName: 'zh-CN-XiaoxiaoNeural', LocalName: 'Xiaoxiao', Locale: 'zh-CN', Gender: 'Female' },
+-    { shortName: 'es-MX-DaliaNeural', localName: 'Dalia', locale: 'es-MX', gender: 'Female' },
+-    { ShortName: 'es-MX-DaliaNeural', LocalName: 'Duplicada', Locale: 'es-MX', Gender: 'Female' },
+-    { ShortName: 'invalid_voice', LocalName: 'Inválida', Locale: 'es-MX', Gender: 'Female' }
++    {ShortName:'zh-CN-XiaoxiaoNeural', Locale:'zh-CN'},
++    {ShortName:'ja-JP-NanamiNeural', Locale:'ja-JP'},
++    {ShortName:'en-US-ExampleMultilingual', Locale:'en-US'},
++    {shortName:'es-MX-DaliaNeural', locale:'es-MX'},
++    {shortName:'es-MX-DaliaNeural', locale:'es-MX'},
++    {shortName:'future-voice', locale:''}
+   ]);
+-  assert.deepEqual(voices.map((voice) => voice.shortName), ['es-MX-DaliaNeural', 'en-US-JennyNeural']);
++  assert.deepEqual(voices.map(v => v.shortName), ['es-MX-DaliaNeural','en-US-ExampleMultilingual','future-voice','ja-JP-NanamiNeural','zh-CN-XiaoxiaoNeural']);
++  assert.ok(FALLBACK_ONLINE_VOICES.length >= 35);
+ });
+diff --git a/src/renderer.js b/src/renderer.js
+index 61085f7..c3abfcf 100644
+--- a/src/renderer.js
++++ b/src/renderer.js
+@@ -1802,21 +1802,17 @@ function renderVoiceOptions() {
+   }
+ 
+   if ($('voiceVisibleCount')) $('voiceVisibleCount').textContent = `${tiktokMatches.length+onlineMatches.length+localMatches.length+systemMatches.length} visibles de ${state.tiktokVoices.length+state.onlineVoices.length+state.localVoices.length+state.voices.length} voces`;
++  // Do not replace a saved voice while its provider is still loading or offline.
++  if (selected && ![...select.options].some((option) => option.value === selected)) {
++    const option = document.createElement('option');
++    option.value = selected;
++    option.textContent = `${selected.replace(/^[^:]+:/, '')} · voz guardada (no disponible todavía)`;
++    select.appendChild(option);
++  }
++  if (selected) select.value = selected;
+   renderCustomVoiceOptions();
+   renderUserVoiceRules();
+ 
+-  if ([...select.options].some((option) => option.value === selected)) {
+-    select.value = selected;
+-  } else {
+-    const preferredTikTok = tiktokMatches.find((voice) => voice.id === 'es_mx_002') || tiktokMatches[0];
+-    const preferredOnline = onlineMatches.find((voice) => voice.locale.toLowerCase().startsWith('es-mx')) || onlineMatches[0];
+-    const preferredLocal=localMatches.find((voice)=>voice.language.toLowerCase().startsWith('es-mx'))||localMatches[0];
+-    const preferredSystem = systemMatches.find((voice) => /^es(-|_)/i.test(voice.lang)) || systemMatches[0];
+-    if(preferredLocal){select.value=`local:${preferredLocal.id}`;state.settings.voiceMode='local';state.settings.localVoiceId=preferredLocal.id;}
+-    else if (preferredOnline) { select.value=`online:${preferredOnline.shortName}`; state.settings.voiceMode='online'; state.settings.onlineVoice=preferredOnline.shortName; }
+-    else if (preferredTikTok) { select.value=`tiktok:${preferredTikTok.id}`; state.settings.voiceMode='tiktok'; state.settings.tiktokVoice=preferredTikTok.id; }
+-    else if (preferredSystem) { select.value=`system:${preferredSystem.voiceURI}`;state.settings.voiceMode='system';state.settings.voiceURI=preferredSystem.voiceURI; }
+-  }
+ }
+ 
+ function loadSystemVoices() {
+@@ -1860,6 +1856,12 @@ async function loadOnlineVoices(showToast = false) {
+     status.innerHTML = total
+       ? `<span class="status-light connected"></span><span>${state.onlineVoices.length} voces Microsoft online y ${state.tiktokVoices.length} voces TikTok · ${tiktokSpanishCount} en español. TikTok solo usa la sesión local cuando eliges una de sus voces.</span>`
+       : '<span class="status-light error"></span><span>No se pudieron cargar los catálogos online. Lulu Local y las voces de Windows siguen disponibles.</span>';
++    if (!online || online.fallback) {
++      status.className = 'voice-provider-status error';
++      status.innerHTML = online?.cached
++        ? '<span class="status-light error"></span><span>Microsoft no respondió. Se muestra el catálogo guardado, que puede estar incompleto; pulsa Recargar para intentar de nuevo.</span>'
++        : '<span class="status-light error"></span><span>Microsoft no respondió. Se muestra una lista de respaldo reducida; pulsa Recargar para obtener el catálogo completo.</span>';
++    }
+     renderVoiceOptions();
+     if (showToast) toast('Voces actualizadas', `${state.onlineVoices.length} Microsoft y ${state.tiktokVoices.length} TikTok.`, total ? 'success' : 'error');
+   } catch (error) {
