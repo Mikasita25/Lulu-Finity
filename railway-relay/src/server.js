@@ -5,6 +5,7 @@ let rouletteAssetCache;
 const { URL } = require('url');
 const WebSocket = require('ws');
 const { WebSocketServer } = WebSocket;
+const { isLiveAuthorized } = require('./live-auth');
 const { KeyPool, parseList } = require('./key-pool');
 const { classifyUpstreamFailure } = require('./failure-classifier');
 const { inspectUpstreamFrame } = require('./upstream-frame');
@@ -16,6 +17,7 @@ const { overlayPageCsp, renderOverlayPage } = require('./overlay-page');
 const PORT = Math.max(1, Number(process.env.PORT || 3000));
 const UPSTREAM_WS_URL = String(process.env.UPSTREAM_WS_URL || 'wss://ws.eulerstream.com').trim();
 const CLIENT_TOKENS = new Set(parseList(process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN));
+const PUBLIC_LIVE_ACCESS = /^(1|true|yes)$/i.test(String(process.env.LULU_PUBLIC_LIVE || '').trim());
 const TTS_CLIENT_TOKENS = new Set(parseList(
   process.env.TTS_CLIENT_TOKENS || process.env.CLIENT_TOKENS || process.env.CLIENT_TOKEN
 ));
@@ -371,6 +373,7 @@ async function handleHttpRequest(request, response) {
       service: 'lulu-finity-railway-relay',
       build: RELAY_BUILD,
       overlays: { stableHttps: true },
+      liveAuth: PUBLIC_LIVE_ACCESS || CLIENT_TOKENS.size === 0 ? 'public' : 'token',
       uptimeSeconds: Math.round(process.uptime()),
       clients: activeClients,
       tts: { provider: 'microsoft-edge', activeRequests: activeTtsRequests, voices: MICROSOFT_VOICES.length },
@@ -499,7 +502,7 @@ server.on('upgrade', (request, socket, head) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   const ip = requestIp(request);
   if (shuttingDown || url.pathname !== '/v1/tiktok/live') return socket.destroy();
-  if (!authorized(request)) {
+  if (!isLiveAuthorized(request.headers, CLIENT_TOKENS, PUBLIC_LIVE_ACCESS)) {
     socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
     return socket.destroy();
   }
@@ -576,4 +579,5 @@ process.on('unhandledRejection', (error) => console.error('[unhandledRejection]'
 server.listen(PORT, '0.0.0.0', () => {
   const usage = usageMeter.snapshot();
   console.info(`[startup] Relay listo en el puerto ${PORT}; ${keyPool.size} API keys cargadas; uso diario ${usage.used}/${usage.limit}.`);
+  console.info(`[startup] LIVE acceso: ${PUBLIC_LIVE_ACCESS || CLIENT_TOKENS.size === 0 ? 'public' : 'token'}; TTS: ${TTS_CLIENT_TOKENS.size ? 'token' : 'open'}.`);
 });
