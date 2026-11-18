@@ -63,7 +63,10 @@ jobs:
             if (!(Test-Path $env:LULU_STARTUP_SMOKE_MARKER)) {
               if (Test-Path $env:LULU_NATIVE_SMOKE_LOG) { Get-Content $env:LULU_NATIVE_SMOKE_LOG }
               $backendLog = Join-Path $env:APPDATA 'com.mikasita.lulufinity.rustbeta/backend.log'
-              if (Test-Path $backendLog) { Get-Content $backendLog -Tail 40 }
+              if (Test-Path $backendLog) {
+                Get-Content $backendLog -Tail 40
+                Copy-Item $backendLog (Join-Path $env:RUNNER_TEMP 'lulu-rust-backend.log')
+              }
               throw "El renderer no arrancó. Código del proceso $($process.ExitCode)."
             }
             if (!(Test-Path $env:LULU_NAVIGATION_SMOKE_MARKER)) { throw 'La navegación de la aplicación no terminó.' }
@@ -84,7 +87,7 @@ jobs:
           path: |
             ${{ runner.temp }}/lulu-rust-navigation.json
             ${{ runner.temp }}/lulu-rust-native.log
-            ~\AppData\Roaming\com.mikasita.lulufinity.rustbeta\backend.log
+            ${{ runner.temp }}/lulu-rust-backend.log
 
   microsoft-online:
     runs-on: ubuntu-latest

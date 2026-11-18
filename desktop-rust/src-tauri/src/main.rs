@@ -96,6 +96,10 @@ fn report_host_exit(handle: &AppHandle, message: &str) {
             json!({ "channel": "live:error", "value": { "message": message } }),
         );
     }
+    if std::env::var_os("LULU_NATIVE_SMOKE_LOG").is_some() {
+        handle.exit(1);
+        return;
+    }
     handle
         .dialog()
         .message(message)

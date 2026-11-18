@@ -10,6 +10,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 adblock = { version = "0.13", default-features = false, features = ["embedded-domain-resolver", "full-regex-handling"] }
 base64 = "0.22"
+dunce = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
 sysinfo = { version = "0.38", default-features = false, features = ["system"] }
 serde = { version = "1", features = ["derive"] }

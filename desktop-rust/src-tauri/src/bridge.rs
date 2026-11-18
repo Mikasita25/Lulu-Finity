@@ -32,7 +32,9 @@ struct Inner {
 
 impl Host {
     pub fn start(app: &AppHandle, resources: &Path, data: &Path) -> std::io::Result<Self> {
-        let entry = resources.join("src").join("main.js");
+        let resources = dunce::simplified(resources);
+        let data = dunce::simplified(data);
+        let entry = Path::new("src").join("main.js");
         let log_path = data.join("backend.log");
         if std::fs::metadata(&log_path).is_ok_and(|file| file.len() > 8 * 1024 * 1024) {
             let _ = std::fs::rename(&log_path, data.join("backend.anterior.log"));
@@ -43,6 +45,7 @@ impl Host {
             .open(log_path)?;
         let mut command = Command::new(resources.join("node.exe"));
         command
+            .arg("--preserve-symlinks-main")
             .arg(entry)
             .current_dir(resources)
             .env("LULU_USER_DATA", data)
