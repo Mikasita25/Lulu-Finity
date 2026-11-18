@@ -99,11 +99,10 @@ main = replaceOnce(main, "const module = await import('@ghostery/adblocker-elect
 main = replaceOnce(main, 'Esta copia fue abierta desde una carpeta ZIP. Se abrirá la página oficial para descargar el instalador nuevo.', 'Se abrirá la página de esta versión en GitHub para descargar el instalador de Lulu Finity Rust.');
 main = replaceOnce(main, "  if (tiktokChatWindow && !tiktokChatWindow.isDestroyed()) {\n    tiktokChatWindow.removeAllListeners('close');", "  await session.fromPartition(TIKTOK_CHAT_PARTITION).clearStorageData();\n  if (tiktokChatWindow && !tiktokChatWindow.isDestroyed()) {\n    tiktokChatWindow.removeAllListeners('close');");
 main = replaceOnce(main, "  await chatSession.clearStorageData();\n  await chatSession.clearCache().catch(() => {});", "  await chatSession.clearCache().catch(() => {});");
-const legacySynthesis = main.slice(main.indexOf('  const EdgeTTS = module.EdgeTTS'), main.indexOf("\n}\n\nconst TIKTOK_TTS_COOKIE_NAMES"));
-main = replaceOnce(main, legacySynthesis, `  const Communicate = module.IsomorphicCommunicate;
-  if (typeof Communicate !== 'function') throw new Error('El motor de Microsoft no está disponible.');
-  return require('./microsoft-speech.cjs').synthesizeMicrosoft({
-    Communicate, text, voice, rate: percentFromRate(request?.rate), pitch: hertzFromPitch(request?.pitch)
+const synthStart = main.indexOf('  const module = await getEdgeTtsModule();', main.indexOf('async function synthesizeOnlineVoice('));
+const legacySynthesis = main.slice(synthStart, main.indexOf("\n}\n\nconst TIKTOK_TTS_COOKIE_NAMES", synthStart));
+main = replaceOnce(main, legacySynthesis, `  return require('./microsoft-speech.cjs').synthesizeMicrosoft({
+    text, voice, rate: percentFromRate(request?.rate), pitch: hertzFromPitch(request?.pitch)
   });`);
 main = replaceOnce(main, "    const {FALLBACK_ONLINE_VOICES}=getOnlineVoiceCatalog();\n    return { voices: FALLBACK_ONLINE_VOICES, fallback: true, cached: false, message: friendlyUpdateError(error) };", `    const {prepareOnlineVoices}=getOnlineVoiceCatalog();
     return { voices: prepareOnlineVoices(require('./microsoft-voice-catalog.json')), fallback: true, cached: false, message: friendlyUpdateError(error) };`);
@@ -130,6 +129,7 @@ delete baseline.dependencies['electron-updater'];
 delete baseline.dependencies['@ghostery/adblocker-electron'];
 baseline.dependencies['@ghostery/adblocker'] = originalLock.packages['node_modules/@ghostery/adblocker'].version;
 baseline.dependencies['node-win-x64'] = '22.23.5';
+baseline.dependencies['msedge-tts'] = '2.1.1';
 const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.1', private: true, dependencies: baseline.dependencies };
 await writeFile(join(sidecar, 'package.json'), JSON.stringify(manifest, null, 2));
 const backendLock = join(root, 'scripts', 'backend-package-lock.json');

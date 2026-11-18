@@ -98,11 +98,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.23.5
-      - run: npm install --no-save --ignore-scripts --no-audit --no-fund edge-tts-universal@1.4.0
+      - run: npm install --no-save --ignore-scripts --no-audit --no-fund msedge-tts@2.1.1
       - name: Probar tres voces del catálogo de Microsoft con audio real
         run: |
           node --input-type=module <<'JS'
-          import { IsomorphicCommunicate } from 'edge-tts-universal';
           import speech from './scripts/microsoft-speech.cjs';
           const examples = [
             ['es-MX-DaliaNeural', 'Hola. Prueba de Lulu Finity.'],
@@ -110,9 +109,9 @@ jobs:
             ['ja-JP-NanamiNeural', 'こんにちは。音声テストです。']
           ];
           const results = await Promise.allSettled(examples.map(async ([voice, text]) => {
-            const audio = await speech.synthesizeMicrosoft({ Communicate: IsomorphicCommunicate, voice, text, rate: '+0%', pitch: '+0Hz' });
+            const audio = await speech.synthesizeMicrosoft({ voice, text, rate: '+0%', pitch: '+0Hz' });
             if (!audio.bytes) throw new Error(voice + ' devolvió audio vacío.');
             console.log(voice, audio.bytes, 'bytes de audio');
           }));
-          for (const result of results) if (result.status === 'rejected') { console.error(result.reason); process.exitCode = 1; }
+          for (const result of results) if (result.status === 'rejected') { console.error(result.reason?.message || 'La síntesis de Microsoft falló.'); process.exitCode = 1; }
           JS
