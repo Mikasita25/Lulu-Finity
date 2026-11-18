@@ -20,7 +20,9 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::oneshot;
 
-pub const UPDATE_KEY: Option<&str> = option_env!("LULU_TAURI_UPDATE_PUBLIC_KEY");
+pub fn update_key() -> Option<&'static str> {
+    option_env!("LULU_TAURI_UPDATE_PUBLIC_KEY").filter(|key| !key.trim().is_empty())
+}
 const UPDATE_ENDPOINT: &str =
     "https://github.com/Mikasita25/Lulu-Finity/releases/download/rust-updates/latest-rust.json";
 const TIKTOK_COOKIES: &[&str] = &[
@@ -387,7 +389,7 @@ fn metrics(backend: u32) -> Value {
 }
 
 async fn update(app: &AppHandle, install: bool) -> Reply {
-    if UPDATE_KEY.is_none() {
+    if update_key().is_none() {
         return Err("El canal firmado de la beta aún no está configurado.".into());
     }
     let endpoint = Url::parse(UPDATE_ENDPOINT).map_err(error)?;

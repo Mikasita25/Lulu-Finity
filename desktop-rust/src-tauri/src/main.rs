@@ -41,13 +41,7 @@ fn resource_path(app: &AppHandle) -> tauri::Result<PathBuf> {
 }
 
 fn main() {
-    let updater = tauri_plugin_updater::Builder::new();
-    let updater = if let Some(pubkey) = desktop::UPDATE_KEY {
-        updater.pubkey(pubkey)
-    } else {
-        updater
-    };
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -57,8 +51,11 @@ fn main() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(updater.build())
+        .plugin(tauri_plugin_clipboard_manager::init());
+    if let Some(pubkey) = desktop::update_key() {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().pubkey(pubkey).build());
+    }
+    builder
         .invoke_handler(tauri::generate_handler![desktop_invoke])
         .setup(|app| {
             let handle = app.handle();
@@ -75,7 +72,12 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {
-            eprintln!("Lulu Finity Rust: {error}");
+            let message = format!("Lulu Finity Rust: {error}\n");
+            eprint!("{message}");
+            let path = std::env::var_os("LULU_NATIVE_SMOKE_LOG")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| std::env::temp_dir().join("lulu-finity-rust-startup.log"));
+            let _ = std::fs::write(path, message);
             std::process::exit(1);
         })
         .run(|app, event| {

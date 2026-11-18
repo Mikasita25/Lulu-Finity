@@ -35,6 +35,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: desktop-rust/src-tauri
+          cache-on-failure: true
       - run: npm ci
       - name: Compilar el instalador
         run: npm run build:windows -- --target x86_64-pc-windows-msvc
@@ -51,13 +52,20 @@ jobs:
           if ($install.ExitCode -ne 0) { throw "El instalador devolvió $($install.ExitCode)" }
           $env:LULU_STARTUP_SMOKE_MARKER = Join-Path $env:RUNNER_TEMP 'lulu-rust-startup.txt'
           $env:LULU_NAVIGATION_SMOKE_MARKER = Join-Path $env:RUNNER_TEMP 'lulu-rust-navigation.json'
+          $env:LULU_NATIVE_SMOKE_LOG = Join-Path $env:RUNNER_TEMP 'lulu-rust-native.log'
+          if (!(Test-Path (Join-Path $installDir 'backend/node.exe'))) { throw 'Falta el motor local en la instalación.' }
           $process = Start-Process (Join-Path $installDir 'lulu-finity-rust.exe') -PassThru
           try {
             $limit = (Get-Date).AddSeconds(100)
             while (!(Test-Path $env:LULU_NAVIGATION_SMOKE_MARKER) -and !$process.HasExited -and (Get-Date) -lt $limit) {
               Start-Sleep -Seconds 1
             }
-            if (!(Test-Path $env:LULU_STARTUP_SMOKE_MARKER)) { throw 'El renderer no arrancó.' }
+            if (!(Test-Path $env:LULU_STARTUP_SMOKE_MARKER)) {
+              if (Test-Path $env:LULU_NATIVE_SMOKE_LOG) { Get-Content $env:LULU_NATIVE_SMOKE_LOG }
+              $backendLog = Join-Path $env:APPDATA 'com.mikasita.lulufinity.rustbeta/backend.log'
+              if (Test-Path $backendLog) { Get-Content $backendLog -Tail 40 }
+              throw "El renderer no arrancó. Código del proceso $($process.ExitCode)."
+            }
             if (!(Test-Path $env:LULU_NAVIGATION_SMOKE_MARKER)) { throw 'La navegación de la aplicación no terminó.' }
             $navigation = Get-Content $env:LULU_NAVIGATION_SMOKE_MARKER -Raw | ConvertFrom-Json
             if (!$navigation.ok) { $navigation | ConvertTo-Json -Depth 8; throw 'Falló la navegación o alguna vista previa.' }
@@ -75,4 +83,36 @@ jobs:
           name: Lulu-Finity-Rust-Beta-diagnostics
           path: |
             ${{ runner.temp }}/lulu-rust-navigation.json
+            ${{ runner.temp }}/lulu-rust-native.log
             ~\AppData\Roaming\com.mikasita.lulufinity.rustbeta\backend.log
+
+  microsoft-online:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: desktop-rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.5
+      - run: npm install --no-save --ignore-scripts --no-audit --no-fund edge-tts-universal@1.4.0
+      - name: Probar tres voces del catálogo de Microsoft con audio real
+        run: |
+          node --input-type=module <<'JS'
+          import { IsomorphicCommunicate } from 'edge-tts-universal';
+          import speech from './scripts/microsoft-speech.cjs';
+          const examples = [
+            ['es-MX-DaliaNeural', 'Hola. Prueba de Lulu Finity.'],
+            ['en-US-AvaMultilingualNeural', 'Hello. Testing Lulu Finity.'],
+            ['ja-JP-NanamiNeural', 'こんにちは。音声テストです。']
+          ];
+          const results = await Promise.allSettled(examples.map(async ([voice, text]) => {
+            const audio = await speech.synthesizeMicrosoft({ Communicate: IsomorphicCommunicate, voice, text, rate: '+0%', pitch: '+0Hz' });
+            if (!audio.bytes) throw new Error(voice + ' devolvió audio vacío.');
+            console.log(voice, audio.bytes, 'bytes de audio');
+          }));
+          for (const result of results) if (result.status === 'rejected') { console.error(result.reason); process.exitCode = 1; }
+          JS

@@ -49,7 +49,7 @@ impl Host {
             .env("LULU_APP_VERSION", &app.package_info().version.to_string())
             .env(
                 "LULU_UPDATE_FEED",
-                if desktop::UPDATE_KEY.is_some() {
+                if desktop::update_key().is_some() {
                     "signed"
                 } else {
                     "releases"
