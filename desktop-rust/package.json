@@ -1,0 +1,13 @@
+{
+  "name": "lulu-finity-desktop-rust",
+  "version": "1.4.0-beta.1",
+  "private": true,
+  "scripts": {
+    "prepare:windows": "node scripts/prepare.mjs",
+    "build:windows": "tauri build --ci --bundles nsis",
+    "test": "node --test scripts/*.test.cjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.5"
+  }
+}

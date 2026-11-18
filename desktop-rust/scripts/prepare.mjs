@@ -1,0 +1,141 @@
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { access, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const generated = join(root, 'generated');
+const archive = resolve(process.env.LULU_SOURCE_ARCHIVE || join(generated, '1.3.3.zip'));
+const sourceUrl = 'https://github.com/Mikasita25/Lulu-Finity/releases/download/v1.3.3/Lulu-Finity-Source-1.3.3.zip';
+const sourceHash = '845536a984914f0fe692ce1ec679709b17550d398ba006061104a30cb7666c41';
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const source = join(generated, 'source');
+const sidecar = join(generated, 'sidecar');
+const frontend = join(generated, 'frontend');
+
+function run(command, args, cwd = root, env = process.env) {
+  const result = spawnSync(command, args, { cwd, env, stdio: 'inherit', shell: process.platform === 'win32' && command === npm });
+  if (result.error) throw result.error;
+  if (result.status) throw new Error(`${command} terminó con estado ${result.status}.`);
+}
+
+function replaceOnce(input, target, replacement) {
+  if (input.split(target).length !== 2) throw new Error(`La fuente publicada cambió: ${target.slice(0, 100)}`);
+  return input.replace(target, () => replacement);
+}
+
+await mkdir(generated, { recursive: true });
+if (!process.env.LULU_SOURCE_ARCHIVE && !await access(archive).then(() => true, () => false)) {
+  run('curl', ['--fail', '--location', '--retry', '3', sourceUrl, '-o', archive + '.partial']);
+  const { rename } = await import('node:fs/promises');
+  await rename(archive + '.partial', archive);
+}
+const hash = createHash('sha256');
+for await (const chunk of createReadStream(archive)) hash.update(chunk);
+if (hash.digest('hex') !== sourceHash) throw new Error('El ZIP oficial de Lulu Finity 1.3.3 no coincide con su SHA-256.');
+
+for (const dir of [source, sidecar, frontend]) {
+  await rm(dir, { recursive: true, force: true });
+  await mkdir(dir, { recursive: true });
+}
+if (process.platform === 'win32') run('tar.exe', ['-xf', archive, '-C', source]);
+else run('unzip', ['-q', archive, '-d', source]);
+
+const src = join(source, 'src');
+const text = async (name) => (await readFile(join(src, name), 'utf8')).replace(/\r\n/g, '\n');
+const html = await text('index.html');
+const pageScripts = [...html.matchAll(/<script src="([^"]+)"/g)].map((match) => match[1]);
+for (const name of [...pageScripts, 'styles.css', 'studio.css']) await cp(join(src, name), join(frontend, name));
+for (const name of await readdir(src)) {
+  if (/\.(webp|jpg|png|svg)$/.test(name)) await cp(join(src, name), join(frontend, name));
+}
+await writeFile(join(frontend, 'index.html'), html
+  .replace("img-src 'self' data: https:", "img-src 'self' data: https: http://asset.localhost")
+  .replace("connect-src 'self';", "connect-src 'self' ipc: http://ipc.localhost;")
+  .replace("media-src 'self' file: data: blob:", "media-src 'self' file: data: blob: http://asset.localhost")
+  .replace('<script src="text-processor.js">', '<script src="desktop-bridge.js"></script>\n<script src="text-processor.js">')
+  .replace(/v1\.3\.3/g, 'v1.4.0 beta Rust')
+  .replace(/<title>[^<]*<\/title>/, '<title>Lulu Finity Rust Beta</title>'));
+
+const preload = await text('preload.js');
+const rendererBridge = await readFile(join(root, 'scripts', 'desktop-bridge.js'), 'utf8');
+await writeFile(join(frontend, 'desktop-bridge.js'),
+  rendererBridge + '\n' + replaceOnce(preload, "const { contextBridge, ipcRenderer } = require('electron');", ''));
+
+let renderer = await text('renderer.js');
+// Los perfiles conservan las URL file: y sólo se transforman al reproducir.
+renderer = replaceOnce(renderer, 'new Audio(url)', 'new Audio(luluMediaUrl(url))');
+renderer = replaceOnce(renderer, "const url = escapeHtml(String(media.url || ''));", "const url = escapeHtml(luluMediaUrl(String(media.url || '')));");
+await writeFile(join(frontend, 'renderer.js'), renderer);
+
+await mkdir(join(sidecar, 'src'));
+for (const name of await readdir(src)) {
+  if ((name.endsWith('.js') && !name.endsWith('.test.js') && !pageScripts.includes(name) && name !== 'preload.js')
+    || name === 'roulette.html.gz') await cp(join(src, name), join(sidecar, 'src', name));
+}
+// Several modules are shared with the renderer.
+for (const name of ['widget-design.js', 'settings-persistence.js', 'text-processor.js', 'release-notice-policy.js']) {
+  await cp(join(src, name), join(sidecar, 'src', name));
+}
+await cp(join(source, 'NOTICE.md'), join(sidecar, 'NOTICE.md'));
+await cp(join(source, 'resources', 'voices'), join(sidecar, 'lulu-voices'), { recursive: true });
+await cp(join(source, 'resources', 'tools', 'cloudflared.exe'), join(sidecar, 'lulu-tools', 'cloudflared.exe'));
+await cp(join(src, 'default-sounds'), join(sidecar, 'lulu-default-sounds'), { recursive: true });
+for (const name of ['desktop-host.cjs', 'host-protocol.cjs', 'beta-updates.cjs', 'microsoft-speech.cjs', 'microsoft-voice-catalog.json']) {
+  await cp(join(root, 'scripts', name), join(sidecar, 'src', name));
+}
+
+let main = await text('main.js');
+main = main.replaceAll("require('electron')", "require('./desktop-host.cjs')").replaceAll("Servicios de Electron", "Servicios del sistema");
+const installedBuild = main.slice(main.indexOf('function isLikelyInstalledBuild()'), main.indexOf('function friendlyUpdateError('));
+main = replaceOnce(main, installedBuild, "function isLikelyInstalledBuild() { return process.env.LULU_UPDATE_FEED === 'signed'; }\n\n");
+main = replaceOnce(main, "const { autoUpdater } = require('electron-updater');", "const { autoUpdater } = require('./beta-updates.cjs');");
+main = replaceOnce(main, "await shell.openExternal(UPDATE_RELEASES_URL);\n      sendUpdateStatus('external'", "await shell.openExternal(info?.releaseUrl || UPDATE_RELEASES_URL);\n      sendUpdateStatus('external'");
+main = replaceOnce(main, "const { nativeImage } = require('./desktop-host.cjs');\n  let image = nativeImage.createFromPath(source);\n  if (image.isEmpty()) throw new Error('No se pudo abrir esta imagen.');\n  const size = image.getSize();\n  if (Math.max(size.width, size.height) > 1920) image = image.resize(size.width >= size.height ? {width:1920} : {height:1920});\n  const bytes = image.toPNG();", "const { convertImage } = require('./desktop-host.cjs');\n  const bytes = await convertImage(source);");
+main = replaceOnce(main, "function setYoutubeNetworkAdBlockEnabled(enabled) {\n  youtubeAdBlockEnabled = Boolean(enabled);", "function setYoutubeNetworkAdBlockEnabled(enabled) {\n  youtubeAdBlockEnabled = Boolean(enabled);\n  session.fromPartition(YOUTUBE_PARTITION).setAdBlockEnabled(youtubeAdBlockEnabled);");
+main = replaceOnce(main, "const module = await import('@ghostery/adblocker-electron');", "const module = await import('./network-filters.mjs');");
+main = replaceOnce(main, 'Esta copia fue abierta desde una carpeta ZIP. Se abrirá la página oficial para descargar el instalador nuevo.', 'Se abrirá la página de esta versión en GitHub para descargar el instalador de Lulu Finity Rust.');
+main = replaceOnce(main, "  if (tiktokChatWindow && !tiktokChatWindow.isDestroyed()) {\n    tiktokChatWindow.removeAllListeners('close');", "  await session.fromPartition(TIKTOK_CHAT_PARTITION).clearStorageData();\n  if (tiktokChatWindow && !tiktokChatWindow.isDestroyed()) {\n    tiktokChatWindow.removeAllListeners('close');");
+main = replaceOnce(main, "  await chatSession.clearStorageData();\n  await chatSession.clearCache().catch(() => {});", "  await chatSession.clearCache().catch(() => {});");
+const legacySynthesis = main.slice(main.indexOf('  const EdgeTTS = module.EdgeTTS'), main.indexOf("\n}\n\nconst TIKTOK_TTS_COOKIE_NAMES"));
+main = replaceOnce(main, legacySynthesis, `  const Communicate = module.IsomorphicCommunicate;
+  if (typeof Communicate !== 'function') throw new Error('El motor de Microsoft no está disponible.');
+  return require('./microsoft-speech.cjs').synthesizeMicrosoft({
+    Communicate, text, voice, rate: percentFromRate(request?.rate), pitch: hertzFromPitch(request?.pitch)
+  });`);
+main = replaceOnce(main, "    const {FALLBACK_ONLINE_VOICES}=getOnlineVoiceCatalog();\n    return { voices: FALLBACK_ONLINE_VOICES, fallback: true, cached: false, message: friendlyUpdateError(error) };", `    const {prepareOnlineVoices}=getOnlineVoiceCatalog();
+    return { voices: prepareOnlineVoices(require('./microsoft-voice-catalog.json')), fallback: true, cached: false, message: friendlyUpdateError(error) };`);
+main = replaceOnce(main, "    if (savedVoices.length) {\n      onlineVoiceCatalogCache = savedVoices;", `    if (savedVoices.length) {
+      const bundled = require('./microsoft-voice-catalog.json');
+      const {prepareOnlineVoices}=getOnlineVoiceCatalog();
+      onlineVoiceCatalogCache = prepareOnlineVoices([...savedVoices, ...bundled]);`);
+main = replaceOnce(main, "return { voices: savedVoices, fallback: true, cached: true, message: friendlyUpdateError(error) };", "return { voices: onlineVoiceCatalogCache, fallback: true, cached: true, message: friendlyUpdateError(error) };");
+await writeFile(join(sidecar, 'src', 'main.js'), main);
+const voiceCatalog = replaceOnce(await text('online-voice-catalog.js'),
+  "const BLOCKED_LANGUAGE_PREFIXES = new Set(['cmn', 'ja', 'ko', 'wuu', 'yue', 'zh']);",
+  "const BLOCKED_LANGUAGE_PREFIXES = new Set();");
+await writeFile(join(sidecar, 'src', 'online-voice-catalog.js'), voiceCatalog);
+await cp(join(root, 'scripts', 'network-filters.mjs'), join(sidecar, 'src', 'network-filters.mjs'));
+const knownCalls = [
+  ...[...preload.matchAll(/ipcRenderer\.(?:invoke|send)\('([^']+)'/g)].map(match => match[1]),
+  'window:minimize', 'window:maximize', 'window:close'
+];
+await writeFile(join(sidecar, 'renderer-channels.json'), JSON.stringify([...new Set(knownCalls)]));
+
+const baseline = JSON.parse(await readFile(join(source, 'package.json'), 'utf8'));
+const originalLock = JSON.parse(await readFile(join(source, 'package-lock.json'), 'utf8'));
+delete baseline.dependencies['electron-updater'];
+delete baseline.dependencies['@ghostery/adblocker-electron'];
+baseline.dependencies['@ghostery/adblocker'] = originalLock.packages['node_modules/@ghostery/adblocker'].version;
+baseline.dependencies['node-win-x64'] = '22.23.5';
+const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.1', private: true, dependencies: baseline.dependencies };
+await writeFile(join(sidecar, 'package.json'), JSON.stringify(manifest, null, 2));
+const backendLock = join(root, 'scripts', 'backend-package-lock.json');
+await cp(backendLock, join(sidecar, 'package-lock.json'));
+run(npm, ['ci', '--omit=dev', '--os=win32', '--cpu=x64', ...(process.platform === 'win32' ? [] : ['--force']), '--ignore-scripts', '--no-audit', '--no-fund'], sidecar);
+await cp(join(sidecar, 'node_modules', 'node-win-x64', 'bin', 'node.exe'), join(sidecar, 'node.exe'));
+await rm(join(sidecar, 'node_modules', 'node-win-x64'), { recursive: true, force: true });
+await rm(join(sidecar, 'node_modules', '.bin'), { recursive: true, force: true });
+await rm(source, { recursive: true, force: true });
