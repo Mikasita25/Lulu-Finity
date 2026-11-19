@@ -48,7 +48,7 @@ pub fn set_background_memory(window: &WebviewWindow, background: bool) -> Result
         .map_err(error)
 }
 
-pub fn set_main_webview_visibility(window: &WebviewWindow, visible: bool) -> Result<(), String> {
+pub fn set_webview_visibility(window: &WebviewWindow, visible: bool) -> Result<(), String> {
     window
         .with_webview(move |platform| unsafe {
             let _ = platform.controller().SetIsVisible(visible);

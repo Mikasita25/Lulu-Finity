@@ -12,6 +12,8 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
     await beginLive(`ws://127.0.0.1:${server.address().port}/v1/tiktok/live`);
     const [peer] = server.clients;
     if (!peer) throw new Error('La conexión LIVE de prueba no abrió su WebSocket.');
+    const playerIsHidden = await player.webContents.executeJavaScript('document.hidden');
+    if (!playerIsHidden) throw new Error('El reproductor oculto seguía dibujando su ventana.');
     await player.webContents.executeJavaScript(`(async () => {
       const context = new AudioContext();
       const oscillator = context.createOscillator();

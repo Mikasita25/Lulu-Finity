@@ -2358,7 +2358,7 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "lulu-finity-rust"
-version = "1.4.0-beta.3"
+version = "1.4.0-beta.4"
 dependencies = [
  "adblock",
  "base64 0.22.1",

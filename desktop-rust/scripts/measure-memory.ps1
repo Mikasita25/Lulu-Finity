@@ -102,7 +102,7 @@ if (Test-Path $profile) { Move-Item $profile $savedProfile }
 try {
   $before = Invoke-LuluMemorySample $BeforeInstaller 'beta2'
   if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta2" }
-  $after = Invoke-LuluMemorySample $AfterInstaller 'beta3'
+  $after = Invoke-LuluMemorySample $AfterInstaller 'beta4'
   $report = [ordered]@{
     workload = 'Cuenta de TikTok consultada una vez, luego panel principal en reposo'
     before = $before
@@ -114,6 +114,6 @@ try {
   $report | ConvertTo-Json -Depth 6 | Tee-Object -FilePath $OutputFile
 } finally {
   Remove-Item Env:\LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
-  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta3" }
+  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta4" }
   if (Test-Path $savedProfile) { Move-Item $savedProfile $profile }
 }

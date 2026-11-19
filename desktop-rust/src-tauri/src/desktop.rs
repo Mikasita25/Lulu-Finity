@@ -193,6 +193,8 @@ async fn create_window(
         return Err("Ventana desconocida.".into());
     }
     let main = label == "main";
+    #[cfg(windows)]
+    let media_player = matches!(label.as_str(), "youtube" | "spotify");
     if main {
         scope_assets(app)?;
     }
@@ -269,15 +271,20 @@ async fn create_window(
                     events.event(&event_label, "close", json!([]));
                 }
                 #[cfg(windows)]
-                if event_label == "main" {
-                    if let Some(window) = event_app.get_webview_window("main") {
-                        if let WindowEvent::Focused(focused) = event {
-                            let _ = crate::webview::set_background_memory(&window, !focused);
-                        }
-                        if matches!(event, WindowEvent::Resized(_)) {
-                            if let Ok(minimized) = window.is_minimized() {
-                                let _ = crate::webview::set_main_webview_visibility(&window, !minimized);
+                if main || media_player {
+                    if let Some(window) = event_app.get_webview_window(&event_label) {
+                        match event {
+                            WindowEvent::Focused(focused) if main => {
+                                let _ = crate::webview::set_background_memory(&window, !focused);
                             }
+                            WindowEvent::Resized(_) => {
+                                if let (Ok(visible), Ok(minimized)) =
+                                    (window.is_visible(), window.is_minimized())
+                                {
+                                    let _ = crate::webview::set_webview_visibility(&window, visible && !minimized);
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -285,7 +292,10 @@ async fn create_window(
             #[cfg(windows)]
             {
                 crate::webview::register(&window, main)?;
-                if matches!(label.as_str(), "tiktok" | "tiktok-profile" | "youtube-search") {
+                if media_player {
+                    crate::webview::set_webview_visibility(&window, false)?;
+                }
+                if media_player || matches!(label.as_str(), "tiktok" | "tiktok-profile" | "youtube-search") {
                     crate::webview::set_background_memory(&window, true)?;
                 }
             }
@@ -594,8 +604,14 @@ pub async fn call(app: &AppHandle, method: &str, args: &Value) -> Reply {
             }
             .map_err(error)?;
             #[cfg(windows)]
-            if label == "main" && method == "window-minimize" {
-                crate::webview::set_main_webview_visibility(&window, false)?;
+            if matches!(label, "main" | "youtube" | "spotify") {
+                match method {
+                    "window-show" => crate::webview::set_webview_visibility(&window, true)?,
+                    "window-hide" | "window-minimize" => {
+                        crate::webview::set_webview_visibility(&window, false)?;
+                    }
+                    _ => {}
+                }
             }
         }
         "window-navigate" | "window-eval" | "window-mute" => {

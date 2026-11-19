@@ -56,7 +56,7 @@ await writeFile(join(frontend, 'index.html'), html
   .replace("connect-src 'self';", "connect-src 'self' ipc: http://ipc.localhost;")
   .replace("media-src 'self' file: data: blob:", "media-src 'self' file: data: blob: http://asset.localhost")
   .replace('<script src="text-processor.js">', '<script src="desktop-bridge.js"></script>\n<script src="text-processor.js">')
-  .replace(/v1\.3\.3/g, 'v1.4.0 beta 3 Rust')
+  .replace(/v1\.3\.3/g, 'v1.4.0 beta 4 Rust')
   .replace('<link href="studio.css" rel="stylesheet"/>', '<link href="studio.css" rel="stylesheet"/><link href="rendering.css" rel="stylesheet"/>')
   .replace(/<title>[^<]*<\/title>/, '<title>Lulu Finity Rust Beta</title>'));
 
@@ -237,7 +237,7 @@ delete baseline.dependencies['tiktok-live-connector'];
 baseline.dependencies['@ghostery/adblocker'] = originalLock.packages['node_modules/@ghostery/adblocker'].version;
 baseline.dependencies['node-win-x64'] = '22.23.5';
 baseline.dependencies['msedge-tts'] = '2.1.1';
-const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.3', private: true, dependencies: baseline.dependencies };
+const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.4', private: true, dependencies: baseline.dependencies };
 await writeFile(join(sidecar, 'package.json'), JSON.stringify(manifest, null, 2));
 const backendLock = join(root, 'scripts', 'backend-package-lock.json');
 await cp(backendLock, join(sidecar, 'package-lock.json'));
