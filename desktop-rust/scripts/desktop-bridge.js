@@ -30,6 +30,17 @@ const contextBridge = {
   }
 };
 
+let lastActivity = -1000;
+function recordDesktopActivity() {
+  const now = performance.now();
+  if (now - lastActivity < 1000) return;
+  lastActivity = now;
+  void ipcRenderer.invoke('runtime:activity').catch(() => {});
+}
+for (const event of ['pointerdown', 'keydown', 'wheel']) {
+  window.addEventListener(event, recordDesktopActivity, { passive: true, capture: true });
+}
+
 function luluMediaUrl(url) {
   if (typeof url !== 'string' || !url.startsWith('file:')) return url;
   try {

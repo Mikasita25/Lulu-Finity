@@ -2,6 +2,8 @@
 
 mod bridge;
 mod desktop;
+#[cfg(windows)]
+mod memory_budget;
 mod profile;
 #[cfg(windows)]
 mod voice_playback;
@@ -27,6 +29,11 @@ async fn desktop_invoke(
     );
     if window.label() != "main" || !local || channel.starts_with('$') {
         return Err("Evento de escritorio fuera de Lulu Finity.".into());
+    }
+    #[cfg(windows)]
+    if channel == "runtime:activity" {
+        window.state::<memory_budget::Activity>().record();
+        return Ok(Value::Null);
     }
     #[cfg(windows)]
     if matches!(channel.as_str(), "tts:play-pcm" | "tts:stop-pcm") {
@@ -73,7 +80,11 @@ fn main() {
             let host = bridge::Host::start(handle, &resources, &data)?;
             handle.manage(desktop::Desktop::new(resources, data));
             #[cfg(windows)]
-            handle.manage(voice_playback::Playback::default());
+            {
+                handle.manage(voice_playback::Playback::default());
+                handle.manage(memory_budget::Activity::default());
+                tauri::async_runtime::spawn(memory_budget::run(handle.clone(), host.pid()));
+            }
             handle.manage(host.clone());
             host.read_messages(handle.clone());
             Ok(())

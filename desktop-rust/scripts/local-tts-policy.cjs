@@ -1,6 +1,6 @@
 'use strict';
 
-const MAX_SEGMENT = 72;
+const MAX_SEGMENT = 48;
 
 function voiceSegments(text) {
   const characters = [...text.trim()];

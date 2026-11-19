@@ -100,20 +100,20 @@ $profile = Join-Path $env:APPDATA 'com.mikasita.lulufinity.rustbeta'
 $savedProfile = "$profile-ci-original"
 if (Test-Path $profile) { Move-Item $profile $savedProfile }
 try {
-  $before = Invoke-LuluMemorySample $BeforeInstaller 'beta2'
-  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta2" }
-  $after = Invoke-LuluMemorySample $AfterInstaller 'beta5'
+  $before = Invoke-LuluMemorySample $BeforeInstaller 'beta5'
+  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta5" }
+  $after = Invoke-LuluMemorySample $AfterInstaller 'beta6'
   $report = [ordered]@{
     workload = 'Cuenta de TikTok consultada una vez, luego panel principal en reposo'
     before = $before
     after = $after
-    targetResidentMiB = 500
-    targetMetForeground = $after.foreground.residentMiB -lt 500
-    targetMetMinimized = $after.minimized.residentMiB -lt 500
+    targetResidentMiB = 300
+    targetMetForeground = $after.foreground.residentMiB -lt 300
+    targetMetMinimized = $after.minimized.residentMiB -lt 300
   }
   $report | ConvertTo-Json -Depth 6 | Tee-Object -FilePath $OutputFile
 } finally {
   Remove-Item Env:\LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
-  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta5" }
+  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta6" }
   if (Test-Path $savedProfile) { Move-Item $savedProfile $profile }
 }

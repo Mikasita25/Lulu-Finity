@@ -15,7 +15,7 @@ async function launch(t, executable) {
   const directory = await mkdtemp(path.join(tmpdir(), 'lulu-rust-test-'));
   const child = spawn(executable, [path.join(backend, 'src/main.js')], {
     cwd: backend,
-    env: { ...process.env, APPDATA: directory, LULU_USER_DATA: directory, LULU_APP_VERSION: '1.4.0-beta.5', LULU_UPDATE_FEED: 'releases' },
+    env: { ...process.env, APPDATA: directory, LULU_USER_DATA: directory, LULU_APP_VERSION: '1.4.0-beta.6', LULU_UPDATE_FEED: 'releases' },
     stdio: ['pipe', 'pipe', 'pipe']
   });
   let diagnostics = '';
@@ -69,7 +69,7 @@ test('el backend conserva configuración, voces y widgets a través del puente d
   const node = process.platform === 'win32' ? path.join(backend, 'node.exe') : process.execPath;
   const { invoke, directory } = await launch(t, node);
   const current = await invoke('app:get-state');
-  assert.equal(current.version, '1.4.0-beta.5');
+  assert.equal(current.version, '1.4.0-beta.6');
   assert.ok(current.settings.overlayToken);
   await invoke('settings:save', { ...current.settings, username: 'lulu_test', checkUpdatesOnStartup: false });
   const saved = JSON.parse(await readFile(path.join(directory, 'settings.json'), 'utf8'));

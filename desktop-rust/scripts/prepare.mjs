@@ -63,7 +63,7 @@ await writeFile(join(frontend, 'index.html'), sizedHtml
   .replace("connect-src 'self';", "connect-src 'self' ipc: http://ipc.localhost;")
   .replace("media-src 'self' file: data: blob:", "media-src 'self' file: data: blob: http://asset.localhost")
   .replace('<script src="text-processor.js">', '<script src="desktop-bridge.js"></script>\n<script src="text-processor.js">')
-  .replace(/v1\.3\.3/g, 'v1.4.0 beta 5 Rust')
+  .replace(/v1\.3\.3/g, 'v1.4.0 beta 6 Rust')
   .replace('<link href="studio.css" rel="stylesheet"/>', '<link href="studio.css" rel="stylesheet"/><link href="rendering.css" rel="stylesheet"/>')
   .replace(/<title>[^<]*<\/title>/, '<title>Lulu Finity Rust Beta</title>'));
 
@@ -242,6 +242,12 @@ main = replaceOnce(main, "function markMusicExpected(provider, expected, userPau
 function markMusicExpected(provider, expected, userPaused = false) {`);
 main = replaceOnce(main, "ipcMain.handle('tts:synthesize-local', (_event,request) => getLocalVoiceManager().synthesize(request));",
   "ipcMain.handle('tts:synthesize-local', (_event,request) => getLocalVoiceManager().synthesize({ ...request, releaseAfterSynthesis:runtimeNeedsAppAwake() }));");
+main = replaceOnce(main, '        await new Promise((resolve)=>setTimeout(resolve,900));', `        const expectedPreviews = { rankings:3, automations:3, games:1 }[name];
+        const page = document.getElementById('page-' + name);
+        const deadline = Date.now() + 8500;
+        while(Date.now() < deadline && page?.querySelectorAll('.stream-widget-preview.preview-ready,.ranking-preview-shell.preview-ready').length < expectedPreviews) {
+          await new Promise((resolve)=>setTimeout(resolve,150));
+        }`);
 await writeFile(join(sidecar, 'src', 'main.js'), main);
 let voiceManager = await text('local-voice-manager.js');
 voiceManager = replaceOnce(voiceManager, '    this.pending = new Map();', '    this.pending = new Map();\n    this.workerExit = null;');
@@ -332,7 +338,7 @@ delete baseline.dependencies['tiktok-live-connector'];
 baseline.dependencies['@ghostery/adblocker'] = originalLock.packages['node_modules/@ghostery/adblocker'].version;
 baseline.dependencies['node-win-x64'] = '22.23.5';
 baseline.dependencies['msedge-tts'] = '2.1.1';
-const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.5', private: true, dependencies: baseline.dependencies };
+const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.6', private: true, dependencies: baseline.dependencies };
 await writeFile(join(sidecar, 'package.json'), JSON.stringify(manifest, null, 2));
 const backendLock = join(root, 'scripts', 'backend-package-lock.json');
 await cp(backendLock, join(sidecar, 'package-lock.json'));

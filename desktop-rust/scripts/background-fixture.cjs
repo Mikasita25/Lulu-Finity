@@ -85,9 +85,12 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
       return { peakResidentMiB, peakAfterSynthesisMiB, samples };
     }
 
+    for (let check = 0; check < 3; check++) await requirePlayback(3);
+    const foregroundIdleLive = await sampleMemory();
     const foreground = await sampleWhileReading('ahorro-visible', 'Seguimos en directo y podemos escuchar los comentarios del chat mientras la música sigue sonando en el reproductor de Lulu.');
     await main.call('window-minimize');
-    await delay(1000);
+    for (let check = 0; check < 3; check++) await requirePlayback(3);
+    const backgroundIdleLive = await sampleMemory();
 
     const before = await player.webContents.executeJavaScript('window.luluProbeAudio.currentTime');
     const cleanup = await main.webContents.executeJavaScript('window.voiceStudio.releaseIdleResources({force:true,keepMusic:false})');
@@ -123,7 +126,8 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
     if (!chatAfterRelease) throw new Error('El LIVE dejó de entregar comentarios tras liberar memoria.');
     const nativeVoice = await main.webContents.executeJavaScript('window.luluProbeVoice');
     return { ok: true, chat: verify.received, chatAfterRelease, hidden: verify.minimized, audioSeconds: lastPlaybackTime - before,
-      nativeVoice, foreground, background, initial, settled, afterRelease };
+      nativeVoice, foregroundIdleLive, foreground, backgroundIdleLive, background, initial, settled, afterRelease,
+      targetResidentMiB: 300 };
   } finally {
     expectMusic(false);
     if (!player.isDestroyed()) player.destroy();

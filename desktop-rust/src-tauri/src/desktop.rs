@@ -57,6 +57,11 @@ pub struct Desktop {
 }
 
 impl Desktop {
+    #[cfg(windows)]
+    pub fn streaming(&self) -> bool {
+        self.streaming.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub fn new(resources: PathBuf, data: PathBuf) -> Self {
         let saved_settings = std::fs::read(data.join("settings.json"))
             .ok()
@@ -279,6 +284,7 @@ async fn create_window(
                     if let Some(window) = event_app.get_webview_window(&event_label) {
                         match event {
                             WindowEvent::Focused(focused) if main => {
+                                event_app.state::<crate::memory_budget::Activity>().record();
                                 let streaming = event_app.state::<Desktop>().streaming.load(std::sync::atomic::Ordering::Relaxed);
                                 let _ = crate::webview::set_background_memory(&window, !focused || streaming);
                             }
@@ -414,14 +420,8 @@ fn image_as_png(path: &Path) -> Reply {
     Ok(json!(STANDARD.encode(output.into_inner())))
 }
 
-fn metrics(backend: u32) -> Value {
-    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
-    let mut system = System::new();
-    system.refresh_processes_specifics(
-        ProcessesToUpdate::All,
-        true,
-        ProcessRefreshKind::nothing().with_memory(),
-    );
+pub fn app_processes(system: &sysinfo::System, backend: u32) -> HashSet<sysinfo::Pid> {
+    use sysinfo::Pid;
     let frontend = std::process::id();
     let mut include = HashSet::from([Pid::from_u32(frontend), Pid::from_u32(backend)]);
     loop {
@@ -438,6 +438,15 @@ fn metrics(backend: u32) -> Value {
             break;
         }
     }
+    include
+}
+
+fn metrics(backend: u32) -> Value {
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
+    let mut system = System::new();
+    system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_memory());
+    let frontend = std::process::id();
+    let include = app_processes(&system, backend);
     json!(include
         .iter()
         .filter_map(|pid| system.process(*pid))
