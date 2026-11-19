@@ -18,6 +18,7 @@ ipcMain.on('app:renderer-ready', async () => {
       main: mainWindow,
       createPlayer: createYoutubeWindow,
       expectMusic: active => { musicRecoveryState.youtube.lastProgressAt = Date.now(); markMusicExpected('youtube', active); },
+      reportProgress: currentTime => noteMusicPlayerPayload('youtube', { paused: false, currentTime }),
       beginLive: async relayUrl => {
         const connection = new RailwayRelayConnection('lulu_test', relayUrl, '', relayEvents);
         liveConnection = connection;
