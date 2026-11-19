@@ -1,0 +1,17 @@
+/* The shared background is static. Panels keep their tint, gradient and
+   border without allocating a separate filtered backdrop for each card. */
+html :is(.sidebar-bottom, .panel, .stat-card, .status-banner, .settings-card,
+  .stream-overlay-card, .command-help, .command-event-card, .category-section-tabs,
+  .tts-section-tabs, .titlebar, .creation-actions, .permanent-preview-badge,
+  .release-notice-close) {
+  backdrop-filter: none !important;
+}
+
+/* Only a foreground modal needs a real blur; it covers all other panels. */
+html :is(.modal-backdrop, .release-notice-backdrop) {
+  backdrop-filter: blur(6px) !important;
+}
+
+html .studio-miku-halo {
+  animation: none;
+}

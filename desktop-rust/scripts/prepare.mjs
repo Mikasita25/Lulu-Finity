@@ -56,7 +56,8 @@ await writeFile(join(frontend, 'index.html'), html
   .replace("connect-src 'self';", "connect-src 'self' ipc: http://ipc.localhost;")
   .replace("media-src 'self' file: data: blob:", "media-src 'self' file: data: blob: http://asset.localhost")
   .replace('<script src="text-processor.js">', '<script src="desktop-bridge.js"></script>\n<script src="text-processor.js">')
-  .replace(/v1\.3\.3/g, 'v1.4.0 beta Rust')
+  .replace(/v1\.3\.3/g, 'v1.4.0 beta 2 Rust')
+  .replace('<link href="studio.css" rel="stylesheet"/>', '<link href="studio.css" rel="stylesheet"/><link href="rendering.css" rel="stylesheet"/>')
   .replace(/<title>[^<]*<\/title>/, '<title>Lulu Finity Rust Beta</title>'));
 
 const preload = await text('preload.js');
@@ -64,10 +65,24 @@ const rendererBridge = await readFile(join(root, 'scripts', 'desktop-bridge.js')
 await writeFile(join(frontend, 'desktop-bridge.js'),
   rendererBridge + '\n' + replaceOnce(preload, "const { contextBridge, ipcRenderer } = require('electron');", ''));
 
+await cp(join(root, 'scripts', 'rendering.css'), join(frontend, 'rendering.css'));
+
 let renderer = await text('renderer.js');
 // Los perfiles conservan las URL file: y sólo se transforman al reproducir.
 renderer = replaceOnce(renderer, 'new Audio(url)', 'new Audio(luluMediaUrl(url))');
 renderer = replaceOnce(renderer, "const url = escapeHtml(String(media.url || ''));", "const url = escapeHtml(luluMediaUrl(String(media.url || '')));");
+renderer = replaceOnce(renderer,
+  'const total=Number(runtime.totalMemoryMb??runtime.memoryMb??0);',
+  "const total=Number(runtime.totalMemoryMb??runtime.memoryMb??0);const ramLabel=runtime.memoryKind==='private'?'RAM privada en uso':'RAM residente (incluye memoria compartida)';");
+renderer = replaceOnce(renderer, 'RAM total de Lulu', '${ramLabel}');
+renderer = replaceOnce(renderer, 'Solo núcleo', 'Núcleo de Rust');
+renderer = replaceOnce(renderer, 'Procesos protegidos', 'Procesos de Lulu');
+renderer = replaceOnce(renderer,
+  'La suma incluye todos los procesos que Windows agrupa como Lulu Finity.',
+  'Medición de los procesos de esta instancia en Windows.');
+renderer = replaceOnce(renderer,
+  'Electron separa interfaz, reproductor, gráficos y servicios para mantener el aislamiento. No son ocho copias de Lulu. Spotify Web puede usar varios de estos procesos mientras reproduce.',
+  'WebView2 ejecuta la interfaz, los reproductores y sus procesos de gráficos. La voz y las conexiones se atienden en el motor de Lulu.');
 await writeFile(join(frontend, 'renderer.js'), renderer);
 
 await mkdir(join(sidecar, 'src'));
@@ -111,6 +126,8 @@ main = replaceOnce(main, "    if (savedVoices.length) {\n      onlineVoiceCatalo
       const {prepareOnlineVoices}=getOnlineVoiceCatalog();
       onlineVoiceCatalogCache = prepareOnlineVoices([...savedVoices, ...bundled]);`);
 main = replaceOnce(main, "return { voices: savedVoices, fallback: true, cached: true, message: friendlyUpdateError(error) };", "return { voices: onlineVoiceCatalogCache, fallback: true, cached: true, message: friendlyUpdateError(error) };");
+const oldMemoryStats = main.slice(main.indexOf('function runtimeWindowPid('), main.indexOf("ipcMain.handle('runtime:status'"));
+main = replaceOnce(main, oldMemoryStats, await readFile(join(root, 'scripts', 'runtime-memory.js'), 'utf8') + '\n');
 await writeFile(join(sidecar, 'src', 'main.js'), main);
 const voiceCatalog = replaceOnce(await text('online-voice-catalog.js'),
   "const BLOCKED_LANGUAGE_PREFIXES = new Set(['cmn', 'ja', 'ko', 'wuu', 'yue', 'zh']);",
@@ -130,7 +147,7 @@ delete baseline.dependencies['@ghostery/adblocker-electron'];
 baseline.dependencies['@ghostery/adblocker'] = originalLock.packages['node_modules/@ghostery/adblocker'].version;
 baseline.dependencies['node-win-x64'] = '22.23.5';
 baseline.dependencies['msedge-tts'] = '2.1.1';
-const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.1', private: true, dependencies: baseline.dependencies };
+const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.2', private: true, dependencies: baseline.dependencies };
 await writeFile(join(sidecar, 'package.json'), JSON.stringify(manifest, null, 2));
 const backendLock = join(root, 'scripts', 'backend-package-lock.json');
 await cp(backendLock, join(sidecar, 'package-lock.json'));

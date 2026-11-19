@@ -47,6 +47,8 @@ pub struct Desktop {
     resources: PathBuf,
     data: PathBuf,
     navigation: Mutex<HashMap<String, NavigationReply>>,
+    tiktok_profile: tokio::sync::Mutex<()>,
+    startup_music_profile: &'static str,
     ad_enabled: std::sync::atomic::AtomicBool,
     base_filters: RwLock<Vec<AdFilter>>,
     advanced: Mutex<Option<adblock::Engine>>,
@@ -54,10 +56,24 @@ pub struct Desktop {
 
 impl Desktop {
     pub fn new(resources: PathBuf, data: PathBuf) -> Self {
+        let saved_settings = std::fs::read(data.join("settings.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+        let startup_music_profile = if saved_settings
+            .as_ref()
+            .and_then(|settings| settings["musicProvider"].as_str())
+            == Some("spotify")
+        {
+            "spotify"
+        } else {
+            "youtube"
+        };
         Self {
             resources,
             data,
             navigation: Mutex::default(),
+            tiktok_profile: tokio::sync::Mutex::default(),
+            startup_music_profile,
             ad_enabled: std::sync::atomic::AtomicBool::new(true),
             base_filters: RwLock::default(),
             advanced: Mutex::default(),
@@ -172,7 +188,7 @@ async fn create_window(
     let label = label.to_owned();
     if !matches!(
         label.as_str(),
-        "main" | "tiktok" | "youtube" | "youtube-search" | "spotify"
+        "main" | "tiktok" | "tiktok-profile" | "youtube" | "youtube-search" | "spotify"
     ) {
         return Err("Ventana desconocida.".into());
     }
@@ -180,7 +196,16 @@ async fn create_window(
     if main {
         scope_assets(app)?;
     }
-    let data = app.state::<Desktop>().data.clone();
+    let desktop = app.state::<Desktop>();
+    // Keep each provider's on-disk session. The local UI can share the current
+    // music provider's runtime without loading the provider or changing its cookies.
+    let profile = match label.as_str() {
+        "main" => desktop.startup_music_profile,
+        "youtube-search" => "youtube",
+        "tiktok-profile" => "tiktok",
+        _ => label.as_str(),
+    };
+    let data_directory = desktop.data.join("profiles").join(profile);
     let window_url = if main {
         WebviewUrl::App("index.html".into())
     } else {
@@ -199,7 +224,6 @@ async fn create_window(
             let width = args["width"].as_f64().unwrap_or(1120.0);
             let height = args["height"].as_f64().unwrap_or(820.0);
             let title = if main { "Lulu Finity Rust Beta" } else { args["title"].as_str().unwrap_or("Lulu Finity") };
-            let profile = if label == "youtube-search" { "youtube" } else { &label };
             let mut builder = WebviewWindowBuilder::new(&handle, &label, window_url)
                 .title(title)
                 .inner_size(width, height)
@@ -208,7 +232,7 @@ async fn create_window(
                 .decorations(!main)
                 .skip_taskbar(!main)
                 .background_color(tauri::window::Color(13, 11, 22, 255))
-                .data_directory(data.join("profiles").join(profile))
+                .data_directory(data_directory)
                 .on_navigation(move |url| {
                     let permitted = allowed(&nav_label, url);
                     if !permitted {
@@ -222,7 +246,7 @@ async fn create_window(
                 });
             #[cfg(windows)]
             {
-                builder = builder.additional_browser_args("--autoplay-policy=no-user-gesture-required --disable-background-timer-throttling --disable-renderer-backgrounding");
+                builder = builder.additional_browser_args("--autoplay-policy=no-user-gesture-required --disable-background-timer-throttling");
             }
             #[cfg(not(windows))]
             {
@@ -244,7 +268,12 @@ async fn create_window(
                 }
             });
             #[cfg(windows)]
-            crate::webview::register(&window, main)?;
+            {
+                crate::webview::register(&window, main)?;
+                if matches!(label.as_str(), "tiktok" | "tiktok-profile" | "youtube-search") {
+                    crate::webview::set_background_memory(&window, true)?;
+                }
+            }
             Ok(window)
         })();
         let _ = sender.send(result);
@@ -356,14 +385,12 @@ fn image_as_png(path: &Path) -> Reply {
 }
 
 fn metrics(backend: u32) -> Value {
-    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
     let mut system = System::new();
     system.refresh_processes_specifics(
         ProcessesToUpdate::All,
         true,
-        ProcessRefreshKind::nothing()
-            .with_exe(UpdateKind::OnlyIfNotSet)
-            .with_memory(),
+        ProcessRefreshKind::nothing().with_memory(),
     );
     let frontend = std::process::id();
     let mut include = HashSet::from([Pid::from_u32(frontend), Pid::from_u32(backend)]);
@@ -381,11 +408,118 @@ fn metrics(backend: u32) -> Value {
             break;
         }
     }
-    json!(include.iter().filter_map(|pid| system.process(*pid)).map(|process| {
-        let pid = process.pid().as_u32();
-        let role = if pid == backend || pid == frontend { "Browser" } else { "Tab" };
-        json!({ "pid": pid, "type": role, "memory": { "workingSetSize": process.memory() / 1024 } })
-    }).collect::<Vec<_>>())
+    json!(include
+        .iter()
+        .filter_map(|pid| system.process(*pid))
+        .map(|process| {
+            let pid = process.pid().as_u32();
+            let role = if pid == frontend {
+                "Desktop"
+            } else if pid == backend {
+                "Backend"
+            } else if process
+                .name()
+                .to_string_lossy()
+                .eq_ignore_ascii_case("msedgewebview2.exe")
+            {
+                "WebView2"
+            } else {
+                "Helper"
+            };
+            #[cfg(windows)]
+            let private = private_resident_memory(pid).map(|bytes| bytes / 1024);
+            #[cfg(not(windows))]
+            let private: Option<usize> = None;
+            json!({ "pid": pid, "type": role, "memory": {
+            "workingSetSize": process.memory() / 1024,
+            "privateWorkingSetSize": private,
+        } })
+        })
+        .collect::<Vec<_>>())
+}
+
+#[cfg(windows)]
+fn private_resident_memory(pid: u32) -> Option<usize> {
+    use std::mem::size_of;
+    use windows::Win32::{
+        Foundation::CloseHandle,
+        System::{
+            ProcessStatus::{
+                K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX2,
+            },
+            Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+        },
+    };
+    let cb = size_of::<PROCESS_MEMORY_COUNTERS_EX2>() as u32;
+    let mut counters = PROCESS_MEMORY_COUNTERS_EX2 {
+        cb,
+        ..Default::default()
+    };
+    unsafe {
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let captured = K32GetProcessMemoryInfo(
+            process,
+            (&mut counters as *mut PROCESS_MEMORY_COUNTERS_EX2).cast::<PROCESS_MEMORY_COUNTERS>(),
+            cb,
+        );
+        let _ = CloseHandle(process);
+        captured.as_bool().then_some(counters.PrivateWorkingSetSize)
+    }
+}
+
+async fn tiktok_profile(app: &AppHandle, method: &str, args: &Value) -> Reply {
+    let desktop = app.state::<Desktop>();
+    let url = if method == "profile-cookies" {
+        let url = Url::parse(arg(args, "url")).map_err(error)?;
+        if !allowed("tiktok", &url) {
+            return Err("Origen de TikTok inválido.".into());
+        }
+        Some(url)
+    } else {
+        None
+    };
+    let _guard = desktop.tiktok_profile.lock().await;
+    let (window, temporary) = match app.get_webview_window("tiktok") {
+        Some(window) => (window, false),
+        None if !desktop.data.join("profiles/tiktok").is_dir() => {
+            return Ok(if url.is_some() {
+                json!([])
+            } else {
+                Value::Null
+            });
+        }
+        None => (
+            create_window(app, "tiktok-profile", &json!({})).await?,
+            true,
+        ),
+    };
+    let result = match url {
+        Some(url) => {
+            let window = window.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let cookies = window.cookies_for_url(url).map_err(error)?;
+                Ok(json!(cookies
+                    .into_iter()
+                    .filter(|cookie| TIKTOK_COOKIES.contains(&cookie.name()))
+                    .map(|cookie| json!({ "name": cookie.name(), "value": cookie.value() }))
+                    .collect::<Vec<_>>()))
+            })
+            .await
+            .map_err(error)
+            .and_then(|result| result)
+        }
+        None => {
+            #[cfg(windows)]
+            let cleared = crate::webview::clear_profile(&window).await;
+            #[cfg(not(windows))]
+            let cleared = window.clear_all_browsing_data().map_err(error);
+            cleared.map(|_| Value::Null)
+        }
+    };
+    if temporary {
+        let _ = window.destroy();
+    }
+    result
 }
 
 async fn update(app: &AppHandle, install: bool) -> Reply {
@@ -423,6 +557,16 @@ pub async fn call(app: &AppHandle, method: &str, args: &Value) -> Reply {
             let window = app
                 .get_webview_window(label)
                 .ok_or("La ventana se cerró.")?;
+            #[cfg(windows)]
+            match method {
+                "window-show" | "window-focus" => {
+                    crate::webview::set_background_memory(&window, false)?
+                }
+                "window-hide" | "window-minimize" => {
+                    crate::webview::set_background_memory(&window, true)?
+                }
+                _ => {}
+            }
             match method {
                 "window-show" => window.show(),
                 "window-hide" => window.hide(),
@@ -456,33 +600,7 @@ pub async fn call(app: &AppHandle, method: &str, args: &Value) -> Reply {
             if label != "tiktok" {
                 return Err("Perfil desconocido.".into());
             }
-            let window = create_window(
-                app,
-                label,
-                &json!({ "title": "Sitio oficial de TikTok — Lulu Finity" }),
-            )
-            .await?;
-            if method == "profile-clear" {
-                #[cfg(windows)]
-                crate::webview::clear_profile(&window).await?;
-                #[cfg(not(windows))]
-                window.clear_all_browsing_data().map_err(error)?;
-            } else {
-                let url = Url::parse(arg(args, "url")).map_err(error)?;
-                if !allowed(label, &url) {
-                    return Err("Origen de TikTok inválido.".into());
-                }
-                return tauri::async_runtime::spawn_blocking(move || {
-                    let cookies = window.cookies_for_url(url).map_err(error)?;
-                    Ok(json!(cookies
-                        .into_iter()
-                        .filter(|cookie| TIKTOK_COOKIES.contains(&cookie.name()))
-                        .map(|cookie| json!({ "name": cookie.name(), "value": cookie.value() }))
-                        .collect::<Vec<_>>()))
-                })
-                .await
-                .map_err(error)?;
-            }
+            return tiktok_profile(app, method, args).await;
         }
         "dialog-file" | "dialog-message" | "dialog-error" => {
             return dialog(app, method, args).await
