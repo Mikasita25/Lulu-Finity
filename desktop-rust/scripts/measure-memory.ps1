@@ -9,6 +9,15 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or !$env:RUNNER_TEMP) {
   throw 'Esta comparación usa perfiles temporales de un runner de CI.'
 }
 
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class LuluNativeWindow {
+  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr window, int command);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr window);
+}
+'@
+
 function Read-LuluMemory([int]$RootId) {
   $processTree = @(Get-CimInstance Win32_Process)
   $included = [System.Collections.Generic.HashSet[int]]::new()
@@ -30,6 +39,19 @@ function Read-LuluMemory([int]$RootId) {
     privateMiB = [math]::Round($private / 1MB, 1)
     residentMiB = [math]::Round($resident / 1MB, 1)
     webView2Processes = @($processTree | Where-Object { $included.Contains([int]$_.ProcessId) -and $_.Name -eq 'msedgewebview2.exe' }).Count
+  }
+}
+
+function Read-LuluMemoryMedian([int]$RootId) {
+  $samples = for ($i = 0; $i -lt 3; $i++) {
+    Read-LuluMemory $RootId
+    Start-Sleep -Seconds 2
+  }
+  [ordered]@{
+    samples = $samples
+    privateMiB = @($samples.privateMiB | Sort-Object)[1]
+    residentMiB = @($samples.residentMiB | Sort-Object)[1]
+    webView2Processes = @($samples.webView2Processes | Sort-Object)[1]
   }
 }
 
@@ -57,15 +79,16 @@ function Invoke-LuluMemorySample([string]$Installer, [string]$Label) {
     $navigation = Get-Content $env:LULU_NAVIGATION_SMOKE_MARKER -Raw | ConvertFrom-Json
     if (!$navigation.ok) { throw "Falló la escena de $Label. $($navigation.error)" }
     Start-Sleep -Seconds 12
-    $samples = for ($i = 0; $i -lt 3; $i++) {
-      Read-LuluMemory $app.Id
-      Start-Sleep -Seconds 2
-    }
+    $foreground = Read-LuluMemoryMedian $app.Id
+    $app.Refresh()
+    $window = $app.MainWindowHandle
+    if ($window -eq [IntPtr]::Zero) { throw "Windows no encontró la ventana de $Label." }
+    [void][LuluNativeWindow]::ShowWindowAsync($window, 6)
+    Start-Sleep -Seconds 12
+    if (![LuluNativeWindow]::IsIconic($window)) { throw "Windows no minimizó la ventana de $Label." }
     [ordered]@{
-      samples = $samples
-      privateMiB = @($samples.privateMiB | Sort-Object)[1]
-      residentMiB = @($samples.residentMiB | Sort-Object)[1]
-      webView2Processes = @($samples.webView2Processes | Sort-Object)[1]
+      foreground = $foreground
+      minimized = Read-LuluMemoryMedian $app.Id
     }
   } finally {
     if (!$app.HasExited) { $null = & taskkill.exe /PID $app.Id /T /F }
@@ -85,7 +108,8 @@ try {
     before = $before
     after = $after
     targetResidentMiB = 250
-    targetMetInThisScenario = $after.residentMiB -lt 250
+    targetMetForeground = $after.foreground.residentMiB -lt 250
+    targetMetMinimized = $after.minimized.residentMiB -lt 250
   }
   $report | ConvertTo-Json -Depth 6 | Tee-Object -FilePath $OutputFile
 } finally {

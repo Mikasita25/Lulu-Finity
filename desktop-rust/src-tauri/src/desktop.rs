@@ -269,10 +269,15 @@ async fn create_window(
                     events.event(&event_label, "close", json!([]));
                 }
                 #[cfg(windows)]
-                if let WindowEvent::Focused(focused) = event {
-                    if event_label == "main" {
-                        if let Some(window) = event_app.get_webview_window("main") {
+                if event_label == "main" {
+                    if let Some(window) = event_app.get_webview_window("main") {
+                        if let WindowEvent::Focused(focused) = event {
                             let _ = crate::webview::set_background_memory(&window, !focused);
+                        }
+                        if matches!(event, WindowEvent::Resized(_)) {
+                            if let Ok(minimized) = window.is_minimized() {
+                                let _ = crate::webview::set_main_webview_visibility(&window, !minimized);
+                            }
                         }
                     }
                 }
@@ -588,6 +593,10 @@ pub async fn call(app: &AppHandle, method: &str, args: &Value) -> Reply {
                 _ => window.destroy(),
             }
             .map_err(error)?;
+            #[cfg(windows)]
+            if label == "main" && method == "window-minimize" {
+                crate::webview::set_main_webview_visibility(&window, false)?;
+            }
         }
         "window-navigate" | "window-eval" | "window-mute" => {
             let window = app

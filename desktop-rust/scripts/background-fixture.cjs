@@ -40,7 +40,8 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
       }
       return { minimized: document.hidden, received: state.comments.some(item => item.comment === 'prueba de continuidad') };
     })()`);
-    if (!verify.minimized || !verify.received) throw new Error('El renderer no recibió el comentario en segundo plano.');
+    if (!verify.received) throw new Error('El LIVE no entregó el comentario al renderer.');
+    if (!verify.minimized) throw new Error('WebView2 siguió tratando la ventana minimizada como visible.');
 
     await new Promise(resolve => setTimeout(resolve, 3000));
     const media = await player.webContents.executeJavaScript('({ running: window.luluProbeAudio.state === "running", time: window.luluProbeAudio.currentTime })');
