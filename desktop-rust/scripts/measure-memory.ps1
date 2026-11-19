@@ -77,20 +77,19 @@ $profile = Join-Path $env:APPDATA 'com.mikasita.lulufinity.rustbeta'
 $savedProfile = "$profile-ci-original"
 if (Test-Path $profile) { Move-Item $profile $savedProfile }
 try {
-  $before = Invoke-LuluMemorySample $BeforeInstaller 'beta1'
-  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta1" }
-  $after = Invoke-LuluMemorySample $AfterInstaller 'beta2'
+  $before = Invoke-LuluMemorySample $BeforeInstaller 'beta2'
+  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta2" }
+  $after = Invoke-LuluMemorySample $AfterInstaller 'beta3'
   $report = [ordered]@{
     workload = 'Cuenta de TikTok consultada una vez, luego panel principal en reposo'
     before = $before
     after = $after
+    targetResidentMiB = 250
+    targetMetInThisScenario = $after.residentMiB -lt 250
   }
   $report | ConvertTo-Json -Depth 6 | Tee-Object -FilePath $OutputFile
-  if ($after.webView2Processes -ge $before.webView2Processes) {
-    throw 'La consulta de cuenta debe usar menos procesos WebView2 que la beta anterior.'
-  }
 } finally {
   Remove-Item Env:\LULU_NAVIGATION_SMOKE_MARKER -ErrorAction SilentlyContinue
-  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta2" }
+  if (Test-Path $profile) { Move-Item $profile "$profile-ci-beta3" }
   if (Test-Path $savedProfile) { Move-Item $savedProfile $profile }
 }

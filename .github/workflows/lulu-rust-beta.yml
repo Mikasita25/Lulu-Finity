@@ -76,6 +76,11 @@ jobs:
           } finally {
             if (!$process.HasExited) { Stop-Process -Id $process.Id -Force }
           }
+      - name: Verificar LIVE y audio con la ventana minimizada
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'lulu-rust-beta/lulu-finity-rust.exe'
+          ./scripts/test-background.ps1 $exe (Join-Path $env:RUNNER_TEMP 'lulu-rust-background.json')
       - uses: actions/upload-artifact@v4
         with:
           name: Lulu-Finity-Rust-Beta-Windows-x64
@@ -89,6 +94,7 @@ jobs:
             ${{ runner.temp }}/lulu-rust-navigation.json
             ${{ runner.temp }}/lulu-rust-native.log
             ${{ runner.temp }}/lulu-rust-backend.log
+            ${{ runner.temp }}/lulu-rust-background.json
 
   memory:
     needs: windows
@@ -108,7 +114,7 @@ jobs:
           name: Lulu-Finity-Rust-Beta-Windows-x64
           path: ${{ runner.temp }}/lulu-memory-before
           github-token: ${{ github.token }}
-          run-id: 44243346577
+          run-id: 44436283889
       - name: Comparar RAM y procesos con la beta anterior
         shell: pwsh
         run: |

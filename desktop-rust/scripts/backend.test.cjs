@@ -15,7 +15,7 @@ async function launch(t, executable) {
   const directory = await mkdtemp(path.join(tmpdir(), 'lulu-rust-test-'));
   const child = spawn(executable, [path.join(backend, 'src/main.js')], {
     cwd: backend,
-    env: { ...process.env, APPDATA: directory, LULU_USER_DATA: directory, LULU_APP_VERSION: '1.4.0-beta.2', LULU_UPDATE_FEED: 'releases' },
+    env: { ...process.env, APPDATA: directory, LULU_USER_DATA: directory, LULU_APP_VERSION: '1.4.0-beta.3', LULU_UPDATE_FEED: 'releases' },
     stdio: ['pipe', 'pipe', 'pipe']
   });
   let diagnostics = '';
@@ -69,7 +69,7 @@ test('el backend conserva configuración, voces y widgets a través del puente d
   const node = process.platform === 'win32' ? path.join(backend, 'node.exe') : process.execPath;
   const { invoke, directory } = await launch(t, node);
   const current = await invoke('app:get-state');
-  assert.equal(current.version, '1.4.0-beta.2');
+  assert.equal(current.version, '1.4.0-beta.3');
   assert.ok(current.settings.overlayToken);
   await invoke('settings:save', { ...current.settings, username: 'lulu_test', checkUpdatesOnStartup: false });
   const saved = JSON.parse(await readFile(path.join(directory, 'settings.json'), 'utf8'));
@@ -103,9 +103,31 @@ test('la edición Rust incluye todas las localidades del catálogo de voces Micr
   assert.equal(prepareOnlineVoices(voices).length, voices.length);
 });
 
-test('el modelo local incluido genera audio en Windows', { skip: process.platform !== 'win32', timeout: 100_000 }, async t => {
+test('la voz local reutiliza un proceso y lo libera al terminar en Windows', { skip: process.platform !== 'win32', timeout: 100_000 }, async t => {
   const { invoke } = await launch(t, path.join(backend, 'node.exe'));
-  const local = await invoke('tts:synthesize-local', { voiceId: 'lulu-es-mx', text: 'Hola, prueba de voz local.' });
-  assert.ok(Buffer.from(local.data, 'base64').length > 44);
+  const say = text => invoke('tts:synthesize-local', { voiceId: 'lulu-es-mx', text });
+  const first = await say('Hola, primera prueba de voz local.');
+  const pid = (await invoke('runtime:status')).modules.localTts.pid;
+  assert.ok(pid > 0);
+  const rest = await Promise.all([say('Segunda prueba.'), say('Tercera prueba.')]);
+  assert.ok([first, ...rest].every(clip => Buffer.from(clip.data, 'base64').length > 44));
+  assert.equal((await invoke('runtime:status')).modules.localTts.pid, pid);
   await invoke('tts:release-local');
+  for (let attempt = 0; attempt < 24; attempt++) {
+    try { process.kill(pid, 0); }
+    catch (error) { if (error.code === 'ESRCH') return; throw error; }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.fail('El proceso de síntesis siguió vivo después de liberar la voz.');
+
+});
+test('el ahorro conserva reproductores activos, pausados o cargando', () => {
+  const { retainMusicWindow } = require('./music-idle-policy.cjs');
+  const window = { isDestroyed: () => false, isVisible: () => false, webContents: { isLoadingMainFrame: () => false } };
+  assert.equal(retainMusicWindow(window, {}), false);
+  for (const key of ['expectedPlaying', 'userPaused', 'replacing', 'recoveryTimer']) {
+    assert.equal(retainMusicWindow(window, { [key]: true }), true);
+  }
+  window.webContents.isLoadingMainFrame = () => true;
+  assert.equal(retainMusicWindow(window, {}), true);
 });

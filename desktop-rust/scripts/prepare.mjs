@@ -56,7 +56,7 @@ await writeFile(join(frontend, 'index.html'), html
   .replace("connect-src 'self';", "connect-src 'self' ipc: http://ipc.localhost;")
   .replace("media-src 'self' file: data: blob:", "media-src 'self' file: data: blob: http://asset.localhost")
   .replace('<script src="text-processor.js">', '<script src="desktop-bridge.js"></script>\n<script src="text-processor.js">')
-  .replace(/v1\.3\.3/g, 'v1.4.0 beta 2 Rust')
+  .replace(/v1\.3\.3/g, 'v1.4.0 beta 3 Rust')
   .replace('<link href="studio.css" rel="stylesheet"/>', '<link href="studio.css" rel="stylesheet"/><link href="rendering.css" rel="stylesheet"/>')
   .replace(/<title>[^<]*<\/title>/, '<title>Lulu Finity Rust Beta</title>'));
 
@@ -83,6 +83,30 @@ renderer = replaceOnce(renderer,
 renderer = replaceOnce(renderer,
   'Electron separa interfaz, reproductor, gráficos y servicios para mantener el aislamiento. No son ocho copias de Lulu. Spotify Web puede usar varios de estos procesos mientras reproduce.',
   'WebView2 ejecuta la interfaz, los reproductores y sus procesos de gráficos. La voz y las conexiones se atienden en el motor de Lulu.');
+renderer = replaceOnce(renderer, 'if(frame&&(refreshFrame||!frame.src||!frame.src.includes(`/ranking?slot=${selected}`)))',
+  'if(frame&&canRenderPreview(frame)&&(refreshFrame||!frame.src||!frame.src.includes(`/ranking?slot=${selected}`)))');
+renderer = replaceOnce(renderer, 'if(frame&&(refreshFrame||!frame.src||!frame.src.includes(`/widget?type=${normalized}`)))',
+  'if(frame&&canRenderPreview(frame)&&(refreshFrame||!frame.src||!frame.src.includes(`/widget?type=${normalized}`)))');
+for (const functionName of ['renderComments', 'renderLiveEvents']) {
+  renderer = replaceOnce(renderer, `function ${functionName}() {`, `function ${functionName}() {
+  if (document.hidden) return;`);
+}
+renderer = replaceOnce(renderer, 'function topLevelPages() {', `function canRenderPreview(frame) {
+  const owner = frame.closest('.page');
+  return !document.hidden && (!owner || !owner.hidden);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    for (const page of Object.keys(PAGE_PREVIEW_FRAMES)) suspendPageView(page);
+  } else {
+    renderComments();
+    renderLiveEvents();
+    if (PAGE_PREVIEW_FRAMES[state.activePage]) activatePageModules(state.activePage);
+  }
+});
+
+function topLevelPages() {`);
 await writeFile(join(frontend, 'renderer.js'), renderer);
 
 await mkdir(join(sidecar, 'src'));
@@ -98,7 +122,7 @@ await cp(join(source, 'NOTICE.md'), join(sidecar, 'NOTICE.md'));
 await cp(join(source, 'resources', 'voices'), join(sidecar, 'lulu-voices'), { recursive: true });
 await cp(join(source, 'resources', 'tools', 'cloudflared.exe'), join(sidecar, 'lulu-tools', 'cloudflared.exe'));
 await cp(join(src, 'default-sounds'), join(sidecar, 'lulu-default-sounds'), { recursive: true });
-for (const name of ['desktop-host.cjs', 'host-protocol.cjs', 'beta-updates.cjs', 'microsoft-speech.cjs', 'microsoft-voice-catalog.json']) {
+for (const name of ['desktop-host.cjs', 'host-protocol.cjs', 'voice-child.cjs', 'music-idle-policy.cjs', 'beta-updates.cjs', 'microsoft-speech.cjs', 'microsoft-voice-catalog.json']) {
   await cp(join(root, 'scripts', name), join(sidecar, 'src', name));
 }
 
@@ -128,7 +152,58 @@ main = replaceOnce(main, "    if (savedVoices.length) {\n      onlineVoiceCatalo
 main = replaceOnce(main, "return { voices: savedVoices, fallback: true, cached: true, message: friendlyUpdateError(error) };", "return { voices: onlineVoiceCatalogCache, fallback: true, cached: true, message: friendlyUpdateError(error) };");
 const oldMemoryStats = main.slice(main.indexOf('function runtimeWindowPid('), main.indexOf("ipcMain.handle('runtime:status'"));
 main = replaceOnce(main, oldMemoryStats, await readFile(join(root, 'scripts', 'runtime-memory.js'), 'utf8') + '\n');
+main = replaceOnce(main, 'let youtubeResolverIdleTimer = null;', 'let youtubeResolverIdleTimer = null;\nlet youtubeSearchInProgress = false;');
+main = replaceOnce(main, '},15000);\n  youtubeResolverIdleTimer.unref?.();', '},3000);\n  youtubeResolverIdleTimer.unref?.();');
+const originalResolver = main.slice(main.indexOf('  const run = async () => {', main.indexOf('async function resolveYoutubeRequest(')),
+  main.indexOf('\n}\n\nfunction clearYoutubeAutomation'));
+main = replaceOnce(main, originalResolver, `  const run = async () => {
+    clearTimeout(youtubeResolverIdleTimer);
+    youtubeResolverIdleTimer = null;
+    youtubeSearchInProgress = true;
+    try {
+      const win = createYoutubeResolverWindow();
+      await withTimeout(win.loadURL(searchUrl), 18000, 'YouTube tardó demasiado en abrir la búsqueda.');
+      const result = await findFirstOrganicYoutubeResult(win);
+      return { ...result, url: withYoutubeAutoplay(result.url), query };
+    } finally {
+      youtubeSearchInProgress = false;
+      scheduleYoutubeResolverRelease();
+    }
+  };
+  const task = youtubeResolveChain.then(run, run);
+  youtubeResolveChain = task.catch(() => {});
+  return task;`);
+main = replaceOnce(main, "    if(key==='music')return Boolean(details?.keepMusic);", "    if(key==='music')return nativeMusicInUse() || Boolean(details?.keepMusic);");
+main = replaceOnce(main, "  clearTimeout(youtubeResolverIdleTimer);youtubeResolverIdleTimer=null;\n  destroyWindowSafely(youtubeResolverWindow);youtubeResolverWindow=null;",
+  "  if (!youtubeSearchInProgress) {\n    clearTimeout(youtubeResolverIdleTimer); youtubeResolverIdleTimer = null;\n    destroyWindowSafely(youtubeResolverWindow); youtubeResolverWindow = null;\n  }");
+main = replaceOnce(main, "  if(preserveMusic){releaseInactiveMusicProvider(settings.musicProvider);protectedCategories.push('music');}",
+  "  if(preserveMusic){protectedCategories.push('music');}");
+main = replaceOnce(main, "function markMusicExpected(provider, expected, userPaused = false) {", `function nativeMusicInUse() {
+  const { retainMusicWindow } = require('./music-idle-policy.cjs');
+  return ['youtube', 'spotify'].some(provider => retainMusicWindow(musicWindow(provider), musicRecoveryState[provider]));
+}
+
+function markMusicExpected(provider, expected, userPaused = false) {`);
 await writeFile(join(sidecar, 'src', 'main.js'), main);
+let voiceManager = await text('local-voice-manager.js');
+voiceManager = replaceOnce(voiceManager, 'if (this.worker?.pid) return this.worker;', 'if (this.worker?.connected && this.worker.exitCode === null) return this.worker;');
+voiceManager = replaceOnce(voiceManager, '      if (!pending) return;', '      if (!pending || pending.worker !== worker) return;');
+voiceManager = replaceOnce(voiceManager,
+  "    worker.on('exit', () => {\n      if (this.worker === worker) this.worker = null;\n      for (const pending of this.pending.values()) pending.reject(new Error('El proceso de Lulu Local se cerró.'));\n      this.pending.clear();\n    });",
+  `    const handleFailure = (error) => {
+      if (this.worker === worker) this.worker = null;
+      for (const [id, pending] of this.pending) {
+        if (pending.worker !== worker) continue;
+        this.pending.delete(id);
+        pending.reject(error);
+      }
+    };
+    worker.on('exit', () => handleFailure(new Error('El proceso de Lulu Local se cerró.')));
+    worker.on('error', handleFailure);`);
+voiceManager = replaceOnce(voiceManager, '    this.idleTimer = setTimeout(() => { void this.release(); }, delay);',
+  '    this.idleTimer = setTimeout(() => {\n      if (this.pending.size) this.armIdleRelease(minutes);\n      else void this.release();\n    }, delay);');
+voiceManager = replaceOnce(voiceManager, '      this.pending.set(requestId, {', '      this.pending.set(requestId, {\n        worker,');
+await writeFile(join(sidecar, 'src', 'local-voice-manager.js'), voiceManager);
 const voiceCatalog = replaceOnce(await text('online-voice-catalog.js'),
   "const BLOCKED_LANGUAGE_PREFIXES = new Set(['cmn', 'ja', 'ko', 'wuu', 'yue', 'zh']);",
   "const BLOCKED_LANGUAGE_PREFIXES = new Set();");
@@ -147,7 +222,7 @@ delete baseline.dependencies['@ghostery/adblocker-electron'];
 baseline.dependencies['@ghostery/adblocker'] = originalLock.packages['node_modules/@ghostery/adblocker'].version;
 baseline.dependencies['node-win-x64'] = '22.23.5';
 baseline.dependencies['msedge-tts'] = '2.1.1';
-const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.2', private: true, dependencies: baseline.dependencies };
+const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.3', private: true, dependencies: baseline.dependencies };
 await writeFile(join(sidecar, 'package.json'), JSON.stringify(manifest, null, 2));
 const backendLock = join(root, 'scripts', 'backend-package-lock.json');
 await cp(backendLock, join(sidecar, 'package-lock.json'));

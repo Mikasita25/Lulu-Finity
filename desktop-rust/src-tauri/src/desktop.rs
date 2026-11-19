@@ -261,10 +261,20 @@ async fn create_window(
             let window = builder.build().map_err(error)?;
             let events = handle.state::<Host>().inner().clone();
             let event_label = label.clone();
+            #[cfg(windows)]
+            let event_app = handle.clone();
             window.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     events.event(&event_label, "close", json!([]));
+                }
+                #[cfg(windows)]
+                if let WindowEvent::Focused(focused) = event {
+                    if event_label == "main" {
+                        if let Some(window) = event_app.get_webview_window("main") {
+                            let _ = crate::webview::set_background_memory(&window, !focused);
+                        }
+                    }
                 }
             });
             #[cfg(windows)]

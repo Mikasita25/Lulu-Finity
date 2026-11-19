@@ -1,6 +1,6 @@
 [package]
 name = "lulu-finity-rust"
-version = "1.4.0-beta.2"
+version = "1.4.0-beta.3"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 

@@ -1,7 +1,7 @@
 'use strict';
 
 const { EventEmitter } = require('node:events');
-const { Worker } = require('node:worker_threads');
+const { fork } = require('node:child_process');
 const { Console } = require('node:console');
 const path = require('node:path');
 const { createHostProtocol } = require('./host-protocol.cjs');
@@ -205,16 +205,18 @@ const dialog = {
 
 const utilityProcess = {
   fork(file) {
-    const worker = new Worker(`
-      const { parentPort, workerData } = require('node:worker_threads');
-      process.parentPort = {
-        on(_event, callback) { parentPort.on('message', data => callback({ data })); },
-        postMessage(value) { parentPort.postMessage(value); }
-      };
-      require(workerData);
-    `, { eval: true, workerData: file, stdout: true });
-    worker.stdout.pipe(process.stderr);
-    worker.kill = () => { void worker.terminate(); };
+    const worker = fork(path.join(__dirname, 'voice-child.cjs'), [file], {
+      execArgv: [],
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
+      windowsHide: true
+    });
+    worker.postMessage = message => {
+      worker.send(message, error => {
+        if (error && message.requestId) {
+          worker.emit('message', { requestId: message.requestId, type: 'error', message: error.message });
+        }
+      });
+    };
     return worker;
   }
 };
