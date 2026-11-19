@@ -19,8 +19,7 @@ ipcMain.on('app:renderer-ready', async () => {
       createPlayer: createYoutubeWindow,
       expectMusic: active => { musicRecoveryState.youtube.lastProgressAt = Date.now(); markMusicExpected('youtube', active); },
       beginLive: async relayUrl => {
-        connectorModule ||= await import('tiktok-live-connector');
-        const connection = new RailwayRelayConnection('lulu_test', relayUrl, '', connectorModule);
+        const connection = new RailwayRelayConnection('lulu_test', relayUrl, '', relayEvents);
         liveConnection = connection;
         refreshAppSuspensionBlocker();
         attachLiveEvents(connection, ++liveConnectNonce);

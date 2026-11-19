@@ -128,6 +128,20 @@ for (const name of ['desktop-host.cjs', 'host-protocol.cjs', 'voice-child.cjs', 
 
 let main = await text('main.js');
 main = main.replaceAll("require('electron')", "require('./desktop-host.cjs')").replaceAll("Servicios de Electron", "Servicios del sistema");
+// Railway delivers decoded events. The desktop client only needs their names.
+main = replaceOnce(main, 'let connectorModule = null;', `const relayEvents = {
+  WebcastEvent: {
+    CHAT: 'chat', MEMBER: 'member', GIFT: 'gift', ROOM_USER: 'roomUser', LIKE: 'like',
+    EMOTE: 'emote', FOLLOW: 'follow', SHARE: 'share', STREAM_END: 'streamEnd', SUB_NOTIFY: 'subNotify'
+  },
+  ControlEvent: {
+    CONNECTED: 'connected', DISCONNECTED: 'disconnected', ERROR: 'error',
+    WEBSOCKET_CONNECTED: 'websocketConnected'
+  }
+};`);
+main = replaceOnce(main, "    if (!connectorModule) connectorModule = await import('tiktok-live-connector');\n", '');
+main = replaceOnce(main, ' = connectorModule;', ' = relayEvents;');
+main = replaceOnce(main, ', connectorModule);', ', relayEvents);');
 const installedBuild = main.slice(main.indexOf('function isLikelyInstalledBuild()'), main.indexOf('function friendlyUpdateError('));
 main = replaceOnce(main, installedBuild, "function isLikelyInstalledBuild() { return process.env.LULU_UPDATE_FEED === 'signed'; }\n\n");
 main = replaceOnce(main, "const { autoUpdater } = require('electron-updater');", "const { autoUpdater } = require('./beta-updates.cjs');");
@@ -219,6 +233,7 @@ const baseline = JSON.parse(await readFile(join(source, 'package.json'), 'utf8')
 const originalLock = JSON.parse(await readFile(join(source, 'package-lock.json'), 'utf8'));
 delete baseline.dependencies['electron-updater'];
 delete baseline.dependencies['@ghostery/adblocker-electron'];
+delete baseline.dependencies['tiktok-live-connector'];
 baseline.dependencies['@ghostery/adblocker'] = originalLock.packages['node_modules/@ghostery/adblocker'].version;
 baseline.dependencies['node-win-x64'] = '22.23.5';
 baseline.dependencies['msedge-tts'] = '2.1.1';
