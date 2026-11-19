@@ -74,7 +74,8 @@ jobs:
             $navigation = Get-Content $env:LULU_NAVIGATION_SMOKE_MARKER -Raw | ConvertFrom-Json
             if (!$navigation.ok) { $navigation | ConvertTo-Json -Depth 8; throw 'Falló la navegación o alguna vista previa.' }
           } finally {
-            if (!$process.HasExited) { Stop-Process -Id $process.Id -Force }
+            if (!$process.HasExited) { $null = & taskkill.exe /PID $process.Id /T /F }
+            Start-Sleep -Seconds 2
           }
       - uses: actions/upload-artifact@v4
         with:
@@ -95,6 +96,7 @@ jobs:
             ${{ runner.temp }}/lulu-rust-native.log
             ${{ runner.temp }}/lulu-rust-backend.log
             ${{ runner.temp }}/lulu-rust-background.json
+            ${{ runner.temp }}/lulu-rust-background.json.stderr.log
 
   memory:
     needs: windows

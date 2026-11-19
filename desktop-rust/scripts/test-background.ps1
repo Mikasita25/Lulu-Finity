@@ -45,13 +45,24 @@ ipcMain.on('app:renderer-ready', async () => {
 });
 '@ | Add-Content $backend -Encoding utf8NoBOM
 $env:LULU_BACKGROUND_SMOKE_MARKER = $Marker
-$app = Start-Process $Executable -PassThru
+$env:RUST_BACKTRACE = '1'
+$since = Get-Date
+$stderr = "$Marker.stderr.log"
+$stdout = "$Marker.stdout.log"
+$app = Start-Process $Executable -RedirectStandardError $stderr -RedirectStandardOutput $stdout -PassThru
 try {
   $limit = (Get-Date).AddSeconds(140)
   while (!(Test-Path $Marker) -and !$app.HasExited -and (Get-Date) -lt $limit) {
     Start-Sleep -Seconds 1
   }
-  if (!(Test-Path $Marker)) { throw 'La app no terminó la prueba en segundo plano.' }
+  if (!(Test-Path $Marker)) {
+    if (Test-Path $stderr) { Get-Content $stderr -Tail 35 }
+    $backendLog = Join-Path $env:APPDATA 'com.mikasita.lulufinity.rustbeta/backend.log'
+    if (Test-Path $backendLog) { Get-Content $backendLog -Tail 30 }
+    Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001; StartTime=$since} -ErrorAction SilentlyContinue |
+      Where-Object { $_.Message -match 'lulu-finity-rust\.exe' } | Select-Object -First 4 -ExpandProperty Message
+    throw "La app no terminó la prueba en segundo plano (salida: $($app.ExitCode))."
+  }
   $result = Get-Content $Marker -Raw | ConvertFrom-Json
   $result | ConvertTo-Json -Depth 4
   if (!$result.ok) { throw $result.error }
