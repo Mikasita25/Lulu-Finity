@@ -26,10 +26,15 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
     })()`);
     expectMusic(true);
     await main.webContents.executeJavaScript(`(() => {
-      window.luluProbeVoice = { started:0, completed:0, errors:[] };
+      window.luluProbeVoice = { synthesized:0, started:0, completed:0, errors:[] };
       const invoke = ipcRenderer.invoke;
       ipcRenderer.invoke = (channel, ...args) => {
         const result = invoke(channel, ...args);
+        if (channel === 'tts:synthesize-local') {
+          result.then(clip => {
+            if (clip?.bytes > 44 && clip.mimeType === 'audio/wav') window.luluProbeVoice.synthesized++;
+          }, error => window.luluProbeVoice.errors.push(String(error)));
+        }
         if (channel === 'tts:play-pcm') {
           window.luluProbeVoice.started++;
           result.then(played => {
@@ -56,23 +61,28 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
       peer.send(JSON.stringify({ type: 'WebcastChatMessage', data: { msgId, user: { userId: msgId, uniqueId: msgId }, comment } }));
     }
     async function sampleWhileReading(id, comment) {
+      const previous = await main.webContents.executeJavaScript('window.luluProbeVoice.synthesized');
       sendChat(id, comment);
       const samples = [];
       let commentState;
       for (let attempt = 0; attempt < 40; attempt++) {
         await requirePlayback(0.5);
-        samples.push(await sampleMemory());
+        const memory = await sampleMemory();
         commentState = await main.webContents.executeJavaScript(`(() => {
           const item = state.comments.find(item => item.id === ${JSON.stringify(id)});
           return { result:item?.result, reason:item?.reason, speaking:state.speaking, mode:state.settings.voiceMode, native:window.luluProbeVoice };
         })()`);
+        samples.push({ ...memory, pcmReady:commentState.native.synthesized > previous });
         if (['read', 'skipped', 'blocked'].includes(commentState.result)) break;
       }
       const peakResidentMiB = Math.max(...samples.map(sample => sample.residentMiB));
-      if (commentState.result !== 'read' || !samples.some(sample => sample.localVoiceProcess)) {
+      if (commentState.result !== 'read' || commentState.native.synthesized <= previous) {
         throw new Error(`La lectura de ${id} quedó incompleta. ${JSON.stringify({ commentState, peakResidentMiB, last: samples.at(-1) })}`);
       }
-      return { peakResidentMiB, samples };
+      const playback = samples.filter(sample => sample.pcmReady);
+      const peakAfterSynthesisMiB = Math.max(...playback.map(sample => sample.residentMiB));
+      if (!playback.some(sample => !sample.localVoiceProcess)) throw new Error('El motor de voz quedó cargado durante toda la lectura.');
+      return { peakResidentMiB, peakAfterSynthesisMiB, samples };
     }
 
     const foreground = await sampleWhileReading('ahorro-visible', 'Seguimos en directo y podemos escuchar los comentarios del chat mientras la música sigue sonando en el reproductor de Lulu.');

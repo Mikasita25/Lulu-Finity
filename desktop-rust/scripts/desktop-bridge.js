@@ -42,6 +42,38 @@ function luluMediaUrl(url) {
   }
 }
 
+function luluWebVoice(encoded, volume) {
+  const wave = atob(encoded);
+  if (wave.length < 46 || wave.slice(0, 4) !== 'RIFF' || wave.slice(36, 40) !== 'data') {
+    throw new Error('Audio local PCM inválido.');
+  }
+  const sampleRate = wave.charCodeAt(24) + (wave.charCodeAt(25) << 8) + (wave.charCodeAt(26) << 16);
+  const context = new AudioContext();
+  const source = context.createBufferSource();
+  const buffer = context.createBuffer(1, (wave.length - 44) / 2, sampleRate);
+  const samples = buffer.getChannelData(0);
+  for (let index = 0; index < samples.length; index++) {
+    const offset = 44 + index * 2;
+    const sample = wave.charCodeAt(offset) | (wave.charCodeAt(offset + 1) << 8);
+    samples[index] = ((sample << 16) >> 16) / 32768 * volume;
+  }
+  source.buffer = buffer;
+  source.connect(context.destination);
+  let stopped = false;
+  let settle;
+  const ended = new Promise(resolve => { settle = resolve; });
+  const finish = played => {
+    if (stopped) return;
+    stopped = true;
+    source.disconnect();
+    void context.close().catch(() => {});
+    settle(played);
+  };
+  source.onended = () => finish(true);
+  const started = context.resume().then(() => { if (!stopped) source.start(); });
+  return { started, ended, duration: buffer.duration, stop: () => finish(false) };
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   const titlebar = document.querySelector('.titlebar');
   titlebar?.addEventListener('pointerdown', event => {

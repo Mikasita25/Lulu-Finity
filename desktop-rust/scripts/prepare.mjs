@@ -94,6 +94,21 @@ renderer = replaceOnce(renderer, '        const { result, voiceMode:preparedMode
           } finally {
             stopNativeVoice = null;
           }
+          let playback;
+          try {
+            playback = luluWebVoice(result.data, tuning.volume);
+            stopNativeVoice = playback.stop;
+            await withSpeechTimeout(playback.started, 2500);
+            const played = await withSpeechTimeout(playback.ended, playback.duration * 1000 + 8000);
+            if (!finished) finish(played, played ? '' : 'audio detenido');
+            return;
+          } catch (error) {
+            if (finished || token !== state.speechToken) { finish(false); return; }
+            console.warn('Salida PCM de WebView2:', error);
+          } finally {
+            playback?.stop();
+            stopNativeVoice = null;
+          }
         }`);
 // Los perfiles conservan las URL file: y sólo se transforman al reproducir.
 renderer = replaceOnce(renderer, 'new Audio(url)', 'new Audio(luluMediaUrl(url))');
@@ -225,10 +240,19 @@ main = replaceOnce(main, "function markMusicExpected(provider, expected, userPau
 }
 
 function markMusicExpected(provider, expected, userPaused = false) {`);
+main = replaceOnce(main, "ipcMain.handle('tts:synthesize-local', (_event,request) => getLocalVoiceManager().synthesize(request));",
+  "ipcMain.handle('tts:synthesize-local', (_event,request) => getLocalVoiceManager().synthesize({ ...request, releaseAfterSynthesis:runtimeNeedsAppAwake() }));");
 await writeFile(join(sidecar, 'src', 'main.js'), main);
 let voiceManager = await text('local-voice-manager.js');
+voiceManager = replaceOnce(voiceManager, '    this.pending = new Map();', '    this.pending = new Map();\n    this.workerExit = null;');
 voiceManager = replaceOnce(voiceManager, 'if (this.worker?.pid) return this.worker;', 'if (this.worker?.connected && this.worker.exitCode === null) return this.worker;');
 voiceManager = replaceOnce(voiceManager, '      if (!pending) return;', '      if (!pending || pending.worker !== worker) return;');
+voiceManager = replaceOnce(voiceManager, "      if (message.type === 'result') pending.resolve(message.result);",
+  `      if (message.type === 'result') {
+        if (pending.releaseAfterSynthesis && !this.pending.size) {
+          void this.release().then(() => pending.resolve(message.result), pending.reject);
+        } else pending.resolve(message.result);
+      }`);
 voiceManager = replaceOnce(voiceManager,
   "    worker.on('exit', () => {\n      if (this.worker === worker) this.worker = null;\n      for (const pending of this.pending.values()) pending.reject(new Error('El proceso de Lulu Local se cerró.'));\n      this.pending.clear();\n    });",
   `    const handleFailure = (error) => {
@@ -244,6 +268,31 @@ voiceManager = replaceOnce(voiceManager,
 voiceManager = replaceOnce(voiceManager, '    this.idleTimer = setTimeout(() => { void this.release(); }, delay);',
   '    this.idleTimer = setTimeout(() => {\n      if (this.pending.size) this.armIdleRelease(minutes);\n      else void this.release();\n    }, delay);');
 voiceManager = replaceOnce(voiceManager, '      this.pending.set(requestId, {', '      this.pending.set(requestId, {\n        worker,');
+voiceManager = replaceOnce(voiceManager, '        worker,\n        resolve:', '        worker,\n        releaseAfterSynthesis: request.releaseAfterSynthesis === true,\n        resolve:');
+voiceManager = replaceOnce(voiceManager, '    const requestId = randomUUID();\n    const worker = this.ensureWorker();',
+  '    const requestId = randomUUID();\n    if (this.workerExit) await this.workerExit;\n    const worker = this.ensureWorker();');
+const releaseStart = voiceManager.indexOf('  async release() {');
+const oldVoiceRelease = voiceManager.slice(releaseStart, voiceManager.indexOf('\n\n  status()', releaseStart));
+voiceManager = replaceOnce(voiceManager, oldVoiceRelease, `  async release() {
+    clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+    const worker = this.worker;
+    if (!worker) return this.workerExit;
+    this.worker = null;
+    const exited = new Promise(resolve => {
+      if (worker.exitCode !== null || worker.signalCode !== null) return resolve();
+      const kill = setTimeout(() => { try { worker.kill(); } catch {} }, 250);
+      kill.unref?.();
+      worker.once('exit', () => { clearTimeout(kill); resolve(); });
+      worker.on('message', message => {
+        if (message?.type === 'released' && worker.connected) worker.disconnect();
+      });
+      try { worker.postMessage({ type: 'release' }); } catch {}
+    });
+    this.workerExit = exited;
+    try { await exited; }
+    finally { if (this.workerExit === exited) this.workerExit = null; }
+  }`);
 await writeFile(join(sidecar, 'src', 'local-voice-manager.js'), voiceManager);
 let voiceWorker = await text('local-tts-worker.js');
 voiceWorker = replaceOnce(voiceWorker, "const path = require('node:path');", "const path = require('node:path');\nconst { voiceSegments } = require('./local-tts-policy.cjs');");
