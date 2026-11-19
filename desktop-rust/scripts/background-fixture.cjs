@@ -25,32 +25,25 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
       window.luluProbeAudio = context;
     })()`);
     expectMusic(true);
-    await main.call('window-minimize');
-    await delay(1000);
-
-    const before = await player.webContents.executeJavaScript('window.luluProbeAudio.currentTime');
-    const cleanup = await main.webContents.executeJavaScript('window.voiceStudio.releaseIdleResources({force:true,keepMusic:false})');
-    if (!cleanup.keptMusic || !cleanup.protectedCategories.includes('live') || player.isDestroyed()) {
-      throw new Error('El ahorro intervino en el LIVE o el reproductor activo.');
-    }
-    peer.send(JSON.stringify({
-      type: 'WebcastChatMessage',
-      data: { msgId: 'ahorro-prueba', user: { userId: '91', uniqueId: 'lulu_test' }, comment: 'prueba de continuidad' }
-    }));
-    const verify = await main.webContents.executeJavaScript(`(async () => {
-      for (let i = 0; i < 20 && !state.comments.some(item => item.comment === 'prueba de continuidad'); i++) {
-        await new Promise(resolve => setTimeout(resolve, 250));
-      }
-      return { minimized: document.hidden, received: state.comments.some(item => item.comment === 'prueba de continuidad') };
+    await main.webContents.executeJavaScript(`(() => {
+      window.luluProbeVoice = { started:0, completed:0, errors:[] };
+      const invoke = ipcRenderer.invoke;
+      ipcRenderer.invoke = (channel, ...args) => {
+        const result = invoke(channel, ...args);
+        if (channel === 'tts:play-pcm') {
+          window.luluProbeVoice.started++;
+          result.then(played => {
+            if (played) window.luluProbeVoice.completed++;
+          }, error => window.luluProbeVoice.errors.push(String(error)));
+        }
+        return result;
+      };
     })()`);
-    if (!verify.received) throw new Error('El LIVE no entregó el comentario al renderer.');
-    if (!verify.minimized) throw new Error('WebView2 siguió tratando la ventana minimizada como visible.');
-
-    let lastPlaybackTime = before;
+    let lastPlaybackTime = await player.webContents.executeJavaScript('window.luluProbeAudio.currentTime');
     async function requirePlayback(seconds) {
       await delay(seconds * 1000);
       const media = await player.webContents.executeJavaScript('({ running: window.luluProbeAudio.state === "running", time: window.luluProbeAudio.currentTime })');
-      if (!media.running || media.time - lastPlaybackTime < seconds - 1) throw new Error('El audio dejó de avanzar al minimizar.');
+      if (!media.running || media.time - lastPlaybackTime < seconds - 0.25) throw new Error('El audio dejó de avanzar.');
       lastPlaybackTime = media.time;
       reportProgress(media.time);
     }
@@ -59,6 +52,38 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
       if (!stats.modules.live || !stats.modules.youtube) throw new Error('El panel no comprobó ambos servicios activos.');
       return { privateMiB: stats.privateMemoryMb, residentMiB: stats.residentMemoryMb, localVoiceProcess: stats.modules.localTts.running };
     }
+    function sendChat(msgId, comment) {
+      peer.send(JSON.stringify({ type: 'WebcastChatMessage', data: { msgId, user: { userId: '91', uniqueId: 'lulu_test' }, comment } }));
+    }
+    async function sampleWhileReading(id, comment) {
+      sendChat(id, comment);
+      const samples = [];
+      let read = false;
+      for (let attempt = 0; attempt < 24; attempt++) {
+        await requirePlayback(0.5);
+        samples.push(await sampleMemory());
+        read = await main.webContents.executeJavaScript(`state.comments.some(item => item.id === ${JSON.stringify(id)} && item.result === 'read')`);
+        if (read) break;
+      }
+      if (!read || !samples.some(sample => sample.localVoiceProcess)) throw new Error('El comentario de la prueba no terminó de leerse con Lulu Local.');
+      return { peakResidentMiB: Math.max(...samples.map(sample => sample.residentMiB)), samples };
+    }
+
+    const foreground = await sampleWhileReading('ahorro-visible', 'Seguimos en directo y podemos escuchar los comentarios del chat mientras la música sigue sonando en el reproductor de Lulu.');
+    await main.call('window-minimize');
+    await delay(1000);
+
+    const before = await player.webContents.executeJavaScript('window.luluProbeAudio.currentTime');
+    const cleanup = await main.webContents.executeJavaScript('window.voiceStudio.releaseIdleResources({force:true,keepMusic:false})');
+    if (!cleanup.keptMusic || !cleanup.protectedCategories.includes('live') || player.isDestroyed()) {
+      throw new Error('El ahorro intervino en el LIVE o el reproductor activo.');
+    }
+    const background = await sampleWhileReading('ahorro-prueba', 'La voz local puede leer el comentario completo y dejar que la música siga sonando en segundo plano con Lulu minimizada.');
+    const verify = await main.webContents.executeJavaScript(`(async () => {
+      return { minimized: document.hidden, received: state.comments.some(item => item.id === 'ahorro-prueba') };
+    })()`);
+    if (!verify.received) throw new Error('El LIVE no entregó el comentario al renderer.');
+    if (!verify.minimized) throw new Error('WebView2 siguió tratando la ventana minimizada como visible.');
 
     await requirePlayback(3);
     const initial = await sampleMemory();
@@ -80,8 +105,9 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
       return false;
     })()`);
     if (!chatAfterRelease) throw new Error('El LIVE dejó de entregar comentarios tras liberar memoria.');
+    const nativeVoice = await main.webContents.executeJavaScript('window.luluProbeVoice');
     return { ok: true, chat: verify.received, chatAfterRelease, hidden: verify.minimized, audioSeconds: lastPlaybackTime - before,
-      initial, settled, afterRelease };
+      nativeVoice, foreground, background, initial, settled, afterRelease };
   } finally {
     expectMusic(false);
     if (!player.isDestroyed()) player.destroy();

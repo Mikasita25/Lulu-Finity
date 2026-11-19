@@ -56,7 +56,7 @@ await writeFile(join(frontend, 'index.html'), html
   .replace("connect-src 'self';", "connect-src 'self' ipc: http://ipc.localhost;")
   .replace("media-src 'self' file: data: blob:", "media-src 'self' file: data: blob: http://asset.localhost")
   .replace('<script src="text-processor.js">', '<script src="desktop-bridge.js"></script>\n<script src="text-processor.js">')
-  .replace(/v1\.3\.3/g, 'v1.4.0 beta 4 Rust')
+  .replace(/v1\.3\.3/g, 'v1.4.0 beta 5 Rust')
   .replace('<link href="studio.css" rel="stylesheet"/>', '<link href="studio.css" rel="stylesheet"/><link href="rendering.css" rel="stylesheet"/>')
   .replace(/<title>[^<]*<\/title>/, '<title>Lulu Finity Rust Beta</title>'));
 
@@ -68,6 +68,26 @@ await writeFile(join(frontend, 'desktop-bridge.js'),
 await cp(join(root, 'scripts', 'rendering.css'), join(frontend, 'rendering.css'));
 
 let renderer = await text('renderer.js');
+renderer = replaceOnce(renderer, '    let stopAudioMonitor = null;', '    let stopAudioMonitor = null;\n    let stopNativeVoice = null;');
+renderer = replaceOnce(renderer, '    state.activeAudioCancel = () => {\n      try { window.speechSynthesis.cancel(); }',
+  '    state.activeAudioCancel = () => {\n      stopNativeVoice?.();\n      try { window.speechSynthesis.cancel(); }');
+renderer = replaceOnce(renderer, '        const { result, voiceMode:preparedMode, tuning } = preparedState.prepared;',
+  `        const { result, voiceMode:preparedMode, tuning } = preparedState.prepared;
+        if (preparedMode === 'local') {
+          const playbackId = Math.floor(performance.timeOrigin * 1000) + token;
+          stopNativeVoice = () => { void ipcRenderer.invoke('tts:stop-pcm', { id:playbackId }).catch(() => {}); };
+          try {
+            markSpeechStarted(speechItem);
+            const played = await ipcRenderer.invoke('tts:play-pcm', { id:playbackId, data:result.data, volume:tuning.volume });
+            if (!finished) finish(played, played ? '' : 'audio detenido');
+            return;
+          } catch (error) {
+            if (finished || token !== state.speechToken) { finish(false); return; }
+            console.warn('Salida de voz local de Windows:', error);
+          } finally {
+            stopNativeVoice = null;
+          }
+        }`);
 // Los perfiles conservan las URL file: y sólo se transforman al reproducir.
 renderer = replaceOnce(renderer, 'new Audio(url)', 'new Audio(luluMediaUrl(url))');
 renderer = replaceOnce(renderer, "const url = escapeHtml(String(media.url || ''));", "const url = escapeHtml(luluMediaUrl(String(media.url || '')));");
@@ -122,7 +142,7 @@ await cp(join(source, 'NOTICE.md'), join(sidecar, 'NOTICE.md'));
 await cp(join(source, 'resources', 'voices'), join(sidecar, 'lulu-voices'), { recursive: true });
 await cp(join(source, 'resources', 'tools', 'cloudflared.exe'), join(sidecar, 'lulu-tools', 'cloudflared.exe'));
 await cp(join(src, 'default-sounds'), join(sidecar, 'lulu-default-sounds'), { recursive: true });
-for (const name of ['desktop-host.cjs', 'host-protocol.cjs', 'voice-child.cjs', 'music-idle-policy.cjs', 'beta-updates.cjs', 'microsoft-speech.cjs', 'microsoft-voice-catalog.json']) {
+for (const name of ['desktop-host.cjs', 'host-protocol.cjs', 'voice-child.cjs', 'local-tts-policy.cjs', 'voice-cpu.conf', 'music-idle-policy.cjs', 'beta-updates.cjs', 'microsoft-speech.cjs', 'microsoft-voice-catalog.json']) {
   await cp(join(root, 'scripts', name), join(sidecar, 'src', name));
 }
 
@@ -218,6 +238,25 @@ voiceManager = replaceOnce(voiceManager, '    this.idleTimer = setTimeout(() => 
   '    this.idleTimer = setTimeout(() => {\n      if (this.pending.size) this.armIdleRelease(minutes);\n      else void this.release();\n    }, delay);');
 voiceManager = replaceOnce(voiceManager, '      this.pending.set(requestId, {', '      this.pending.set(requestId, {\n        worker,');
 await writeFile(join(sidecar, 'src', 'local-voice-manager.js'), voiceManager);
+let voiceWorker = await text('local-tts-worker.js');
+voiceWorker = replaceOnce(voiceWorker, "const path = require('node:path');", "const path = require('node:path');\nconst { voiceSegments } = require('./local-tts-policy.cjs');");
+voiceWorker = replaceOnce(voiceWorker, "provider: 'cpu'", "provider: 'cpu:' + path.join(__dirname, 'voice-cpu.conf')");
+voiceWorker = replaceOnce(voiceWorker,
+  "  const audio = activeTts.generate({ text: String(message.text || '').slice(0, 500), generationConfig });\n  const wave = pcm16Wave(audio.samples, audio.sampleRate);\n  return { mimeType: 'audio/wav', data: wave.toString('base64'), bytes: wave.length, sampleRate: audio.sampleRate };",
+  `  const segments = voiceSegments(String(message.text || '').slice(0, 500));
+  const clips = segments.map(text => activeTts.generate({ text, generationConfig }));
+  const { sampleRate } = clips[0];
+  const gap = Math.round(sampleRate * 0.035);
+  const length = clips.reduce((total, clip) => total + clip.samples.length, 0) + gap * (clips.length - 1);
+  const samples = new Float32Array(length);
+  let offset = 0;
+  for (const clip of clips) {
+    samples.set(clip.samples, offset);
+    offset += clip.samples.length + gap;
+  }
+  const wave = pcm16Wave(samples, sampleRate);
+  return { mimeType: 'audio/wav', data: wave.toString('base64'), bytes: wave.length, sampleRate };`);
+await writeFile(join(sidecar, 'src', 'local-tts-worker.js'), voiceWorker);
 const voiceCatalog = replaceOnce(await text('online-voice-catalog.js'),
   "const BLOCKED_LANGUAGE_PREFIXES = new Set(['cmn', 'ja', 'ko', 'wuu', 'yue', 'zh']);",
   "const BLOCKED_LANGUAGE_PREFIXES = new Set();");
@@ -237,7 +276,7 @@ delete baseline.dependencies['tiktok-live-connector'];
 baseline.dependencies['@ghostery/adblocker'] = originalLock.packages['node_modules/@ghostery/adblocker'].version;
 baseline.dependencies['node-win-x64'] = '22.23.5';
 baseline.dependencies['msedge-tts'] = '2.1.1';
-const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.4', private: true, dependencies: baseline.dependencies };
+const manifest = { name: 'lulu-finity-backend', version: '1.4.0-beta.5', private: true, dependencies: baseline.dependencies };
 await writeFile(join(sidecar, 'package.json'), JSON.stringify(manifest, null, 2));
 const backendLock = join(root, 'scripts', 'backend-package-lock.json');
 await cp(backendLock, join(sidecar, 'package-lock.json'));

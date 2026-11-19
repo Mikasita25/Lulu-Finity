@@ -49,6 +49,8 @@ pub struct Desktop {
     navigation: Mutex<HashMap<String, NavigationReply>>,
     tiktok_profile: tokio::sync::Mutex<()>,
     startup_music_profile: &'static str,
+    #[cfg(windows)]
+    streaming: std::sync::atomic::AtomicBool,
     ad_enabled: std::sync::atomic::AtomicBool,
     base_filters: RwLock<Vec<AdFilter>>,
     advanced: Mutex<Option<adblock::Engine>>,
@@ -74,6 +76,8 @@ impl Desktop {
             navigation: Mutex::default(),
             tiktok_profile: tokio::sync::Mutex::default(),
             startup_music_profile,
+            #[cfg(windows)]
+            streaming: std::sync::atomic::AtomicBool::new(false),
             ad_enabled: std::sync::atomic::AtomicBool::new(true),
             base_filters: RwLock::default(),
             advanced: Mutex::default(),
@@ -275,7 +279,8 @@ async fn create_window(
                     if let Some(window) = event_app.get_webview_window(&event_label) {
                         match event {
                             WindowEvent::Focused(focused) if main => {
-                                let _ = crate::webview::set_background_memory(&window, !focused);
+                                let streaming = event_app.state::<Desktop>().streaming.load(std::sync::atomic::Ordering::Relaxed);
+                                let _ = crate::webview::set_background_memory(&window, !focused || streaming);
                             }
                             WindowEvent::Resized(_) => {
                                 if let (Ok(visible), Ok(minimized)) =
@@ -585,7 +590,8 @@ pub async fn call(app: &AppHandle, method: &str, args: &Value) -> Reply {
             #[cfg(windows)]
             match method {
                 "window-show" | "window-focus" => {
-                    crate::webview::set_background_memory(&window, false)?
+                    let streaming = label == "main" && app.state::<Desktop>().streaming.load(std::sync::atomic::Ordering::Relaxed);
+                    crate::webview::set_background_memory(&window, streaming)?
                 }
                 "window-hide" | "window-minimize" => {
                     crate::webview::set_background_memory(&window, true)?
@@ -662,8 +668,13 @@ pub async fn call(app: &AppHandle, method: &str, args: &Value) -> Reply {
         "keep-awake" => {
             let awake = args["value"].as_bool() == Some(true);
             #[cfg(windows)]
-            app.run_on_main_thread(move || crate::webview::keep_awake(awake))
-                .map_err(error)?;
+            {
+                app.state::<Desktop>().streaming.store(awake, std::sync::atomic::Ordering::Relaxed);
+                if let Some(window) = app.get_webview_window("main") {
+                    crate::webview::set_background_memory(&window, awake || !window.is_focused().unwrap_or(true))?;
+                }
+                app.run_on_main_thread(move || crate::webview::keep_awake(awake)).map_err(error)?;
+            }
         }
         "metrics" => {
             let pid = app.state::<Host>().pid();

@@ -4,6 +4,8 @@ mod bridge;
 mod desktop;
 mod profile;
 #[cfg(windows)]
+mod voice_playback;
+#[cfg(windows)]
 mod webview;
 
 use serde_json::{json, Value};
@@ -25,6 +27,10 @@ async fn desktop_invoke(
     );
     if window.label() != "main" || !local || channel.starts_with('$') {
         return Err("Evento de escritorio fuera de Lulu Finity.".into());
+    }
+    #[cfg(windows)]
+    if matches!(channel.as_str(), "tts:play-pcm" | "tts:stop-pcm") {
+        return voice_playback::invoke(window.state(), &channel, args).await;
     }
     host.invoke(&channel, args).await
 }
@@ -66,6 +72,8 @@ fn main() {
             std::fs::create_dir_all(&data)?;
             let host = bridge::Host::start(handle, &resources, &data)?;
             handle.manage(desktop::Desktop::new(resources, data));
+            #[cfg(windows)]
+            handle.manage(voice_playback::Playback::default());
             handle.manage(host.clone());
             host.read_messages(handle.clone());
             Ok(())

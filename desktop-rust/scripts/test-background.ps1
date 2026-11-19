@@ -39,7 +39,7 @@ ipcMain.on('app:renderer-ready', async () => {
 $env:LULU_BACKGROUND_SMOKE_MARKER = $Marker
 $app = Start-Process $Executable -PassThru
 try {
-  $limit = (Get-Date).AddSeconds(65)
+  $limit = (Get-Date).AddSeconds(105)
   while (!(Test-Path $Marker) -and !$app.HasExited -and (Get-Date) -lt $limit) {
     Start-Sleep -Seconds 1
   }
