@@ -76,16 +76,16 @@ jobs:
           } finally {
             if (!$process.HasExited) { Stop-Process -Id $process.Id -Force }
           }
-      - name: Verificar LIVE y audio con la ventana minimizada
-        shell: pwsh
-        run: |
-          $exe = Join-Path $env:RUNNER_TEMP 'lulu-rust-beta/lulu-finity-rust.exe'
-          ./scripts/test-background.ps1 $exe (Join-Path $env:RUNNER_TEMP 'lulu-rust-background.json')
       - uses: actions/upload-artifact@v4
         with:
           name: Lulu-Finity-Rust-Beta-Windows-x64
           path: desktop-rust/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
           if-no-files-found: error
+      - name: Verificar LIVE y audio con la ventana minimizada
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'lulu-rust-beta/lulu-finity-rust.exe'
+          ./scripts/test-background.ps1 $exe (Join-Path $env:RUNNER_TEMP 'lulu-rust-background.json')
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

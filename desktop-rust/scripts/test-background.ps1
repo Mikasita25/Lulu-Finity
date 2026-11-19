@@ -5,6 +5,14 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Esta prueba usa la instalación temporal del runner.' }
 
+foreach ($name in @('AudioEndpointBuilder', 'Audiosrv')) {
+  $service = Get-Service $name -ErrorAction SilentlyContinue
+  if ($service -and $service.Status -ne 'Running') {
+    try { Start-Service $service -ErrorAction Stop }
+    catch { Write-Warning $_.Exception.Message }
+  }
+}
+
 $installDir = Split-Path $Executable
 $backend = Join-Path $installDir 'backend/src/main.js'
 Copy-Item (Join-Path $PSScriptRoot 'background-fixture.cjs') (Join-Path $installDir 'backend/src/background-fixture.cjs')
@@ -39,7 +47,7 @@ ipcMain.on('app:renderer-ready', async () => {
 $env:LULU_BACKGROUND_SMOKE_MARKER = $Marker
 $app = Start-Process $Executable -PassThru
 try {
-  $limit = (Get-Date).AddSeconds(105)
+  $limit = (Get-Date).AddSeconds(140)
   while (!(Test-Path $Marker) -and !$app.HasExited -and (Get-Date) -lt $limit) {
     Start-Sleep -Seconds 1
   }

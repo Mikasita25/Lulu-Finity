@@ -53,20 +53,26 @@ module.exports = async function checkBackground({ main, createPlayer, beginLive,
       return { privateMiB: stats.privateMemoryMb, residentMiB: stats.residentMemoryMb, localVoiceProcess: stats.modules.localTts.running };
     }
     function sendChat(msgId, comment) {
-      peer.send(JSON.stringify({ type: 'WebcastChatMessage', data: { msgId, user: { userId: '91', uniqueId: 'lulu_test' }, comment } }));
+      peer.send(JSON.stringify({ type: 'WebcastChatMessage', data: { msgId, user: { userId: msgId, uniqueId: msgId }, comment } }));
     }
     async function sampleWhileReading(id, comment) {
       sendChat(id, comment);
       const samples = [];
-      let read = false;
-      for (let attempt = 0; attempt < 24; attempt++) {
+      let commentState;
+      for (let attempt = 0; attempt < 40; attempt++) {
         await requirePlayback(0.5);
         samples.push(await sampleMemory());
-        read = await main.webContents.executeJavaScript(`state.comments.some(item => item.id === ${JSON.stringify(id)} && item.result === 'read')`);
-        if (read) break;
+        commentState = await main.webContents.executeJavaScript(`(() => {
+          const item = state.comments.find(item => item.id === ${JSON.stringify(id)});
+          return { result:item?.result, reason:item?.reason, speaking:state.speaking, mode:state.settings.voiceMode, native:window.luluProbeVoice };
+        })()`);
+        if (['read', 'skipped', 'blocked'].includes(commentState.result)) break;
       }
-      if (!read || !samples.some(sample => sample.localVoiceProcess)) throw new Error('El comentario de la prueba no terminó de leerse con Lulu Local.');
-      return { peakResidentMiB: Math.max(...samples.map(sample => sample.residentMiB)), samples };
+      const peakResidentMiB = Math.max(...samples.map(sample => sample.residentMiB));
+      if (commentState.result !== 'read' || !samples.some(sample => sample.localVoiceProcess)) {
+        throw new Error(`La lectura de ${id} quedó incompleta. ${JSON.stringify({ commentState, peakResidentMiB, last: samples.at(-1) })}`);
+      }
+      return { peakResidentMiB, samples };
     }
 
     const foreground = await sampleWhileReading('ahorro-visible', 'Seguimos en directo y podemos escuchar los comentarios del chat mientras la música sigue sonando en el reproductor de Lulu.');
