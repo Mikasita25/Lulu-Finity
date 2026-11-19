@@ -45,13 +45,20 @@ else run('unzip', ['-q', archive, '-d', source]);
 
 const src = join(source, 'src');
 const text = async (name) => (await readFile(join(src, name), 'utf8')).replace(/\r\n/g, '\n');
+const originalIllustration = /miku-(?:classic|dark|soft)-user\.(?:jpg|png)/g;
+const resizeReferences = value => value.replace(originalIllustration, name => name.replace(/\.(?:jpg|png)$/, '.webp'));
 const html = await text('index.html');
 const pageScripts = [...html.matchAll(/<script src="([^"]+)"/g)].map((match) => match[1]);
-for (const name of [...pageScripts, 'styles.css', 'studio.css']) await cp(join(src, name), join(frontend, name));
-for (const name of await readdir(src)) {
-  if (/\.(webp|jpg|png|svg)$/.test(name)) await cp(join(src, name), join(frontend, name));
+for (const name of [...pageScripts, 'styles.css', 'studio.css']) {
+  await writeFile(join(frontend, name), resizeReferences(await text(name)));
 }
-await writeFile(join(frontend, 'index.html'), html
+for (const name of await readdir(src)) {
+  if (/\.(webp|jpg|png|svg)$/.test(name) && resizeReferences(name) === name) await cp(join(src, name), join(frontend, name));
+}
+const visualAssets = join(root, 'scripts', 'visual-assets');
+for (const name of await readdir(visualAssets)) await cp(join(visualAssets, name), join(frontend, name));
+const sizedHtml = resizeReferences(html.replace(/(data-studio-theme="[^"]+">\s*<img src=")(miku-(?:classic|dark|soft)-user)\.(?:jpg|png)/g, '$1$2-thumb.webp'));
+await writeFile(join(frontend, 'index.html'), sizedHtml
   .replace("img-src 'self' data: https:", "img-src 'self' data: https: http://asset.localhost")
   .replace("connect-src 'self';", "connect-src 'self' ipc: http://ipc.localhost;")
   .replace("media-src 'self' file: data: blob:", "media-src 'self' file: data: blob: http://asset.localhost")
@@ -67,7 +74,7 @@ await writeFile(join(frontend, 'desktop-bridge.js'),
 
 await cp(join(root, 'scripts', 'rendering.css'), join(frontend, 'rendering.css'));
 
-let renderer = await text('renderer.js');
+let renderer = resizeReferences(await text('renderer.js'));
 renderer = replaceOnce(renderer, '    let stopAudioMonitor = null;', '    let stopAudioMonitor = null;\n    let stopNativeVoice = null;');
 renderer = replaceOnce(renderer, '    state.activeAudioCancel = () => {\n      try { window.speechSynthesis.cancel(); }',
   '    state.activeAudioCancel = () => {\n      stopNativeVoice?.();\n      try { window.speechSynthesis.cancel(); }');
