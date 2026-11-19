@@ -289,6 +289,9 @@ async fn create_window(
                                 let _ = crate::webview::set_background_memory(&window, !focused || streaming);
                             }
                             WindowEvent::Resized(_) => {
+                                if main {
+                                    event_app.state::<crate::memory_budget::Activity>().record();
+                                }
                                 if let (Ok(visible), Ok(minimized)) =
                                     (window.is_visible(), window.is_minimized())
                                 {

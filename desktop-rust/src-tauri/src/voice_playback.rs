@@ -21,6 +21,12 @@ const MAX_WAVE_BYTES: usize = 8 * 1024 * 1024;
 #[derive(Default)]
 pub struct Playback(Mutex<Ticket>);
 
+impl Playback {
+    pub fn active(&self) -> bool {
+        self.0.lock().unwrap().cancelled.is_some()
+    }
+}
+
 #[derive(Default)]
 struct Ticket {
     id: u64,
